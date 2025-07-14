@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 /**
- * @file Shared types for ShipStatic platform
+ * @file Shared types for Shipstatic platform
  * Simple, clean types that both API and SDK agree on
  */
 
@@ -115,7 +115,7 @@ export interface Account {
 // =============================================================================
 
 /**
- * All possible error types in the ShipStatic platform
+ * All possible error types in the Shipstatic platform
  * Names are developer-friendly while wire format stays consistent
  */
 export enum ErrorType {

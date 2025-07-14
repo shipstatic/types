@@ -1,13 +1,13 @@
-# ShipStatic Types
+# Shipstatic Types
 
-Shared TypeScript types and constants for the ShipStatic platform. This package provides a single source of truth for types, errors, and configuration across the ShipStatic ecosystem.
+Shared TypeScript types and constants for the Shipstatic platform. This package provides a single source of truth for types, errors, and configuration across the Shipstatic ecosystem.
 
 ## Overview
 
 This package contains all shared types used between:
-- **ShipStatic API** (`/cloudflare/api`) - Backend API on Cloudflare Workers
-- **ShipStatic SDK** (`/ship`) - Universal SDK for Node.js and Browser
-- **ShipStatic CLI** - Command-line interface
+- **Shipstatic API** (`/cloudflare/api`) - Backend API on Cloudflare Workers
+- **Shipstatic SDK** (`/ship`) - Universal SDK for Node.js and Browser
+- **Shipstatic CLI** - Command-line interface
 
 ## Core Types
 
