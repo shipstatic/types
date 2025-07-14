@@ -1,5 +1,3 @@
-/// <reference types="@cloudflare/workers-types" />
-
 /**
  * @file Shared types for Shipstatic platform
  * Simple, clean types that both API and SDK agree on
