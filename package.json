@@ -1,6 +1,6 @@
 {
   "name": "@shipstatic/types",
-  "version": "0.1.0", 
+  "version": "0.1.1", 
   "description": "Shared types for Shipstatic platform",
   "type": "module",
   "main": "./dist/index.js",
@@ -25,8 +25,18 @@
   ],
   "author": "ShipStatic",
   "license": "MIT",
+  "homepage": "https://github.com/shipstatic/types",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shipstatic/types.git"
+  },
+  "bugs": {
+    "url": "https://github.com/shipstatic/types/issues"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "devDependencies": {
-    "typescript": "^5.8.3",
-    "@cloudflare/workers-types": "^4.20241218.0"
+    "typescript": "^5.8.3"
   }
 }

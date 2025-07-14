@@ -8,17 +8,11 @@ importers:
 
   .:
     devDependencies:
-      '@cloudflare/workers-types':
-        specifier: ^4.20241218.0
-        version: 4.20250708.0
       typescript:
         specifier: ^5.8.3
         version: 5.8.3
 
 packages:
-
-  '@cloudflare/workers-types@4.20250708.0':
-    resolution: {integrity: sha512-jEIHy5lPtGFumnRWNR4tE9lZvR+E+DRGvSKe/C32uAlk9n7fjGfyCGN1QSCn7MTEZjXLWTck3K0fsmOjt6VWCQ==}
 
   typescript@5.8.3:
     resolution: {integrity: sha512-p1diW6TqL9L07nNxvRMM7hMMw4c5XOo/1ibL4aAIGmSAt9slTE1Xgw5KWuof2uTOvCg9BY7ZRi+GaF+7sfgPeQ==}
@@ -26,7 +20,5 @@ packages:
     hasBin: true
 
 snapshots:
-
-  '@cloudflare/workers-types@4.20250708.0': {}
 
   typescript@5.8.3: {}
