@@ -345,3 +345,6 @@ export interface PingResponse {
 
 // API Key Configuration
 export const API_KEY_PREFIX = 'ship-';
+
+// Deployment Configuration
+export const DEPLOYMENT_CONFIG_FILENAME = 'ship.json';
