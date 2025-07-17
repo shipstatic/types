@@ -19,6 +19,8 @@ export interface Deployment {
   totalSize: number;
   /** Current deployment status */
   status: 'pending' | 'success' | 'failed';
+  /** The deployment URL */
+  url: string;
   /** Unix timestamp (seconds) when deployment was created */
   createdAt: number;
   /** Unix timestamp (seconds) when deployment expires */
