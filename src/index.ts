@@ -239,6 +239,14 @@ export class ShipError extends Error {
     return new ShipError(ErrorType.Api, message, status, { code, data });
   }
 
+  static database(message: string, status: number = 500): ShipError {
+    return new ShipError(ErrorType.Api, message, status);
+  }
+
+  static storage(message: string, status: number = 500): ShipError {
+    return new ShipError(ErrorType.Api, message, status);
+  }
+
   // Helper getters for accessing common detail properties
   get filePath(): string | undefined {
     return this.details?.filePath;
