@@ -25,8 +25,6 @@ export interface Deployment {
   createdAt: number;
   /** Unix timestamp (seconds) when deployment expires */
   expiresAt?: number;
-  /** Unix timestamp (seconds) when deployment was verified */
-  verifiedAt?: number;
 }
 
 
