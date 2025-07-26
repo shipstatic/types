@@ -60,6 +60,8 @@ export interface Alias {
   createdAt: number;
   /** Unix timestamp (seconds) when alias was confirmed */
   confirmedAt?: number;
+  /** Whether this was a create operation (true) or update operation (false). Optional - only present in set operations */
+  isCreate?: boolean;
 }
 
 /**
