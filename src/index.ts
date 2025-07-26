@@ -54,6 +54,8 @@ export interface Alias {
   deploymentName: string;
   /** Current alias status */
   status: 'pending' | 'success' | 'failed';
+  /** The alias URL - internal (subdomain) or external (custom domain) */
+  url: string;
   /** Unix timestamp (seconds) when alias was created */
   createdAt: number;
   /** Unix timestamp (seconds) when alias was confirmed */
