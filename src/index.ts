@@ -102,11 +102,11 @@ export interface Account {
   name: string;
   /** User profile picture URL */
   picture?: string;
-  /** Account subscription status */
-  subscription: 'free' | 'active' | 'suspended';
+  /** Account plan status */
+  plan: 'free' | 'active' | 'suspended';
   /** Unix timestamp (seconds) when account was created */
   createdAt: number;
-  /** Unix timestamp (seconds) when subscription started */
+  /** Unix timestamp (seconds) when plan started */
   subscribedAt?: number;
   /** Unix timestamp (seconds) when account was suspended */
   suspendedAt?: number;
