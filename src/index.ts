@@ -14,17 +14,17 @@ export interface Deployment {
   /** The deployment ID */
   deployment: string;
   /** Number of files in this deployment */
-  filesCount: number;
+  files: number;
   /** Total size of all files in bytes */
-  totalSize: number;
+  size: number;
   /** Current deployment status */
   status: 'pending' | 'success' | 'failed';
   /** The deployment URL */
   url: string;
   /** Unix timestamp (seconds) when deployment was created */
-  createdAt: number;
+  created: number;
   /** Unix timestamp (seconds) when deployment expires */
-  expiresAt?: number;
+  expires?: number;
 }
 
 
@@ -51,15 +51,15 @@ export interface Alias {
   /** The alias name */
   alias: string;
   /** The deployment name this alias points to */
-  deploymentName: string;
+  deployment: string;
   /** Current alias status */
   status: 'pending' | 'success' | 'failed';
   /** The alias URL - internal (subdomain) or external (custom domain) */
   url: string;
   /** Unix timestamp (seconds) when alias was created */
-  createdAt: number;
+  created: number;
   /** Unix timestamp (seconds) when alias was confirmed */
-  confirmedAt?: number;
+  confirmed?: number;
   /** Whether this was a create operation (true) or update operation (false). Optional - only present in set operations */
   isCreate?: boolean;
 }
@@ -105,11 +105,11 @@ export interface Account {
   /** Account plan status */
   plan: 'free' | 'active' | 'suspended';
   /** Unix timestamp (seconds) when account was created */
-  createdAt: number;
+  created: number;
   /** Unix timestamp (seconds) when plan started */
-  subscribedAt?: number;
+  subscribed?: number;
   /** Unix timestamp (seconds) when account was suspended */
-  suspendedAt?: number;
+  suspended?: number;
 }
 
 // =============================================================================

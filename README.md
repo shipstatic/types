@@ -17,21 +17,21 @@ This package contains all shared types used between:
 // Core deployment object
 interface Deployment {
   deployment: string;         // Deployment ID
-  filesCount: number;         // Number of files
-  totalSize: number;          // Total size in bytes
+  files: number;             // Number of files
+  size: number;              // Total size in bytes
   status: 'pending' | 'success' | 'failed';
-  createdAt: number;          // Unix timestamp
-  expiresAt?: number;         // Unix timestamp
-  verifiedAt?: number;        // Unix timestamp
+  created: number;           // Unix timestamp
+  expires?: number;          // Unix timestamp
+  verified?: number;         // Unix timestamp
 }
 
 // Successful deployment response
 interface DeploySuccessResponse {
   success: true;
   deployment: string;
-  expiresAt: number;
-  filesCount: number;
-  totalSize: number;
+  expires: number;
+  files: number;
+  size: number;
 }
 
 // Deployment list response
@@ -48,10 +48,10 @@ interface DeploymentListResponse {
 // Core alias object
 interface Alias {
   alias: string;             // Alias name
-  deploymentName: string;    // Target deployment name
+  deployment: string;        // Target deployment ID
   status: 'pending' | 'success' | 'failed';
-  createdAt: number;         // Unix timestamp
-  confirmedAt?: number;      // Unix timestamp
+  created: number;           // Unix timestamp
+  confirmed?: number;        // Unix timestamp
 }
 
 // Alias list response
@@ -71,9 +71,9 @@ interface Account {
   name: string;
   picture?: string;
   subscription: 'free' | 'active' | 'suspended';
-  createdAt: number;         // Unix timestamp
-  subscribedAt?: number;     // Unix timestamp
-  suspendedAt?: number;      // Unix timestamp
+  created: number;           // Unix timestamp
+  subscribed?: number;       // Unix timestamp
+  suspended?: number;        // Unix timestamp
 }
 ```
 
