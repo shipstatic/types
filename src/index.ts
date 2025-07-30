@@ -357,6 +357,56 @@ export interface PingResponse {
 
 // API Key Configuration
 export const API_KEY_PREFIX = 'ship-';
+export const API_KEY_HEX_LENGTH = 64;
+export const API_KEY_TOTAL_LENGTH = API_KEY_PREFIX.length + API_KEY_HEX_LENGTH; // 69
 
 // Deployment Configuration
 export const DEPLOYMENT_CONFIG_FILENAME = 'ship.json';
+
+// =============================================================================
+// VALIDATION UTILITIES
+// =============================================================================
+
+/**
+ * Validate API key format
+ */
+export function validateApiKey(apiKey: string): void {
+  if (!apiKey.startsWith(API_KEY_PREFIX)) {
+    throw ShipError.validation(`API key must start with "${API_KEY_PREFIX}"`);
+  }
+  
+  if (apiKey.length !== API_KEY_TOTAL_LENGTH) {
+    throw ShipError.validation(`API key must be ${API_KEY_TOTAL_LENGTH} characters total (${API_KEY_PREFIX} + ${API_KEY_HEX_LENGTH} hex chars)`);
+  }
+  
+  const hexPart = apiKey.slice(API_KEY_PREFIX.length);
+  if (!/^[a-f0-9]{64}$/i.test(hexPart)) {
+    throw ShipError.validation(`API key must contain ${API_KEY_HEX_LENGTH} hexadecimal characters after "${API_KEY_PREFIX}" prefix`);
+  }
+}
+
+/**
+ * Validate API URL format
+ */
+export function validateApiUrl(apiUrl: string): void {
+  try {
+    const url = new URL(apiUrl);
+    
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      throw ShipError.validation('API URL must use http:// or https:// protocol');
+    }
+    
+    if (url.pathname !== '/' && url.pathname !== '') {
+      throw ShipError.validation('API URL must not contain a path');
+    }
+    
+    if (url.search || url.hash) {
+      throw ShipError.validation('API URL must not contain query parameters or fragments');
+    }
+  } catch (error) {
+    if (error instanceof ShipError) {
+      throw error;
+    }
+    throw ShipError.validation('API URL must be a valid URL');
+  }
+}
