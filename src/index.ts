@@ -410,3 +410,11 @@ export function validateApiUrl(apiUrl: string): void {
     throw ShipError.validation('API URL must be a valid URL');
   }
 }
+
+/**
+ * Validate subdomain format (deployment pattern)
+ */
+export function validateSubdomain(input: string): boolean {
+  // Deployment subdomain format: word-word-7chars (e.g. "happy-cat-abc1234")
+  return /^[a-z]+-[a-z]+-[a-z0-9]{7}$/i.test(input);
+}
