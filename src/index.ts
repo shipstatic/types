@@ -360,6 +360,11 @@ export const API_KEY_PREFIX = 'ship-';
 export const API_KEY_HEX_LENGTH = 64;
 export const API_KEY_TOTAL_LENGTH = API_KEY_PREFIX.length + API_KEY_HEX_LENGTH; // 69
 
+// Deploy Token Configuration
+export const DEPLOY_TOKEN_PREFIX = 'token-';
+export const DEPLOY_TOKEN_HEX_LENGTH = 64;
+export const DEPLOY_TOKEN_TOTAL_LENGTH = DEPLOY_TOKEN_PREFIX.length + DEPLOY_TOKEN_HEX_LENGTH; // 70
+
 // Deployment Configuration
 export const DEPLOYMENT_CONFIG_FILENAME = 'ship.json';
 
@@ -382,6 +387,24 @@ export function validateApiKey(apiKey: string): void {
   const hexPart = apiKey.slice(API_KEY_PREFIX.length);
   if (!/^[a-f0-9]{64}$/i.test(hexPart)) {
     throw ShipError.validation(`API key must contain ${API_KEY_HEX_LENGTH} hexadecimal characters after "${API_KEY_PREFIX}" prefix`);
+  }
+}
+
+/**
+ * Validate deploy token format
+ */
+export function validateDeployToken(deployToken: string): void {
+  if (!deployToken.startsWith(DEPLOY_TOKEN_PREFIX)) {
+    throw ShipError.validation(`Deploy token must start with "${DEPLOY_TOKEN_PREFIX}"`);
+  }
+  
+  if (deployToken.length !== DEPLOY_TOKEN_TOTAL_LENGTH) {
+    throw ShipError.validation(`Deploy token must be ${DEPLOY_TOKEN_TOTAL_LENGTH} characters total (${DEPLOY_TOKEN_PREFIX} + ${DEPLOY_TOKEN_HEX_LENGTH} hex chars)`);
+  }
+  
+  const hexPart = deployToken.slice(DEPLOY_TOKEN_PREFIX.length);
+  if (!/^[a-f0-9]{64}$/i.test(hexPart)) {
+    throw ShipError.validation(`Deploy token must contain ${DEPLOY_TOKEN_HEX_LENGTH} hexadecimal characters after "${DEPLOY_TOKEN_PREFIX}" prefix`);
   }
 }
 
