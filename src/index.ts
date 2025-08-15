@@ -450,8 +450,8 @@ export function validateSubdomain(input: string): boolean {
  * Request payload for SPA check endpoint
  */
 export interface SPACheckRequest {
-  /** Array of files with paths and sizes */
-  files: Array<{ path: string; size: number }>;
+  /** Array of file paths */
+  files: string[];
   /** Raw HTML content of index.html file */
   index: string;
 }
