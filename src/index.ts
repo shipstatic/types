@@ -441,3 +441,25 @@ export function validateSubdomain(input: string): boolean {
   // Deployment subdomain format: word-word-7chars (e.g. "happy-cat-abc1234")
   return /^[a-z]+-[a-z]+-[a-z0-9]{7}$/i.test(input);
 }
+
+// =============================================================================
+// SPA CHECK TYPES
+// =============================================================================
+
+/**
+ * Request payload for SPA check endpoint
+ */
+export interface SPACheckRequest {
+  /** Array of files with paths and sizes */
+  files: Array<{ path: string; size: number }>;
+  /** Raw HTML content of index.html file */
+  index: string;
+}
+
+/**
+ * Response from SPA check endpoint
+ */
+export interface SPACheckResponse {
+  /** Whether the project is detected as a Single Page Application */
+  isSPA: boolean;
+}
