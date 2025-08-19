@@ -1,6 +1,6 @@
 {
   "name": "@shipstatic/types",
-  "version": "0.1.14", 
+  "version": "0.2.0",
   "description": "Shared types for Shipstatic platform",
   "type": "module",
   "main": "./dist/index.js",
@@ -37,6 +37,7 @@
     "node": ">=20.0.0"
   },
   "devDependencies": {
+    "@types/node": "^24.3.0",
     "typescript": "^5.8.3"
   }
 }
