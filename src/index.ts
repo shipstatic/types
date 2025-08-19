@@ -1,10 +1,10 @@
 /**
- * @file Shared types for Shipstatic platform
- * Simple, clean types that both API and SDK agree on
+ * @file Shared TypeScript types, constants, and utilities for the Shipstatic platform.
+ * This package is the single source of truth for all shared data structures.
  */
 
 // =============================================================================
-// DEPLOYMENT TYPES
+// I. CORE ENTITIES
 // =============================================================================
 
 /**
@@ -18,7 +18,7 @@ export interface Deployment {
   /** Total size of all files in bytes */
   size: number;
   /** Current deployment status */
-  status: 'pending' | 'success' | 'failed';
+  status: 'pending' | 'success' | 'failed' | 'deleting';
   /** Whether deployment has configuration */
   config?: boolean;
   /** The deployment URL */
@@ -27,6 +27,8 @@ export interface Deployment {
   created: number;
   /** Unix timestamp (seconds) when deployment expires */
   expires?: number;
+  /** Unix timestamp (seconds) when deployment was verified and ready */
+  verified?: number;
 }
 
 
@@ -452,7 +454,7 @@ export function validateSubdomain(input: string): boolean {
 export interface SPACheckRequest {
   /** Array of file paths */
   files: string[];
-  /** Raw HTML content of index.html file */
+  /** HTML content of index.html file */
   index: string;
 }
 
@@ -462,4 +464,169 @@ export interface SPACheckRequest {
 export interface SPACheckResponse {
   /** Whether the project is detected as a Single Page Application */
   isSPA: boolean;
+  /** Debugging information about detection */
+  debug: {
+    /** Which tier made the detection: 'exclusions', 'inclusions', 'scoring', 'ai', or 'fallback' */
+    tier: 'exclusions' | 'inclusions' | 'scoring' | 'ai' | 'fallback';
+    /** The reason for the detection result */
+    reason: string;
+  };
+}
+
+// =============================================================================
+// STATIC FILE REPRESENTATION
+// =============================================================================
+
+/**
+ * Represents a file that has been processed and is ready for deploy.
+ * Used across the platform (API, SDK, CLI) for file operations.
+ */
+export interface StaticFile {
+  /**
+   * The content of the file.
+   * In Node.js, this is typically a `Buffer`.
+   * In the browser, this is typically a `File` or `Blob` object.
+   */
+  content: File | Buffer | Blob;
+  /**
+   * The desired path for the file on the server, relative to the deployment root.
+   * Should include the filename, e.g., `images/photo.jpg`.
+   */
+  path: string;
+  /**
+   * The original absolute file system path (primarily used in Node.js environments).
+   * This helps in debugging or associating the server path back to its source.
+   */
+  filePath?: string;
+  /**
+   * The MD5 hash (checksum) of the file's content.
+   * This is calculated by the SDK before deploy if not provided.
+   */
+  md5?: string;
+  /** The size of the file in bytes. */
+  size: number;
+}
+
+// =============================================================================
+// PLATFORM CONFIGURATION
+// =============================================================================
+
+/**
+ * Standard platform configuration format used by all clients
+ */
+export interface PlatformConfig {
+  apiUrl?: string;
+  deployToken?: string;
+  apiKey?: string;
+}
+
+// =============================================================================
+// PLATFORM CONSTANTS
+// =============================================================================
+
+/** Default API URL if not otherwise configured. */
+export const DEFAULT_API = 'https://api.shipstatic.com';
+
+// =============================================================================
+// RESOURCE INTERFACE CONTRACTS
+// =============================================================================
+
+/**
+ * Universal deploy input type for all environments.
+ * - File[] | FileList: Browser environments (file upload)
+ * - string: Node.js environments (file/directory path)
+ */
+export type DeployInput = File[] | FileList | string;
+
+/**
+ * Deployment resource interface - the contract all implementations must follow
+ */
+export interface DeploymentResource {
+  create: (input: DeployInput, options?: any) => Promise<Deployment>;
+  list: () => Promise<DeploymentListResponse>;
+  remove: (id: string) => Promise<void>;
+  get: (id: string) => Promise<Deployment>;
+}
+
+/**
+ * Alias resource interface - the contract all implementations must follow
+ */
+export interface AliasResource {
+  set: (aliasName: string, deployment: string) => Promise<Alias>;
+  get: (aliasName: string) => Promise<Alias>;
+  list: () => Promise<AliasListResponse>;
+  remove: (aliasName: string) => Promise<void>;
+  check: (aliasName: string) => Promise<{ message: string }>;
+}
+
+/**
+ * Account resource interface - the contract all implementations must follow
+ */
+export interface AccountResource {
+  get: () => Promise<Account>;
+}
+
+/**
+ * Keys resource interface - the contract all implementations must follow
+ */
+export interface KeysResource {
+  create: () => Promise<{ apiKey: string }>;
+}
+
+// =============================================================================
+// FILE UPLOAD TYPES
+// =============================================================================
+
+/**
+ * Represents a file that has been uploaded and stored
+ */
+export interface UploadedFile {
+  key: string;
+  etag: string;
+  size: number;
+  validated?: boolean;
+}
+
+/**
+ * Upload/deployment status enum
+ */
+export enum UploadStatus {
+  PENDING = 'pending',
+  SUCCESS = 'success',
+  FAILED = 'failed',
+  DELETING = 'deleting'
+}
+
+/**
+ * Rate limiting data structure
+ */
+export interface RateLimitData {
+  count: number;
+  timestamp: number;
+}
+
+// =============================================================================
+// URL GENERATION UTILITIES
+// =============================================================================
+
+/**
+ * Generate deployment URL from deployment ID and sites domain
+ */
+export function generateDeploymentUrl(deployment: string, sitesDomain?: string): string {
+  const domain = sitesDomain || 'statichost.com';
+  return `https://${deployment}.${domain}`;
+}
+
+/**
+ * Generate alias URL based on whether it's internal (subdomain) or external (custom domain)
+ */
+export function generateAliasUrl(alias: string, sitesDomain?: string): string {
+  // If alias contains dots, it's an external domain
+  if (alias.includes('.')) {
+    return `https://${alias}`;
+  }
+  
+  // Otherwise it's an internal subdomain
+  const domain = sitesDomain || 'statichost.dev';
+  return `https://${alias}.${domain}`;
 }

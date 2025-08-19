@@ -1,6 +1,6 @@
-# Shipstatic Types
+# @shipstatic/types
 
-Shared TypeScript types and constants for the Shipstatic platform. This package provides a single source of truth for types, errors, and configuration across the Shipstatic ecosystem.
+Shared TypeScript types, constants, and utilities for the Shipstatic platform. This package is the single source of truth for all shared data structures used across the API, SDK, and CLI.
 
 ## Overview
 
@@ -9,82 +9,146 @@ This package contains all shared types used between:
 - **Shipstatic SDK** (`/ship`) - Universal SDK for Node.js and Browser
 - **Shipstatic CLI** - Command-line interface
 
-## Core Types
+## Core Entities
 
-### Deployment Types
+### Deployment
 
 ```typescript
-// Core deployment object
 interface Deployment {
-  deployment: string;         // Deployment ID
-  files: number;             // Number of files
-  size: number;              // Total size in bytes
-  status: 'pending' | 'success' | 'failed';
-  created: number;           // Unix timestamp
-  expires?: number;          // Unix timestamp
-  verified?: number;         // Unix timestamp
-}
-
-// Successful deployment response
-interface DeploySuccessResponse {
-  success: true;
-  deployment: string;
-  expires: number;
-  files: number;
-  size: number;
-}
-
-// Deployment list response
-interface DeploymentListResponse {
-  deployments: Deployment[];
-  cursor?: string;
-  total?: number;
+  deployment: string;           // Deployment ID (e.g., "happy-cat-abc1234")
+  files: number;               // Number of files in deployment
+  size: number;                // Total size in bytes
+  status: 'pending' | 'success' | 'failed' | 'deleting';
+  config?: boolean;            // Whether deployment has ship.json
+  url: string;                 // Deployment URL
+  created: number;             // Unix timestamp (seconds)
+  expires?: number;            // Unix timestamp (seconds)
+  verified?: number;           // Unix timestamp (seconds) when verified
 }
 ```
 
-### Alias Types
+### Alias
 
 ```typescript
-// Core alias object
 interface Alias {
-  alias: string;             // Alias name
-  deployment: string;        // Target deployment ID
+  alias: string;               // Alias name (subdomain or custom domain)
+  deployment: string;          // Target deployment ID
   status: 'pending' | 'success' | 'failed';
-  created: number;           // Unix timestamp
-  confirmed?: number;        // Unix timestamp
+  url: string;                 // Alias URL
+  created: number;             // Unix timestamp (seconds)
+  confirmed?: number;          // Unix timestamp (seconds) when confirmed
+  isCreate?: boolean;          // Present in set operations only
+}
+```
+
+### Account
+
+```typescript
+interface Account {
+  email: string;               // User email address
+  name: string;                // User display name
+  picture?: string;            // Profile picture URL
+  plan: 'free' | 'active' | 'suspended';  // Account plan status
+  created: number;             // Unix timestamp (seconds)
+  subscribed?: number;         // Unix timestamp (seconds) when plan started
+  suspended?: number;          // Unix timestamp (seconds) when suspended
+}
+```
+
+### Static File
+
+```typescript
+interface StaticFile {
+  content: File | Buffer | Blob;  // File content
+  path: string;                   // Server path (e.g., "assets/style.css")
+  filePath?: string;              // Original filesystem path (Node.js)
+  md5?: string;                   // MD5 hash of content
+  size: number;                   // File size in bytes
+}
+```
+
+## API Response Types
+
+### Success Responses
+
+```typescript
+interface DeploymentListResponse {
+  deployments: Deployment[];
+  cursor?: string;             // Pagination cursor
+  total?: number;              // Total count if available
 }
 
-// Alias list response
 interface AliasListResponse {
   aliases: Alias[];
   cursor?: string;
   total?: number;
 }
-```
 
-### Account Types
-
-```typescript
-// Core account object
-interface Account {
-  email: string;
-  name: string;
-  picture?: string;
-  subscription: 'free' | 'active' | 'suspended';
-  created: number;           // Unix timestamp
-  subscribed?: number;       // Unix timestamp
-  suspended?: number;        // Unix timestamp
+interface SuccessResponse<T = any> {
+  success: true;
+  data: T;
 }
 ```
 
-### Platform Configuration
+### Configuration
 
 ```typescript
-// Dynamic platform configuration from API
 interface ConfigResponse {
-  maxFileSize: number;       // Maximum file size in bytes
-  maxFilesCount: number;     // Maximum files per deployment
-  maxTotalSize: number;      // Maximum total deployment size
+  maxFileSize: number;         // Maximum file size in bytes
+  maxFilesCount: number;       // Maximum files per deployment
+  maxTotalSize: number;        // Maximum total deployment size
+}
+
+interface PlatformConfig {
+  apiUrl?: string;
+  deployToken?: string;
+  apiKey?: string;
+}
+```
+
+### SPA Detection
+
+```typescript
+interface SPACheckRequest {
+  files: string[];             // Array of file paths
+  index: string;               // Index file path
+}
+
+interface SPACheckResponse {
+  isSPA: boolean;              // Whether it's detected as SPA
+  debug: {
+    tier: 'exclusions' | 'inclusions' | 'scoring' | 'ai' | 'fallback';
+    reason: string;
+  };
+}
+```
+
+## Resource Interface Contracts
+
+These interfaces define the contracts that all SDK implementations must follow:
+
+```typescript
+interface DeploymentResource {
+  create: (input: DeployInput, options?: any) => Promise<Deployment>;
+  list: () => Promise<DeploymentListResponse>;
+  remove: (id: string) => Promise<void>;
+  get: (id: string) => Promise<Deployment>;
+}
+
+interface AliasResource {
+  set: (aliasName: string, deployment: string) => Promise<Alias>;
+  get: (aliasName: string) => Promise<Alias>;
+  list: () => Promise<AliasListResponse>;
+  remove: (aliasName: string) => Promise<void>;
+  check: (aliasName: string) => Promise<{ message: string }>;
+}
+
+interface AccountResource {
+  get: () => Promise<Account>;
+}
+
+interface KeysResource {
+  create: () => Promise<{ apiKey: string }>;
 }
 ```
 
@@ -93,7 +157,6 @@ interface ConfigResponse {
 ### Unified Error Handling
 
 ```typescript
-// All possible error types
 enum ErrorType {
   Validation = "validation_failed",
   NotFound = "not_found",
@@ -107,7 +170,6 @@ enum ErrorType {
   Config = "config_error"
 }
 
-// Standard error response format
 interface ErrorResponse {
   error: ErrorType;
   message: string;
@@ -115,7 +177,6 @@ interface ErrorResponse {
   details?: any;
 }
 
-// Unified error class for both API and SDK
 class ShipError extends Error {
   constructor(
     public readonly type: ErrorType,
@@ -128,72 +189,102 @@ class ShipError extends Error {
   static validation(message: string, details?: any): ShipError;
   static notFound(resource: string, id?: string): ShipError;
   static authentication(message?: string): ShipError;
-  static client(message: string, details?: any): ShipError;
+  static business(message: string, status?: number): ShipError;
+  static network(message: string, cause?: Error): ShipError;
+  static api(message?: string, status?: number): ShipError;
   
   // Helper methods
   isClientError(): boolean;
   isNetworkError(): boolean;
   isAuthError(): boolean;
+  toResponse(): ErrorResponse;
 }
 ```
 
-## Platform Configuration
-
-### Shared Constants
+## Platform Constants
 
 ```typescript
-// Server-side platform configuration
-export const serverConfig = {
-  /** Maximum individual file size in bytes (10MB) */
-  maxFileSize: 10 * 1024 * 1024,
-  /** Maximum number of files per deployment */
-  maxFilesCount: 1000,
-  /** Maximum total deployment size in bytes (100MB) */
-  maxTotalSize: 100 * 1024 * 1024,
-  /** Deployment expiry in hours */
-  deploymentExpiryHours: 168, // 7 days
-  /** Pagination limits */
-  defaultLimit: 50,
-  maxLimit: 100,
+// API configuration
+const DEFAULT_API = 'https://api.shipstatic.com';
+
+// Server configuration limits
+const serverConfig = {
+  maxFileSize: 10 * 1024 * 1024,        // 10MB
+  maxFilesCount: 1000,                  // Files per deployment
+  maxTotalSize: 100 * 1024 * 1024,      // 100MB total
+  deploymentExpiryHours: 168,           // 7 days
+  defaultLimit: 50,                     // Pagination default
+  maxLimit: 100,                        // Pagination maximum
 } as const;
 
-// Client-side configuration - conservative defaults for SDK/CLI
-export const clientConfig = {
-  /** Conservative file size limit for client validation (5MB) */
-  maxFileSize: 5 * 1024 * 1024,
-  /** Conservative file count limit for client validation */
-  maxFilesCount: 100,
-  /** Conservative total size limit for client validation (25MB) */
-  maxTotalSize: 25 * 1024 * 1024,
-} as const;
+// API key format validation
+const API_KEY_PREFIX = 'ship-';
+const API_KEY_HEX_LENGTH = 64;
+const API_KEY_TOTAL_LENGTH = 69; // 'ship-' + 64 hex chars
 ```
 
-### Dynamic Configuration
+## Upload Types
 
-The platform provides dynamic configuration through the API's `/config` endpoint:
+```typescript
+enum UploadStatus {
+  PENDING = 'pending',
+  SUCCESS = 'success',
+  FAILED = 'failed',
+  DELETING = 'deleting'
+}
 
-```json
-{
-  "maxFileSize": 10485760,     // 10MB
-  "maxFilesCount": 1000,       // Files per deployment  
-  "maxTotalSize": 104857600    // 100MB total
+interface UploadedFile {
+  key: string;                 // Storage key
+  etag: string;                // ETag from storage
+  size: number;                // File size in bytes
+  validated?: boolean;         // Whether file was validated
+}
+
+interface RateLimitData {
+  count: number;               // Current request count
+  timestamp: number;           // Window start timestamp
 }
 ```
 
-**Benefits:**
-- **Single source of truth** - Configuration defined once in `serverConfig`
-- **Dynamic updates** - API can adjust limits without code changes
-- **SDK synchronization** - SDK automatically fetches current limits
-- **Type safety** - Shared `ConfigResponse` interface ensures consistency
-
-## Usage
-
-### In Ship API
+## Validation Utilities
 
 ```typescript
-import { serverConfig, ShipError, type ConfigResponse } from '@shipstatic/types';
+// Validate API key format
+function validateApiKey(apiKey: string): void;
 
-// Use shared configuration constants
+// Validate deploy token format  
+function validateDeployToken(deployToken: string): void;
+
+// Validate API URL format
+function validateApiUrl(apiUrl: string): void;
+
+// Validate deployment subdomain format
+function validateSubdomain(input: string): boolean;
+```
+
+## URL Generation
+
+```typescript
+// Generate deployment URL
+function generateDeploymentUrl(deployment: string, sitesDomain?: string): string;
+
+// Generate alias URL (handles both subdomains and custom domains)
+function generateAliasUrl(alias: string, sitesDomain?: string): string;
+```
+
+## Usage Examples
+
+### In the API
+
+```typescript
+import { 
+  serverConfig, 
+  ShipError, 
+  type ConfigResponse,
+  type Deployment 
+} from '@shipstatic/types';
+
+// Use shared configuration
 const config: ConfigResponse = {
   maxFileSize: serverConfig.maxFileSize,
   maxFilesCount: serverConfig.maxFilesCount,
@@ -201,32 +292,45 @@ const config: ConfigResponse = {
 };
 
 // Use unified error handling
-throw ShipError.validation('File too large', { maxSize: serverConfig.maxFileSize });
+throw ShipError.validation('File too large', { 
+  maxSize: serverConfig.maxFileSize 
+});
 ```
 
-### In Ship SDK
+### In the SDK
 
 ```typescript
-import { ShipError, type ConfigResponse, type DeploySuccessResponse } from '@shipstatic/types';
+import { 
+  ShipError, 
+  type ConfigResponse, 
+  type DeploymentListResponse,
+  generateDeploymentUrl
+} from '@shipstatic/types';
 
-// Receive platform configuration
-const config: ConfigResponse = await api.getConfig();
+// Handle API responses
+const deployments: DeploymentListResponse = await api.listDeployments();
+
+// Generate URLs consistently
+const url = generateDeploymentUrl('happy-cat-abc1234');
 
 // Handle errors consistently
 try {
-  const result: DeploySuccessResponse = await deploy(files);
+  const result = await deploy(files);
 } catch (error) {
-  if (error instanceof ShipError) {
-    // Handle Ship-specific errors
+  if (error instanceof ShipError && error.isClientError()) {
+    // Handle client errors
   }
 }
 ```
 
 ## Installation
 
-This package is automatically installed as a dependency of the Ship SDK and API:
+This package is automatically installed as a dependency:
 
 ```bash
+# Included with Ship SDK
+npm install @shipstatic/ship
+
 # Direct installation (if needed)
 npm install @shipstatic/types
 ```
@@ -236,40 +340,34 @@ npm install @shipstatic/types
 ### Design Principles
 
 - **Single source of truth** - All types defined once, used everywhere
-- **Type safety** - Strict TypeScript with no `any` types
-- **Wire format compatibility** - Types match API request/response formats
+- **Type safety** - Strict TypeScript with comprehensive validation
+- **Wire format compatibility** - Types match actual API contracts
 - **Error consistency** - Unified error handling across all components
-- **Configuration sharing** - Shared constants prevent drift
-
-### Package Structure
-
-```
-/types/src/
-└── index.ts              # All types and exports in single file
-```
+- **Platform contracts** - Resource interfaces define SDK behavior
 
 ### Type Organization
 
-All types are organized in a single `index.ts` file by category:
+All types are organized in a single `src/index.ts` file by category:
 
-- **Core entities** - Deployment, Alias, Account objects
-- **API responses** - Success/error response wrappers  
-- **Configuration** - `serverConfig` and `clientConfig` with platform limits
-- **Error system** - Unified `ShipError` class with factory methods
-- **Common patterns** - Shared response formats and interfaces
+1. **Core entities** - Deployment, Alias, Account objects
+2. **API responses** - Response wrappers and pagination
+3. **Resource contracts** - SDK interface definitions
+4. **Error system** - Unified ShipError class and error types
+5. **Platform configuration** - Shared constants and validation
+6. **Upload types** - File handling and status enums
+7. **Utility functions** - URL generation and validation
 
 ## Philosophy
 
 This package follows the **"Impossible Simplicity"** principle:
 
-- **Do more with less** - Maximum type safety with minimal complexity
-- **Single source of truth** - Types defined once, used everywhere
-- **Wire format compatibility** - Types match actual API contracts
-- **Developer experience** - Clear, predictable type interfaces
+- **Clear contracts** - Types define platform behavior
+- **Zero duplication** - Single source prevents drift
+- **Developer experience** - Predictable, well-documented interfaces
 - **Maintainability** - Easy to update types across entire platform
 
-**Result:** Type-safe development across the entire Ship platform with zero type drift between components.
+The result is type-safe development across the entire Shipstatic platform with guaranteed consistency between API, SDK, and CLI components.
 
 ---
 
-**Ship Types** - Shared types for the Ship platform 🚢
+**@shipstatic/types** - The foundation of type safety for Shipstatic 🚢
