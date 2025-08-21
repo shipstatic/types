@@ -189,11 +189,16 @@ export class ShipError extends Error {
 
   /** Convert to wire format */
   toResponse(): ErrorResponse {
+    // For security, exclude internal details from authentication errors in API responses
+    const details = this.type === ErrorType.Authentication && this.details?.internal 
+      ? undefined 
+      : this.details;
+      
     return {
       error: this.type,
       message: this.message,
       status: this.status,
-      details: this.details
+      details
     };
   }
 
@@ -216,8 +221,8 @@ export class ShipError extends Error {
     return new ShipError(ErrorType.RateLimit, message, 429);
   }
 
-  static authentication(message: string = "Authentication required"): ShipError {
-    return new ShipError(ErrorType.Authentication, message, 401);
+  static authentication(message: string = "Authentication required", details?: any): ShipError {
+    return new ShipError(ErrorType.Authentication, message, 401, details);
   }
 
 
