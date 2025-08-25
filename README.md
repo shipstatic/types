@@ -50,8 +50,6 @@ interface Account {
   picture?: string;            // Profile picture URL
   plan: 'free' | 'active' | 'suspended';  // Account plan status
   created: number;             // Unix timestamp (seconds)
-  subscribed?: number;         // Unix timestamp (seconds) when plan started
-  suspended?: number;          // Unix timestamp (seconds) when suspended
 }
 ```
 
@@ -212,7 +210,7 @@ const serverConfig = {
   maxFileSize: 10 * 1024 * 1024,        // 10MB
   maxFilesCount: 1000,                  // Files per deployment
   maxTotalSize: 100 * 1024 * 1024,      // 100MB total
-  deploymentExpiryHours: 168,           // 7 days
+  deploymentExpiryHours: 120,           // 5 days
   defaultLimit: 50,                     // Pagination default
   maxLimit: 100,                        // Pagination maximum
 } as const;
