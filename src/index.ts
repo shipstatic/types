@@ -17,8 +17,8 @@ export interface Deployment {
   files: number;
   /** Total size of all files in bytes */
   size: number;
-  /** Current deployment status */
-  status: 'pending' | 'success' | 'failed' | 'deleting';
+  /** Current deployment status - computed from verified field */
+  status: 'incomplete' | 'complete';
   /** Whether deployment has configuration */
   config?: boolean;
   /** The deployment URL */
@@ -110,10 +110,6 @@ export interface Account {
   plan: 'free' | 'active' | 'suspended';
   /** Unix timestamp (seconds) when account was created */
   created: number;
-  /** Unix timestamp (seconds) when plan started */
-  subscribed?: number;
-  /** Unix timestamp (seconds) when account was suspended */
-  suspended?: number;
 }
 
 // =============================================================================
@@ -313,7 +309,7 @@ export const serverConfig = {
   /** Maximum total deployment size in bytes (100MB) */
   maxTotalSize: 100 * 1024 * 1024,
   /** Deployment expiry in hours */
-  deploymentExpiryHours: 168, // 7 days
+  deploymentExpiryHours: 120, // 5 days
   /** Pagination limits */
   defaultLimit: 50,
   maxLimit: 100,
@@ -593,13 +589,11 @@ export interface UploadedFile {
 }
 
 /**
- * Upload/deployment status enum
+ * Deployment status - computed from verified timestamp
  */
-export enum UploadStatus {
-  PENDING = 'pending',
-  SUCCESS = 'success',
-  FAILED = 'failed',
-  DELETING = 'deleting'
+export enum DeploymentStatus {
+  INCOMPLETE = 'incomplete',  // verified IS NULL
+  COMPLETE = 'complete'       // verified IS NOT NULL
 }
 
 /**
