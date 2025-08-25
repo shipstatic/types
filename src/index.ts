@@ -589,11 +589,13 @@ export interface UploadedFile {
 }
 
 /**
- * Deployment status - computed from verified timestamp
+ * Deployment status enumeration
  */
 export enum DeploymentStatus {
-  INCOMPLETE = 'incomplete',  // verified IS NULL
-  COMPLETE = 'complete'       // verified IS NOT NULL
+  PENDING = 'pending',
+  SUCCESS = 'success',
+  FAILED = 'failed',
+  DELETING = 'deleting'
 }
 
 /**
