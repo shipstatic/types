@@ -8,27 +8,41 @@
 // =============================================================================
 
 /**
+ * Deployment status constants
+ */
+export const DeploymentStatus = {
+  PENDING: 'pending',
+  SUCCESS: 'success',
+  FAILED: 'failed',
+  DELETING: 'deleting'
+} as const;
+
+export type DeploymentStatusType = typeof DeploymentStatus[keyof typeof DeploymentStatus];
+
+/**
  * Core deployment object - used in both API responses and SDK
  */
 export interface Deployment {
   /** The deployment ID */
-  deployment: string;
+  readonly deployment: string;
   /** Number of files in this deployment */
-  files: number;
+  readonly files: number;
   /** Total size of all files in bytes */
-  size: number;
-  /** Current deployment status - computed from verified field */
-  status: 'incomplete' | 'complete';
+  readonly size: number;
+  /** Current deployment status */
+  status: DeploymentStatusType; // Mutable - can be updated
   /** Whether deployment has configuration */
-  config?: boolean;
+  readonly config?: boolean;
   /** The deployment URL */
-  url: string;
+  readonly url: string;
   /** Unix timestamp (seconds) when deployment was created */
-  created: number;
+  readonly created: number;
   /** Unix timestamp (seconds) when deployment expires */
-  expires?: number;
+  expires?: number; // Mutable - can be updated
   /** Unix timestamp (seconds) when deployment was verified and ready */
-  verified?: number;
+  verified?: number; // Mutable - can be updated  
+  /** Short-lived JWT token for claiming this deployment (only present for public deployments) */
+  claimToken?: string; // Mutable - can be updated
 }
 
 
@@ -49,23 +63,34 @@ export interface DeploymentListResponse {
 // =============================================================================
 
 /**
+ * Alias status constants
+ */
+export const AliasStatus = {
+  PENDING: 'pending',
+  SUCCESS: 'success',
+  FAILED: 'failed'
+} as const;
+
+export type AliasStatusType = typeof AliasStatus[keyof typeof AliasStatus];
+
+/**
  * Core alias object - used in both API responses and SDK
  */
 export interface Alias {
   /** The alias name */
-  alias: string;
+  readonly alias: string;
   /** The deployment name this alias points to */
-  deployment: string;
+  deployment: string; // Mutable - can be updated to point to different deployment
   /** Current alias status */
-  status: 'pending' | 'success' | 'failed';
+  status: AliasStatusType; // Mutable - can be updated
   /** The alias URL - internal (subdomain) or external (custom domain) */
-  url: string;
+  readonly url: string;
   /** Unix timestamp (seconds) when alias was created */
-  created: number;
+  readonly created: number;
+  /** Whether this was a create (201) or update (200) operation */
+  readonly isCreate?: boolean;
   /** Unix timestamp (seconds) when alias was confirmed */
-  confirmed?: number;
-  /** Whether this was a create operation (true) or update operation (false). Optional - only present in set operations */
-  isCreate?: boolean;
+  confirmed?: number; // Mutable - can be updated
 }
 
 /**
@@ -97,6 +122,18 @@ export interface DeploymentRemoveResponse {
 // =============================================================================
 
 /**
+ * Account plan constants
+ */
+export const AccountPlan = {
+  FREE: 'free',
+  PAID: 'paid',
+  PARTNER: 'partner',
+  BLOCKED: 'blocked'
+} as const;
+
+export type AccountPlanType = typeof AccountPlan[keyof typeof AccountPlan];
+
+/**
  * Core account object - used in both API responses and SDK
  */
 export interface Account {
@@ -107,9 +144,11 @@ export interface Account {
   /** User profile picture URL */
   picture?: string;
   /** Account plan status */
-  plan: 'free' | 'active' | 'suspended';
+  plan: AccountPlanType;
   /** Unix timestamp (seconds) when account was created */
   created: number;
+  /** Unix timestamp (seconds) when account was activated (first deployment) */
+  activated?: number;
 }
 
 // =============================================================================
@@ -298,22 +337,6 @@ export class ShipError extends Error {
 // CONFIGURATION CONSTANTS
 // =============================================================================
 
-/**
- * Server-side platform configuration - enforced limits on the platform
- */
-export const serverConfig = {
-  /** Maximum individual file size in bytes (10MB) */
-  maxFileSize: 10 * 1024 * 1024,
-  /** Maximum number of files per deployment */
-  maxFilesCount: 1000,
-  /** Maximum total deployment size in bytes (100MB) */
-  maxTotalSize: 100 * 1024 * 1024,
-  /** Deployment expiry in hours */
-  deploymentExpiryHours: 120, // 5 days
-  /** Pagination limits */
-  defaultLimit: 50,
-  maxLimit: 100,
-} as const;
 
 
 
@@ -586,16 +609,6 @@ export interface UploadedFile {
   etag: string;
   size: number;
   validated?: boolean;
-}
-
-/**
- * Deployment status enumeration
- */
-export enum DeploymentStatus {
-  PENDING = 'pending',
-  SUCCESS = 'success',
-  FAILED = 'failed',
-  DELETING = 'deleting'
 }
 
 /**
