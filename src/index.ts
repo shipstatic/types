@@ -128,7 +128,9 @@ export const AccountPlan = {
   FREE: 'free',
   PAID: 'paid',
   PARTNER: 'partner',
-  BLOCKED: 'blocked'
+  SUSPENDED: 'suspended',
+  TERMINATING: 'terminating',
+  TERMINATED: 'terminated'
 } as const;
 
 export type AccountPlanType = typeof AccountPlan[keyof typeof AccountPlan];
@@ -390,6 +392,15 @@ export const API_KEY_TOTAL_LENGTH = API_KEY_PREFIX.length + API_KEY_HEX_LENGTH; 
 export const DEPLOY_TOKEN_PREFIX = 'token-';
 export const DEPLOY_TOKEN_HEX_LENGTH = 64;
 export const DEPLOY_TOKEN_TOTAL_LENGTH = DEPLOY_TOKEN_PREFIX.length + DEPLOY_TOKEN_HEX_LENGTH; // 70
+
+// Authentication Method Constants
+export const AuthMethod = {
+  JWT: 'jwt',
+  API_KEY: 'apiKey', 
+  TOKEN: 'token'
+} as const;
+
+export type AuthMethodType = typeof AuthMethod[keyof typeof AuthMethod];
 
 // Deployment Configuration
 export const DEPLOYMENT_CONFIG_FILENAME = 'ship.json';
