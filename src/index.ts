@@ -67,7 +67,8 @@ export interface DeploymentListResponse {
  */
 export const AliasStatus = {
   PENDING: 'pending',
-  SUCCESS: 'success',
+  PARTIAL: 'partial',
+  CONFIRMED: 'confirmed',
   FAILED: 'failed'
 } as const;
 
