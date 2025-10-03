@@ -33,6 +33,8 @@ export interface Deployment {
   status: DeploymentStatusType; // Mutable - can be updated
   /** Whether deployment has configuration */
   readonly config?: boolean;
+  /** Optional array of tags for categorization and filtering (lowercase, alphanumeric with separators) */
+  tags?: string[];
   /** The deployment URL */
   readonly url: string;
   /** Unix timestamp (seconds) when deployment was created */
@@ -40,7 +42,7 @@ export interface Deployment {
   /** Unix timestamp (seconds) when deployment expires */
   expires?: number; // Mutable - can be updated
   /** Unix timestamp (seconds) when deployment was verified and ready */
-  verified?: number; // Mutable - can be updated  
+  verified?: number; // Mutable - can be updated
   /** Short-lived JWT token for claiming this deployment (only present for public deployments) */
   claimToken?: string; // Mutable - can be updated
 }
@@ -84,6 +86,8 @@ export interface Alias {
   deployment: string; // Mutable - can be updated to point to different deployment
   /** Current alias status */
   status: AliasStatusType; // Mutable - can be updated
+  /** Optional array of tags for categorization and filtering (lowercase, alphanumeric with separators) */
+  tags?: string[];
   /** The alias URL - internal (subdomain) or external (custom domain) */
   readonly url: string;
   /** Unix timestamp (seconds) when alias was created */
@@ -588,11 +592,11 @@ export interface DeploymentResource {
  * Alias resource interface - the contract all implementations must follow
  */
 export interface AliasResource {
-  set: (aliasName: string, deployment: string) => Promise<Alias>;
+  set: (aliasName: string, deployment: string, tags?: string[]) => Promise<Alias>;
   get: (aliasName: string) => Promise<Alias>;
   list: () => Promise<AliasListResponse>;
   remove: (aliasName: string) => Promise<void>;
-  check: (aliasName: string) => Promise<{ message: string }>;
+  confirm: (aliasName: string) => Promise<{ message: string }>;
 }
 
 /**
