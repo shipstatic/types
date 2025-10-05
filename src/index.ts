@@ -123,6 +123,52 @@ export interface DeploymentRemoveResponse {
 }
 
 // =============================================================================
+// TOKEN TYPES
+// =============================================================================
+
+/**
+ * Deployment token for automated deployments
+ */
+export interface Token {
+  /** The token hash (not the actual token value) */
+  readonly token: string;
+  /** The account this token belongs to */
+  readonly account: string;
+  /** Optional IP address binding for security */
+  readonly ip?: string;
+  /** Optional array of tags for categorization and filtering (lowercase, alphanumeric with separators) */
+  tags?: string[];
+  /** Unix timestamp (seconds) when token was created */
+  readonly created: number;
+  /** Unix timestamp (seconds) when token expires, or null for never */
+  readonly expires?: number;
+  /** Unix timestamp (seconds) when token was last used */
+  readonly used?: number;
+}
+
+/**
+ * Response for listing tokens
+ */
+export interface TokenListResponse {
+  /** Array of tokens */
+  tokens: Token[];
+  /** Total count of tokens */
+  count?: number;
+}
+
+/**
+ * Response for token creation
+ */
+export interface TokenCreateResponse {
+  /** The actual token value (only returned on creation) */
+  token: string;
+  /** Unix timestamp (seconds) when token expires, or null for never */
+  expires?: number;
+  /** Success message */
+  message?: string;
+}
+
+// =============================================================================
 // ACCOUNT TYPES
 // =============================================================================
 
@@ -607,6 +653,15 @@ export interface AliasResource {
  */
 export interface AccountResource {
   get: () => Promise<Account>;
+}
+
+/**
+ * Token resource interface - the contract all implementations must follow
+ */
+export interface TokenResource {
+  create: (ttl?: number, tags?: string[]) => Promise<TokenCreateResponse>;
+  list: () => Promise<TokenListResponse>;
+  remove: (token: string) => Promise<void>;
 }
 
 /**
