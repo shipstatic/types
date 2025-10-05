@@ -597,6 +597,9 @@ export interface AliasResource {
   list: () => Promise<AliasListResponse>;
   remove: (aliasName: string) => Promise<void>;
   confirm: (aliasName: string) => Promise<{ message: string }>;
+  dns: (aliasName: string) => Promise<{ alias: string; dns: any }>;
+  records: (aliasName: string) => Promise<{ alias: string; records: any[] }>;
+  share: (aliasName: string) => Promise<{ alias: string; hash: string }>;
 }
 
 /**
