@@ -61,52 +61,52 @@ export interface DeploymentListResponse {
 }
 
 // =============================================================================
-// ALIAS TYPES
+// DOMAIN TYPES
 // =============================================================================
 
 /**
- * Alias status constants
+ * Domain status constants
  */
-export const AliasStatus = {
+export const DomainStatus = {
   PENDING: 'pending',
   PARTIAL: 'partial',
   CONFIRMED: 'confirmed',
   FAILED: 'failed'
 } as const;
 
-export type AliasStatusType = typeof AliasStatus[keyof typeof AliasStatus];
+export type DomainStatusType = typeof DomainStatus[keyof typeof DomainStatus];
 
 /**
- * Core alias object - used in both API responses and SDK
+ * Core domain object - used in both API responses and SDK
  */
-export interface Alias {
-  /** The alias name */
-  readonly alias: string;
-  /** The deployment name this alias points to */
+export interface Domain {
+  /** The domain name */
+  readonly domain: string;
+  /** The deployment name this domain points to */
   deployment: string; // Mutable - can be updated to point to different deployment
-  /** Current alias status */
-  status: AliasStatusType; // Mutable - can be updated
+  /** Current domain status */
+  status: DomainStatusType; // Mutable - can be updated
   /** Optional array of tags for categorization and filtering (lowercase, alphanumeric with separators) */
   tags?: string[];
-  /** The alias URL - internal (subdomain) or external (custom domain) */
+  /** The domain URL - internal (subdomain) or external (custom domain) */
   readonly url: string;
-  /** Unix timestamp (seconds) when alias was created */
+  /** Unix timestamp (seconds) when domain was created */
   readonly created: number;
   /** Whether this was a create (201) or update (200) operation */
   readonly isCreate?: boolean;
-  /** Unix timestamp (seconds) when alias was confirmed */
+  /** Unix timestamp (seconds) when domain was confirmed */
   confirmed?: number; // Mutable - can be updated
 }
 
 /**
- * Response for listing aliases
+ * Response for listing domains
  */
-export interface AliasListResponse {
-  /** Array of aliases */
-  aliases: Alias[];
+export interface DomainListResponse {
+  /** Array of domains */
+  domains: Domain[];
   /** Optional cursor for pagination */
   cursor?: string;
-  /** Total number of aliases if available */
+  /** Total number of domains if available */
   total?: number;
 }
 
@@ -635,17 +635,17 @@ export interface DeploymentResource {
 }
 
 /**
- * Alias resource interface - the contract all implementations must follow
+ * Domain resource interface - the contract all implementations must follow
  */
-export interface AliasResource {
-  set: (aliasName: string, deployment: string, tags?: string[]) => Promise<Alias>;
-  get: (aliasName: string) => Promise<Alias>;
-  list: () => Promise<AliasListResponse>;
-  remove: (aliasName: string) => Promise<void>;
-  confirm: (aliasName: string) => Promise<{ message: string }>;
-  dns: (aliasName: string) => Promise<{ alias: string; dns: any }>;
-  records: (aliasName: string) => Promise<{ alias: string; records: any[] }>;
-  share: (aliasName: string) => Promise<{ alias: string; hash: string }>;
+export interface DomainResource {
+  set: (domainName: string, deployment: string, tags?: string[]) => Promise<Domain>;
+  get: (domainName: string) => Promise<Domain>;
+  list: () => Promise<DomainListResponse>;
+  remove: (domainName: string) => Promise<void>;
+  confirm: (domainName: string) => Promise<{ message: string }>;
+  dns: (domainName: string) => Promise<{ domain: string; dns: any }>;
+  records: (domainName: string) => Promise<{ domain: string; records: any[] }>;
+  share: (domainName: string) => Promise<{ domain: string; hash: string }>;
 }
 
 /**
@@ -706,15 +706,15 @@ export function generateDeploymentUrl(deployment: string, sitesDomain?: string):
 }
 
 /**
- * Generate alias URL based on whether it's internal (subdomain) or external (custom domain)
+ * Generate domain URL based on whether it's internal (subdomain) or external (custom domain)
  */
-export function generateAliasUrl(alias: string, sitesDomain?: string): string {
-  // If alias contains dots, it's an external domain
-  if (alias.includes('.')) {
-    return `https://${alias}`;
+export function generateDomainUrl(domain: string, sitesDomain?: string): string {
+  // If domain contains dots, it's an external domain
+  if (domain.includes('.')) {
+    return `https://${domain}`;
   }
-  
+
   // Otherwise it's an internal subdomain
-  const domain = sitesDomain || 'statichost.dev';
-  return `https://${alias}.${domain}`;
+  const siteDomain = sitesDomain || 'statichost.dev';
+  return `https://${domain}.${siteDomain}`;
 }
