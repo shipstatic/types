@@ -407,6 +407,8 @@ export interface ConfigResponse {
   maxFilesCount: number;
   /** Maximum total deployment size in bytes */
   maxTotalSize: number;
+  /** Allowed MIME type categories for file validation */
+  allowedMimeTypes: string[];
 }
 
 // =============================================================================
