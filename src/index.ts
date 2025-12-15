@@ -216,7 +216,7 @@ export enum ErrorType {
   /** Validation failed (400) */
   Validation = "validation_failed",
   /** Resource not found (404) */
-  NotFound = "not_found", 
+  NotFound = "not_found",
   /** Rate limit exceeded (429) */
   RateLimit = "rate_limit_exceeded",
   /** Authentication required (401) */
@@ -278,10 +278,10 @@ export class ShipError extends Error {
   /** Convert to wire format */
   toResponse(): ErrorResponse {
     // For security, exclude internal details from authentication errors in API responses
-    const details = this.type === ErrorType.Authentication && this.details?.internal 
-      ? undefined 
+    const details = this.type === ErrorType.Authentication && this.details?.internal
+      ? undefined
       : this.details;
-      
+
     return {
       error: this.type,
       message: this.message,
@@ -449,7 +449,7 @@ export const DEPLOY_TOKEN_TOTAL_LENGTH = DEPLOY_TOKEN_PREFIX.length + DEPLOY_TOK
 // Authentication Method Constants
 export const AuthMethod = {
   JWT: 'jwt',
-  API_KEY: 'apiKey', 
+  API_KEY: 'apiKey',
   TOKEN: 'token'
 } as const;
 
@@ -469,11 +469,11 @@ export function validateApiKey(apiKey: string): void {
   if (!apiKey.startsWith(API_KEY_PREFIX)) {
     throw ShipError.validation(`API key must start with "${API_KEY_PREFIX}"`);
   }
-  
+
   if (apiKey.length !== API_KEY_TOTAL_LENGTH) {
     throw ShipError.validation(`API key must be ${API_KEY_TOTAL_LENGTH} characters total (${API_KEY_PREFIX} + ${API_KEY_HEX_LENGTH} hex chars)`);
   }
-  
+
   const hexPart = apiKey.slice(API_KEY_PREFIX.length);
   if (!/^[a-f0-9]{64}$/i.test(hexPart)) {
     throw ShipError.validation(`API key must contain ${API_KEY_HEX_LENGTH} hexadecimal characters after "${API_KEY_PREFIX}" prefix`);
@@ -487,11 +487,11 @@ export function validateDeployToken(deployToken: string): void {
   if (!deployToken.startsWith(DEPLOY_TOKEN_PREFIX)) {
     throw ShipError.validation(`Deploy token must start with "${DEPLOY_TOKEN_PREFIX}"`);
   }
-  
+
   if (deployToken.length !== DEPLOY_TOKEN_TOTAL_LENGTH) {
     throw ShipError.validation(`Deploy token must be ${DEPLOY_TOKEN_TOTAL_LENGTH} characters total (${DEPLOY_TOKEN_PREFIX} + ${DEPLOY_TOKEN_HEX_LENGTH} hex chars)`);
   }
-  
+
   const hexPart = deployToken.slice(DEPLOY_TOKEN_PREFIX.length);
   if (!/^[a-f0-9]{64}$/i.test(hexPart)) {
     throw ShipError.validation(`Deploy token must contain ${DEPLOY_TOKEN_HEX_LENGTH} hexadecimal characters after "${DEPLOY_TOKEN_PREFIX}" prefix`);
@@ -504,15 +504,15 @@ export function validateDeployToken(deployToken: string): void {
 export function validateApiUrl(apiUrl: string): void {
   try {
     const url = new URL(apiUrl);
-    
+
     if (!['http:', 'https:'].includes(url.protocol)) {
       throw ShipError.validation('API URL must use http:// or https:// protocol');
     }
-    
+
     if (url.pathname !== '/' && url.pathname !== '') {
       throw ShipError.validation('API URL must not contain a path');
     }
-    
+
     if (url.search || url.hash) {
       throw ShipError.validation('API URL must not contain query parameters or fragments');
     }
@@ -620,11 +620,12 @@ export const DEFAULT_API = 'https://api.shipstatic.com';
 // =============================================================================
 
 /**
- * Universal deploy input type for all environments.
- * - File[] | FileList: Browser environments (file upload)
- * - string: Node.js environments (file/directory path)
+ * Deploy input type - environment-specific
+ *
+ * Browser: File[] - array of File objects
+ * Node.js: string | string[] - file/directory paths
  */
-export type DeployInput = File[] | FileList | string;
+export type DeployInput = File[] | string | string[];
 
 /**
  * Deployment resource interface - the contract all implementations must follow
@@ -676,6 +677,55 @@ export interface KeysResource {
 // =============================================================================
 // FILE UPLOAD TYPES
 // =============================================================================
+
+/**
+ * File status constants for validation state tracking
+ */
+export const FileValidationStatus = {
+  PENDING: 'pending',
+  PROCESSING_ERROR: 'processing_error',
+  EMPTY_FILE: 'empty_file',
+  VALIDATION_FAILED: 'validation_failed',
+  READY: 'ready',
+} as const;
+
+export type FileValidationStatusType = typeof FileValidationStatus[keyof typeof FileValidationStatus];
+
+/**
+ * Client-side validation error structure
+ */
+export interface ValidationError {
+  error: string;
+  details: string;
+  errors: string[];
+  isClientError: true;
+}
+
+/**
+ * Minimal file interface required for validation
+ */
+export interface ValidatableFile {
+  name: string;
+  size: number;
+  type: string;
+  status?: string;
+  statusMessage?: string;
+}
+
+/**
+ * File validation result
+ *
+ * NOTE: Validation is ATOMIC - if any file fails validation, ALL files are rejected.
+ * This ensures deployments are all-or-nothing for data integrity.
+ */
+export interface FileValidationResult<T extends ValidatableFile> {
+  /** All files with updated status */
+  files: T[];
+  /** Files that passed validation (empty if ANY file failed - atomic validation) */
+  validFiles: T[];
+  /** Validation error if any files failed */
+  error: ValidationError | null;
+}
 
 /**
  * Represents a file that has been uploaded and stored
