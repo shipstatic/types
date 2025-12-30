@@ -178,7 +178,8 @@ export interface TokenCreateResponse {
 export const AccountPlan = {
   FREE: 'free',
   PAID: 'paid',
-  PARTNER: 'partner',
+  SPONSORED: 'sponsored',
+  ENTERPRISE: 'enterprise',
   SUSPENDED: 'suspended',
   TERMINATING: 'terminating',
   TERMINATED: 'terminated'
