@@ -205,6 +205,19 @@ export interface Account {
   activated?: number;
 }
 
+/**
+ * Account-specific configuration overrides
+ * Allows per-account customization of limits without changing plan
+ */
+export interface AccountOverrides {
+  /** Override for maximum individual file size in bytes */
+  fileSize?: number;
+  /** Override for maximum number of files per deployment */
+  filesCount?: number;
+  /** Override for maximum total deployment size in bytes */
+  totalSize?: number;
+}
+
 // =============================================================================
 // ERROR SYSTEM
 // =============================================================================
@@ -667,6 +680,82 @@ export interface TokenResource {
   create: (ttl?: number, tags?: string[]) => Promise<TokenCreateResponse>;
   list: () => Promise<TokenListResponse>;
   remove: (token: string) => Promise<void>;
+}
+
+// =============================================================================
+// SUBSCRIPTION TYPES
+// =============================================================================
+
+/**
+ * Subscription status response from GET /subscriptions/status
+ */
+export interface SubscriptionStatus {
+  /** Whether the account has an active subscription */
+  hasSubscription: boolean;
+  /** Current account plan */
+  plan: AccountPlanType;
+  /** Creem subscription ID (if subscribed) */
+  subscriptionId?: string;
+  /** Number of subscription units (1 unit = 1 custom domain) */
+  units?: number;
+  /** Number of custom domains currently in use */
+  customDomains?: number;
+  /** Subscription status from Creem (active, trialing, canceled, etc.) */
+  status?: string;
+  /** Link to Creem customer portal for subscription management */
+  portalLink?: string | null;
+}
+
+/**
+ * Checkout session response from POST /subscriptions/checkout
+ */
+export interface CheckoutSession {
+  /** URL to redirect user to Creem checkout page */
+  checkoutUrl: string;
+  /** Creem checkout session ID */
+  checkoutId: string;
+}
+
+/**
+ * Subscription sync request body for POST /subscriptions/sync
+ */
+export interface SubscriptionSyncRequest {
+  /** Creem subscription ID received after checkout */
+  subscriptionId: string;
+}
+
+/**
+ * Subscription sync response from POST /subscriptions/sync
+ */
+export interface SubscriptionSyncResponse {
+  /** Whether sync was successful */
+  success: boolean;
+  /** The synced subscription ID */
+  subscriptionId: string;
+}
+
+/**
+ * Subscription resource interface - the contract all implementations must follow
+ */
+export interface SubscriptionResource {
+  /**
+   * Create a checkout session
+   * @returns Checkout session with URL to redirect user
+   */
+  checkout: () => Promise<CheckoutSession>;
+
+  /**
+   * Get current subscription status
+   * @returns Subscription status and usage information
+   */
+  status: () => Promise<SubscriptionStatus>;
+
+  /**
+   * Sync subscription ID after checkout redirect
+   * @param subscriptionId - Subscription ID from Creem redirect
+   * @returns Sync confirmation
+   */
+  sync: (subscriptionId: string) => Promise<SubscriptionSyncResponse>;
 }
 
 /**
