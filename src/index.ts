@@ -451,7 +451,8 @@ export const DEPLOY_TOKEN_TOTAL_LENGTH = DEPLOY_TOKEN_PREFIX.length + DEPLOY_TOK
 export const AuthMethod = {
   JWT: 'jwt',
   API_KEY: 'apiKey',
-  TOKEN: 'token'
+  TOKEN: 'token',
+  WEBHOOK: 'webhook'
 } as const;
 
 export type AuthMethodType = typeof AuthMethod[keyof typeof AuthMethod];
