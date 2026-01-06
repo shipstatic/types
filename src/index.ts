@@ -210,6 +210,8 @@ export interface Account {
  * Allows per-account customization of limits without changing plan
  */
 export interface AccountOverrides {
+  /** Override for maximum resources (deployments + domains) */
+  resources?: number;
   /** Override for maximum individual file size in bytes */
   fileSize?: number;
   /** Override for maximum number of files per deployment */
@@ -725,17 +727,10 @@ export interface SubscriptionSyncRequest {
 }
 
 /**
- * Subscription sync response from POST /subscriptions/sync
- */
-export interface SubscriptionSyncResponse {
-  /** Whether sync was successful */
-  success: boolean;
-  /** The synced subscription ID */
-  subscriptionId: string;
-}
-
-/**
  * Subscription resource interface - the contract all implementations must follow
+ *
+ * IMPOSSIBLE SIMPLICITY: No sync() method needed!
+ * Webhooks are the single source of truth. Frontend just polls status().
  */
 export interface SubscriptionResource {
   /**
@@ -749,13 +744,6 @@ export interface SubscriptionResource {
    * @returns Subscription status and usage information
    */
   status: () => Promise<SubscriptionStatus>;
-
-  /**
-   * Sync subscription ID after checkout redirect
-   * @param subscriptionId - Subscription ID from Creem redirect
-   * @returns Sync confirmation
-   */
-  sync: (subscriptionId: string) => Promise<SubscriptionSyncResponse>;
 }
 
 /**
