@@ -48,7 +48,7 @@ interface Account {
   email: string;               // User email address
   name: string;                // User display name
   picture?: string;            // Profile picture URL
-  plan: 'free' | 'active' | 'suspended';  // Account plan status
+  plan: 'free' | 'standard' | 'sponsored' | 'enterprise' | 'suspended' | 'terminating' | 'terminated';  // Account plan status
   created: number;             // Unix timestamp (seconds)
 }
 ```
