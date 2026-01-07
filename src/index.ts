@@ -719,14 +719,6 @@ export interface CheckoutSession {
 }
 
 /**
- * Subscription sync request body for POST /subscriptions/sync
- */
-export interface SubscriptionSyncRequest {
-  /** Creem subscription ID received after checkout */
-  subscriptionId: string;
-}
-
-/**
  * Subscription resource interface - the contract all implementations must follow
  *
  * IMPOSSIBLE SIMPLICITY: No sync() method needed!
