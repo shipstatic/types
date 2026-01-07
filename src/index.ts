@@ -177,7 +177,7 @@ export interface TokenCreateResponse {
  */
 export const AccountPlan = {
   FREE: 'free',
-  PAID: 'paid',
+  STANDARD: 'standard',
   SPONSORED: 'sponsored',
   ENTERPRISE: 'enterprise',
   SUSPENDED: 'suspended',
@@ -467,7 +467,8 @@ export const AuthMethod = {
   JWT: 'jwt',
   API_KEY: 'apiKey',
   TOKEN: 'token',
-  WEBHOOK: 'webhook'
+  WEBHOOK: 'webhook',
+  SYSTEM: 'system'
 } as const;
 
 export type AuthMethodType = typeof AuthMethod[keyof typeof AuthMethod];
