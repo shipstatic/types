@@ -189,20 +189,21 @@ export type AccountPlanType = typeof AccountPlan[keyof typeof AccountPlan];
 
 /**
  * Core account object - used in both API responses and SDK
+ * All fields are readonly to prevent accidental mutations
  */
 export interface Account {
   /** User email address */
-  email: string;
+  readonly email: string;
   /** User display name */
-  name: string;
+  readonly name: string;
   /** User profile picture URL */
-  picture?: string;
+  readonly picture?: string;
   /** Account plan status */
-  plan: AccountPlanType;
+  readonly plan: AccountPlanType;
   /** Unix timestamp (seconds) when account was created */
-  created: number;
+  readonly created: number;
   /** Unix timestamp (seconds) when account was activated (first deployment) */
-  activated?: number;
+  readonly activated?: number;
 }
 
 /**
