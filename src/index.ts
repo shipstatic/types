@@ -686,31 +686,31 @@ export interface TokenResource {
 }
 
 // =============================================================================
-// SUBSCRIPTION TYPES
+// BILLING TYPES
 // =============================================================================
 
 /**
- * Subscription status response from GET /subscriptions/status
+ * Billing status response from GET /billing/status
  */
-export interface SubscriptionStatus {
-  /** Whether the account has an active subscription */
-  hasSubscription: boolean;
+export interface BillingStatus {
+  /** Whether the account has an active billing plan */
+  hasActiveBilling: boolean;
   /** Current account plan */
   plan: AccountPlanType;
-  /** Creem subscription ID (if subscribed) */
-  subscriptionId?: string;
-  /** Number of subscription units (1 unit = 1 custom domain) */
+  /** Creem billing ID (if subscribed) */
+  billing?: string;
+  /** Number of billing units (1 unit = 1 custom domain) */
   units?: number;
   /** Number of custom domains currently in use */
   customDomains?: number;
-  /** Subscription status from Creem (active, trialing, canceled, etc.) */
+  /** Billing status from Creem (active, trialing, canceled, etc.) */
   status?: string;
-  /** Link to Creem customer portal for subscription management */
+  /** Link to Creem customer portal for billing management */
   portalLink?: string | null;
 }
 
 /**
- * Checkout session response from POST /subscriptions/checkout
+ * Checkout session response from POST /billing/checkout
  */
 export interface CheckoutSession {
   /** URL to redirect user to Creem checkout page */
@@ -720,12 +720,12 @@ export interface CheckoutSession {
 }
 
 /**
- * Subscription resource interface - the contract all implementations must follow
+ * Billing resource interface - the contract all implementations must follow
  *
  * IMPOSSIBLE SIMPLICITY: No sync() method needed!
  * Webhooks are the single source of truth. Frontend just polls status().
  */
-export interface SubscriptionResource {
+export interface BillingResource {
   /**
    * Create a checkout session
    * @returns Checkout session with URL to redirect user
@@ -733,10 +733,10 @@ export interface SubscriptionResource {
   checkout: () => Promise<CheckoutSession>;
 
   /**
-   * Get current subscription status
-   * @returns Subscription status and usage information
+   * Get current billing status
+   * @returns Billing status and usage information
    */
-  status: () => Promise<SubscriptionStatus>;
+  status: () => Promise<BillingStatus>;
 }
 
 /**
