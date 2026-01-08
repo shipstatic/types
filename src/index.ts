@@ -740,6 +740,17 @@ export interface BillingResource {
 }
 
 /**
+ * @deprecated Use BillingStatus instead. Kept for backward compatibility.
+ */
+export type SubscriptionStatus = BillingStatus;
+
+/**
+ * @deprecated Use BillingResource instead. Kept for backward compatibility.
+ */
+export type SubscriptionResource = BillingResource;
+
+
+/**
  * Keys resource interface - the contract all implementations must follow
  */
 export interface KeysResource {
