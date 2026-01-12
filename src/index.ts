@@ -211,8 +211,10 @@ export interface Account {
  * Allows per-account customization of limits without changing plan
  */
 export interface AccountOverrides {
-  /** Override for maximum resources (deployments + domains) */
-  resources?: number;
+  /** Override for maximum number of domains */
+  domains?: number;
+  /** Override for maximum number of deployments */
+  deployments?: number;
   /** Override for maximum individual file size in bytes */
   fileSize?: number;
   /** Override for maximum number of files per deployment */
