@@ -692,32 +692,32 @@ export interface TokenResource {
 
 /**
  * Billing status response from GET /billing/status
+ *
+ * Note: The user's `plan` comes from Account, not here.
+ * This endpoint only returns billing-specific data (usage, portal, etc.)
+ *
+ * If `billing` is null, the user has no active billing.
  */
 export interface BillingStatus {
-  /** Whether the account has an active billing plan */
-  hasActiveBilling: boolean;
-  /** Current account plan */
-  plan: AccountPlanType;
-  /** Creem billing ID (if subscribed) */
-  billing?: string;
+  /** Creem billing ID, or null if no active billing */
+  billing: string | null;
   /** Number of billing units (1 unit = 1 custom domain) */
   units?: number;
   /** Number of custom domains currently in use */
-  customDomains?: number;
+  usage?: number;
   /** Billing status from Creem (active, trialing, canceled, etc.) */
   status?: string;
   /** Link to Creem customer portal for billing management */
-  portalLink?: string | null;
+  portal?: string | null;
 }
+
 
 /**
  * Checkout session response from POST /billing/checkout
  */
 export interface CheckoutSession {
   /** URL to redirect user to Creem checkout page */
-  checkoutUrl: string;
-  /** Creem checkout session ID */
-  checkoutId: string;
+  url: string;
 }
 
 /**
@@ -739,16 +739,6 @@ export interface BillingResource {
    */
   status: () => Promise<BillingStatus>;
 }
-
-/**
- * @deprecated Use BillingStatus instead. Kept for backward compatibility.
- */
-export type SubscriptionStatus = BillingStatus;
-
-/**
- * @deprecated Use BillingResource instead. Kept for backward compatibility.
- */
-export type SubscriptionResource = BillingResource;
 
 
 /**
