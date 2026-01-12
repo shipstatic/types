@@ -70,8 +70,7 @@ export interface DeploymentListResponse {
 export const DomainStatus = {
   PENDING: 'pending',
   PARTIAL: 'partial',
-  CONFIRMED: 'confirmed',
-  FAILED: 'failed'
+  SUCCESS: 'success'
 } as const;
 
 export type DomainStatusType = typeof DomainStatus[keyof typeof DomainStatus];
