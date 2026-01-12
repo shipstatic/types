@@ -82,8 +82,8 @@ export type DomainStatusType = typeof DomainStatus[keyof typeof DomainStatus];
 export interface Domain {
   /** The domain name */
   readonly domain: string;
-  /** The deployment name this domain points to */
-  deployment: string; // Mutable - can be updated to point to different deployment
+  /** The deployment name this domain points to (null = domain added but not yet linked) */
+  deployment: string | null; // Mutable - can be updated to point to different deployment
   /** Current domain status */
   status: DomainStatusType; // Mutable - can be updated
   /** Optional array of tags for categorization and filtering (lowercase, alphanumeric with separators) */
@@ -662,7 +662,7 @@ export interface DeploymentResource {
  * Domain resource interface - the contract all implementations must follow
  */
 export interface DomainResource {
-  set: (domainName: string, deployment: string, tags?: string[]) => Promise<Domain>;
+  set: (domainName: string, deployment?: string, tags?: string[]) => Promise<Domain>;
   get: (domainName: string) => Promise<Domain>;
   list: () => Promise<DomainListResponse>;
   remove: (domainName: string) => Promise<void>;
