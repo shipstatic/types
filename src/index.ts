@@ -373,7 +373,6 @@ export class ShipError extends Error {
     return new ShipError(ErrorType.Authentication, message, 401, details);
   }
 
-
   static business(message: string, status: number = 400): ShipError {
     return new ShipError(ErrorType.Business, message, status);
   }
@@ -447,13 +446,6 @@ export class ShipError extends Error {
 }
 
 // =============================================================================
-// CONFIGURATION CONSTANTS
-// =============================================================================
-
-
-
-
-// =============================================================================
 // CONFIG TYPES
 // =============================================================================
 
@@ -494,7 +486,6 @@ export interface PingResponse {
   /** Optional timestamp */
   timestamp?: number;
 }
-
 
 // API Key Configuration
 export const API_KEY_PREFIX = 'ship-';
