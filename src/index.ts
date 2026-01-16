@@ -110,6 +110,51 @@ export interface DomainListResponse {
 }
 
 /**
+ * DNS record types supported for domain configuration
+ */
+export type DnsRecordType = 'A' | 'CNAME';
+
+/**
+ * DNS record required for domain configuration
+ */
+export interface DnsRecord {
+  /** Record type (A for apex, CNAME for subdomains) */
+  type: DnsRecordType;
+  /** The DNS name to configure */
+  name: string;
+  /** The value to set (IP for A, hostname for CNAME) */
+  value: string;
+}
+
+/**
+ * DNS provider information for a domain
+ */
+export interface DnsProvider {
+  /** Provider name (e.g., "Cloudflare", "GoDaddy") */
+  name?: string;
+}
+
+/**
+ * Response for domain DNS provider lookup
+ */
+export interface DomainDnsResponse {
+  /** The domain name */
+  domain: string;
+  /** DNS provider information, null if not yet looked up */
+  dns: { provider?: DnsProvider } | null;
+}
+
+/**
+ * Response for domain DNS records
+ */
+export interface DomainRecordsResponse {
+  /** The domain name */
+  domain: string;
+  /** Required DNS records for configuration */
+  records: DnsRecord[];
+}
+
+/**
  * Response for deployment removal
  */
 export interface DeploymentRemoveResponse {
@@ -252,9 +297,6 @@ export enum ErrorType {
   /** Configuration error */
   Config = "config_error"
 }
-
-/** @deprecated Use ErrorType instead. Kept for backward compatibility. */
-export const ShipErrorType = ErrorType;
 
 /**
  * Categorizes error types for better type checking
@@ -628,6 +670,38 @@ export interface PlatformConfig {
   apiKey?: string;
 }
 
+/**
+ * Resolved configuration with required apiUrl.
+ * This is the normalized config after merging options, env, and config files.
+ */
+export interface ResolvedConfig {
+  /** API URL (always present after resolution, defaults to DEFAULT_API) */
+  apiUrl: string;
+  /** API key for authenticated deployments */
+  apiKey?: string;
+  /** Deploy token for single-use deployments */
+  deployToken?: string;
+}
+
+// =============================================================================
+// PROGRESS TRACKING
+// =============================================================================
+
+/**
+ * Progress information for deploy/upload operations.
+ * Provides consistent percentage-based progress with byte-level details.
+ */
+export interface ProgressInfo {
+  /** Progress percentage (0-100) */
+  percent: number;
+  /** Number of bytes loaded so far */
+  loaded: number;
+  /** Total number of bytes to load. May be 0 if unknown initially */
+  total: number;
+  /** Current file being processed (optional) */
+  file?: string;
+}
+
 // =============================================================================
 // PLATFORM CONSTANTS
 // =============================================================================
@@ -666,8 +740,8 @@ export interface DomainResource {
   list: () => Promise<DomainListResponse>;
   remove: (domainName: string) => Promise<void>;
   confirm: (domainName: string) => Promise<{ message: string }>;
-  dns: (domainName: string) => Promise<{ domain: string; dns: any }>;
-  records: (domainName: string) => Promise<{ domain: string; records: any[] }>;
+  dns: (domainName: string) => Promise<DomainDnsResponse>;
+  records: (domainName: string) => Promise<DomainRecordsResponse>;
   share: (domainName: string) => Promise<{ domain: string; hash: string }>;
 }
 

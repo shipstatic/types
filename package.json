@@ -1,6 +1,6 @@
 {
   "name": "@shipstatic/types",
-  "version": "0.3.17",
+  "version": "0.3.18",
   "description": "Shared types for Shipstatic platform",
   "type": "module",
   "main": "./dist/index.js",
