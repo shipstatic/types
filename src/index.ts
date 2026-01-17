@@ -35,6 +35,8 @@ export interface Deployment {
   readonly config?: boolean;
   /** Optional array of tags for categorization and filtering (lowercase, alphanumeric with separators) */
   tags?: string[];
+  /** The client/tool used to create this deployment (e.g., 'web', 'sdk', 'cli') */
+  readonly via?: string;
   /** The deployment URL */
   readonly url: string;
   /** Unix timestamp (seconds) when deployment was created */
@@ -93,8 +95,8 @@ export interface Domain {
   readonly created: number;
   /** Whether this was a create (201) or update (200) operation */
   readonly isCreate?: boolean;
-  /** Unix timestamp (seconds) when domain was confirmed */
-  confirmed?: number; // Mutable - can be updated
+  /** Unix timestamp (seconds) when domain was verified */
+  verified?: number; // Mutable - can be updated
 }
 
 /**
@@ -730,7 +732,7 @@ export interface DomainResource {
   get: (domainName: string) => Promise<Domain>;
   list: () => Promise<DomainListResponse>;
   remove: (domainName: string) => Promise<void>;
-  confirm: (domainName: string) => Promise<{ message: string }>;
+  verify: (domainName: string) => Promise<{ message: string }>;
   dns: (domainName: string) => Promise<DomainDnsResponse>;
   records: (domainName: string) => Promise<DomainRecordsResponse>;
   share: (domainName: string) => Promise<{ domain: string; hash: string }>;
@@ -839,7 +841,7 @@ export type ActivityEvent =
   | 'domain_update'
   | 'domain_delete'
   | 'domain_set'
-  | 'domain_confirm'
+  | 'domain_verify'
   // Token events
   | 'token_create'
   | 'token_consume'
@@ -883,7 +885,7 @@ export type UserVisibleActivityEvent =
   | 'domain_update'
   | 'domain_delete'
   | 'domain_set'
-  | 'domain_confirm'
+  | 'domain_verify'
   | 'token_create'
   | 'token_consume';
 
