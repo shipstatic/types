@@ -43,8 +43,8 @@ export interface Deployment {
   readonly created: number;
   /** Unix timestamp (seconds) when deployment expires */
   expires?: number; // Mutable - can be updated
-  /** Unix timestamp (seconds) when deployment was verified and ready */
-  verified?: number; // Mutable - can be updated
+  /** Unix timestamp (seconds) when deployment was reviewed (content moderation) */
+  reviewed?: number; // Mutable - can be updated
   /** Short-lived JWT token for claiming this deployment (only present for public deployments) */
   claimToken?: string; // Mutable - can be updated
 }
@@ -97,6 +97,8 @@ export interface Domain {
   readonly isCreate?: boolean;
   /** Unix timestamp (seconds) when domain was verified */
   verified?: number; // Mutable - can be updated
+  /** Unix timestamp (seconds) when deployment binding last changed */
+  bound?: number;
 }
 
 /**
