@@ -731,6 +731,7 @@ export interface DeploymentResource {
  */
 export interface DomainResource {
   set: (domainName: string, deployment?: string, tags?: string[]) => Promise<Domain>;
+  update: (domainName: string, tags: string[]) => Promise<Domain>;
   get: (domainName: string) => Promise<Domain>;
   list: () => Promise<DomainListResponse>;
   remove: (domainName: string) => Promise<void>;
