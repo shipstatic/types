@@ -95,8 +95,6 @@ export interface Domain {
   readonly created: number;
   /** Whether this was a create (201) or update (200) operation */
   readonly isCreate?: boolean;
-  /** Unix timestamp (seconds) when domain was verified */
-  verified?: number; // Mutable - can be updated
   /** Unix timestamp (seconds) when deployment binding last changed */
   bound?: number;
 }
