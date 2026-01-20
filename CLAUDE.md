@@ -88,18 +88,34 @@ ShipError.fromResponse(response)
 
 ### Resource Contracts
 
-Interfaces that SDK implementations must follow:
+Interfaces that SDK implementations must follow. These define the **minimal contract** - SDKs may accept additional options for implementation-specific concerns (timeout, signals, etc.):
 
 ```typescript
 interface DeploymentResource {
-  create: (input: DeployInput, options?: any) => Promise<Deployment>;
+  create: (input: DeployInput, options?: DeploymentCreateOptions) => Promise<Deployment>;
   list: () => Promise<DeploymentListResponse>;
-  remove: (id: string) => Promise<void>;
   get: (id: string) => Promise<Deployment>;
+  set: (id: string, options: { tags: string[] }) => Promise<Deployment>;
+  remove: (id: string) => Promise<void>;
+}
+
+interface DomainResource {
+  set: (name: string, options?: { deployment?: string; tags?: string[] }) => Promise<Domain>;
+  list: () => Promise<DomainListResponse>;
+  get: (name: string) => Promise<Domain>;
+  remove: (name: string) => Promise<void>;
+  verify: (name: string) => Promise<{ message: string }>;
+  // ... dns, records, share
+}
+
+interface TokenResource {
+  create: (options?: { ttl?: number; tags?: string[] }) => Promise<TokenCreateResponse>;
+  list: () => Promise<TokenListResponse>;
+  remove: (token: string) => Promise<void>;
 }
 ```
 
-These contracts ensure SDK behavior matches API capabilities.
+**Design principle:** Contracts define API-level options (tags, subdomain). SDK implementations extend with runtime options (timeout, signal, callbacks).
 
 ### Status Constants
 
