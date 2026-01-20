@@ -717,28 +717,41 @@ export const DEFAULT_API = 'https://api.shipstatic.com';
 export type DeployInput = File[] | string | string[];
 
 /**
+ * Options for deployment creation at the API contract level.
+ * SDK implementations may extend with additional options (timeout, signal, callbacks, etc.).
+ */
+export interface DeploymentCreateOptions {
+  /** Optional tags for categorization and filtering */
+  tags?: string[];
+  /** Optional subdomain suggestion for the deployment */
+  subdomain?: string;
+  /** Client identifier (e.g., 'cli', 'sdk', 'web') */
+  via?: string;
+}
+
+/**
  * Deployment resource interface - the contract all implementations must follow
  */
 export interface DeploymentResource {
-  create: (input: DeployInput, options?: any) => Promise<Deployment>;
+  create: (input: DeployInput, options?: DeploymentCreateOptions) => Promise<Deployment>;
   list: () => Promise<DeploymentListResponse>;
-  remove: (id: string) => Promise<void>;
   get: (id: string) => Promise<Deployment>;
+  set: (id: string, options: { tags: string[] }) => Promise<Deployment>;
+  remove: (id: string) => Promise<void>;
 }
 
 /**
  * Domain resource interface - the contract all implementations must follow
  */
 export interface DomainResource {
-  set: (domainName: string, deployment?: string, tags?: string[]) => Promise<Domain>;
-  update: (domainName: string, tags: string[]) => Promise<Domain>;
-  get: (domainName: string) => Promise<Domain>;
+  set: (name: string, options?: { deployment?: string; tags?: string[] }) => Promise<Domain>;
   list: () => Promise<DomainListResponse>;
-  remove: (domainName: string) => Promise<void>;
-  verify: (domainName: string) => Promise<{ message: string }>;
-  dns: (domainName: string) => Promise<DomainDnsResponse>;
-  records: (domainName: string) => Promise<DomainRecordsResponse>;
-  share: (domainName: string) => Promise<{ domain: string; hash: string }>;
+  get: (name: string) => Promise<Domain>;
+  remove: (name: string) => Promise<void>;
+  verify: (name: string) => Promise<{ message: string }>;
+  dns: (name: string) => Promise<DomainDnsResponse>;
+  records: (name: string) => Promise<DomainRecordsResponse>;
+  share: (name: string) => Promise<{ domain: string; hash: string }>;
 }
 
 /**
@@ -752,7 +765,7 @@ export interface AccountResource {
  * Token resource interface - the contract all implementations must follow
  */
 export interface TokenResource {
-  create: (ttl?: number, tags?: string[]) => Promise<TokenCreateResponse>;
+  create: (options?: { ttl?: number; tags?: string[] }) => Promise<TokenCreateResponse>;
   list: () => Promise<TokenListResponse>;
   remove: (token: string) => Promise<void>;
 }
