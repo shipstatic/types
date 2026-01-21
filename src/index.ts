@@ -848,13 +848,13 @@ export type ActivityEvent =
   | 'account_suspended'
   // Deployment events
   | 'deployment_create'
+  | 'deployment_update'
   | 'deployment_delete'
   | 'deployment_claim'
   // Domain events
   | 'domain_create'
   | 'domain_update'
   | 'domain_delete'
-  | 'domain_set'
   | 'domain_verify'
   // Token events
   | 'token_create'
@@ -880,8 +880,8 @@ export type ActivityEvent =
   | 'billing_past_due'
   | 'billing_terminated'
   | 'billing_manual_sync'
-  | 'refund_created'
-  | 'dispute_created';
+  | 'refund_create'
+  | 'dispute_create';
 
 /**
  * Activity events visible to users in the dashboard
@@ -893,12 +893,12 @@ export type UserVisibleActivityEvent =
   | 'account_key_generate'
   | 'account_plan_transition'
   | 'deployment_create'
+  | 'deployment_update'
   | 'deployment_delete'
   | 'deployment_claim'
   | 'domain_create'
   | 'domain_update'
   | 'domain_delete'
-  | 'domain_set'
   | 'domain_verify'
   | 'token_create'
   | 'token_consume';
@@ -917,6 +917,47 @@ export interface Activity {
   domain?: string;
   /** JSON-encoded metadata (parse with JSON.parse) */
   meta?: string;
+}
+
+/**
+ * Parsed activity metadata.
+ * Different events populate different fields.
+ */
+export interface ActivityMeta {
+  // Deployment events
+  /** Number of files in deployment */
+  files?: number;
+  /** Total size in bytes */
+  size?: number;
+  /** Whether deployment has config */
+  hasConfig?: boolean;
+
+  // Domain events
+  /** Whether this was an update (vs create) */
+  isUpdate?: boolean;
+  /** Whether domain was already verified */
+  wasVerified?: boolean;
+  /** Previous deployment ID before rebinding */
+  previousDeployment?: string;
+  /** Tags that were set/updated */
+  tags?: string[];
+
+  // Account events
+  /** OAuth provider name */
+  provider?: string;
+  /** Account email */
+  email?: string;
+  /** Account display name */
+  name?: string;
+
+  // Plan transition events
+  /** Previous plan */
+  from?: string;
+  /** New plan */
+  to?: string;
+
+  /** Allow additional fields for future use */
+  [key: string]: unknown;
 }
 
 /**
