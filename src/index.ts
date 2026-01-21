@@ -1003,23 +1003,23 @@ export interface RateLimitData {
 // =============================================================================
 
 /**
- * Generate deployment URL from deployment ID and sites domain
+ * Generate deployment URL from deployment ID and base domain
  */
-export function generateDeploymentUrl(deployment: string, sitesDomain?: string): string {
-  const domain = sitesDomain || 'statichost.com';
+export function generateDeploymentUrl(deployment: string, baseDomain?: string): string {
+  const domain = baseDomain || 'shipstatic.com';
   return `https://${deployment}.${domain}`;
 }
 
 /**
  * Generate domain URL based on whether it's internal (subdomain) or external (custom domain)
  */
-export function generateDomainUrl(domain: string, sitesDomain?: string): string {
+export function generateDomainUrl(domainName: string, baseDomain?: string): string {
   // If domain contains dots, it's an external domain
-  if (domain.includes('.')) {
-    return `https://${domain}`;
+  if (domainName.includes('.')) {
+    return `https://${domainName}`;
   }
 
   // Otherwise it's an internal subdomain
-  const siteDomain = sitesDomain || 'statichost.dev';
-  return `https://${domain}.${siteDomain}`;
+  const domain = baseDomain || 'shipstatic.com';
+  return `https://${domainName}.${domain}`;
 }
