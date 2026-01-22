@@ -95,8 +95,14 @@ export interface Domain {
   readonly created: number;
   /** Whether this was a create (201) or update (200) operation */
   readonly isCreate?: boolean;
-  /** Unix timestamp (seconds) when deployment binding last changed */
+  /** When DNS was verified (Unix timestamp, null if pending) */
+  verified?: number;
+  /** Total DNS verification attempts */
+  verifications?: number;
+  /** When deployment was last bound (Unix timestamp, null if never) */
   bound?: number;
+  /** Total deployment bindings */
+  bindings?: number;
 }
 
 /**
