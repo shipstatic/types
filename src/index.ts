@@ -99,10 +99,10 @@ export interface Domain {
   verified?: number;
   /** Total DNS verification attempts */
   verifications?: number;
-  /** When deployment was last bound (Unix timestamp, null if never) */
-  bound?: number;
-  /** Total deployment bindings */
-  bindings?: number;
+  /** When deployment was last linked (Unix timestamp, null if never) */
+  linked?: number;
+  /** Total deployment links */
+  links?: number;
 }
 
 /**
@@ -186,7 +186,7 @@ export interface Token {
   readonly token: string;
   /** The account this token belongs to */
   readonly account: string;
-  /** Optional IP address binding for security */
+  /** Optional IP address locking for security */
   readonly ip?: string;
   /** Optional array of tags for categorization and filtering (lowercase, alphanumeric with separators) */
   tags?: string[];
@@ -943,7 +943,7 @@ export interface ActivityMeta {
   isUpdate?: boolean;
   /** Whether domain was already verified */
   wasVerified?: boolean;
-  /** Previous deployment ID before rebinding */
+  /** Previous deployment ID before relinking */
   previousDeployment?: string;
   /** Tags that were set/updated */
   tags?: string[];
