@@ -1040,8 +1040,30 @@ export interface RateLimitData {
 }
 
 // =============================================================================
-// URL GENERATION UTILITIES
+// DOMAIN UTILITIES
 // =============================================================================
+
+/**
+ * Check if a domain is internal (a subdomain of our platform).
+ * Internal domains have no dots (e.g., "www", "my-app").
+ *
+ * @example isInternalDomain("www") → true
+ * @example isInternalDomain("example.com") → false
+ */
+export function isInternalDomain(domain: string): boolean {
+  return !domain.includes('.');
+}
+
+/**
+ * Check if a domain is external (a custom domain).
+ * External domains contain at least one dot (e.g., "example.com").
+ *
+ * @example isExternalDomain("example.com") → true
+ * @example isExternalDomain("www") → false
+ */
+export function isExternalDomain(domain: string): boolean {
+  return domain.includes('.');
+}
 
 /**
  * Generate deployment URL from deployment ID and base domain
@@ -1056,11 +1078,64 @@ export function generateDeploymentUrl(deployment: string, baseDomain?: string): 
  */
 export function generateDomainUrl(domainName: string, baseDomain?: string): string {
   // If domain contains dots, it's an external domain
-  if (domainName.includes('.')) {
+  if (isExternalDomain(domainName)) {
     return `https://${domainName}`;
   }
 
   // Otherwise it's an internal subdomain
   const domain = baseDomain || 'shipstatic.com';
   return `https://${domainName}.${domain}`;
+}
+
+/**
+ * Format domain name for display (hostname only, no protocol).
+ * Expands internal domains to full hostname.
+ *
+ * @example formatDomainName("www", "shipstatic.dev") → "www.shipstatic.dev"
+ * @example formatDomainName("example.com") → "example.com"
+ */
+export function formatDomainName(domainName: string, baseDomain?: string): string {
+  // If domain contains dots, it's an external domain - return as-is
+  if (isExternalDomain(domainName)) {
+    return domainName;
+  }
+
+  // Otherwise it's an internal subdomain - expand it
+  const domain = baseDomain || 'shipstatic.com';
+  return `${domainName}.${domain}`;
+}
+
+// =============================================================================
+// TAG UTILITIES
+// =============================================================================
+
+/**
+ * Serialize tags array to JSON string for database storage.
+ * Returns null for empty or undefined arrays.
+ *
+ * @example serializeTags(['web', 'production']) → '["web","production"]'
+ * @example serializeTags([]) → null
+ * @example serializeTags(undefined) → null
+ */
+export function serializeTags(tags: string[] | undefined): string | null {
+  if (!tags || tags.length === 0) return null;
+  return JSON.stringify(tags);
+}
+
+/**
+ * Deserialize tags from JSON string to array.
+ * Returns undefined for null/empty strings.
+ *
+ * @example deserializeTags('["web","production"]') → ['web', 'production']
+ * @example deserializeTags(null) → undefined
+ * @example deserializeTags('') → undefined
+ */
+export function deserializeTags(tagsJson: string | null): string[] | undefined {
+  if (!tagsJson) return undefined;
+  try {
+    const parsed = JSON.parse(tagsJson);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
 }
