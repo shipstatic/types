@@ -43,8 +43,6 @@ export interface Deployment {
   readonly created: number;
   /** Unix timestamp (seconds) when deployment expires */
   expires?: number; // Mutable - can be updated
-  /** Unix timestamp (seconds) when deployment was reviewed (content moderation) */
-  reviewed?: number; // Mutable - can be updated
   /** Short-lived JWT token for claiming this deployment (only present for public deployments) */
   claimToken?: string; // Mutable - can be updated
 }
@@ -95,10 +93,6 @@ export interface Domain {
   readonly created: number;
   /** Whether this was a create (201) or update (200) operation */
   readonly isCreate?: boolean;
-  /** When DNS was verified (Unix timestamp, null if pending) */
-  verified?: number;
-  /** Total DNS verification attempts */
-  verifications?: number;
   /** When deployment was last linked (Unix timestamp, null if never) */
   linked?: number;
   /** Total deployment links */
