@@ -1044,65 +1044,55 @@ export interface RateLimitData {
 // =============================================================================
 
 /**
- * Check if a domain is internal (a subdomain of our platform).
- * Internal domains have no dots (e.g., "www", "my-app").
+ * Check if a domain is a platform domain (subdomain of our platform).
+ * Platform domains are free and don't require DNS verification.
  *
- * @example isInternalDomain("www") → true
- * @example isInternalDomain("example.com") → false
+ * @example isPlatformDomain("www.shipstatic.dev", "shipstatic.dev") → true
+ * @example isPlatformDomain("example.com", "shipstatic.dev") → false
  */
-export function isInternalDomain(domain: string): boolean {
-  return !domain.includes('.');
+export function isPlatformDomain(domain: string, platformDomain: string): boolean {
+  return domain.endsWith(`.${platformDomain}`);
 }
 
 /**
- * Check if a domain is external (a custom domain).
- * External domains contain at least one dot (e.g., "example.com").
+ * Check if a domain is a custom domain (not a platform subdomain).
+ * Custom domains are billable and require DNS verification.
  *
- * @example isExternalDomain("example.com") → true
- * @example isExternalDomain("www") → false
+ * @example isCustomDomain("example.com", "shipstatic.dev") → true
+ * @example isCustomDomain("www.shipstatic.dev", "shipstatic.dev") → false
  */
-export function isExternalDomain(domain: string): boolean {
-  return domain.includes('.');
+export function isCustomDomain(domain: string, platformDomain: string): boolean {
+  return !isPlatformDomain(domain, platformDomain);
 }
 
 /**
- * Generate deployment URL from deployment ID and base domain
+ * Extract subdomain from a platform domain.
+ * Returns null if not a platform domain.
+ *
+ * @example extractSubdomain("www.shipstatic.dev", "shipstatic.dev") → "www"
+ * @example extractSubdomain("example.com", "shipstatic.dev") → null
  */
-export function generateDeploymentUrl(deployment: string, baseDomain?: string): string {
-  const domain = baseDomain || 'shipstatic.com';
+export function extractSubdomain(domain: string, platformDomain: string): string | null {
+  if (!isPlatformDomain(domain, platformDomain)) {
+    return null;
+  }
+  return domain.slice(0, -(platformDomain.length + 1)); // +1 for the dot
+}
+
+/**
+ * Generate deployment URL from deployment ID and platform domain
+ */
+export function generateDeploymentUrl(deployment: string, platformDomain?: string): string {
+  const domain = platformDomain || 'shipstatic.com';
   return `https://${deployment}.${domain}`;
 }
 
 /**
- * Generate domain URL based on whether it's internal (subdomain) or external (custom domain)
+ * Generate URL for a domain.
+ * Domains are stored as FQDNs, so this just prepends https://
  */
-export function generateDomainUrl(domainName: string, baseDomain?: string): string {
-  // If domain contains dots, it's an external domain
-  if (isExternalDomain(domainName)) {
-    return `https://${domainName}`;
-  }
-
-  // Otherwise it's an internal subdomain
-  const domain = baseDomain || 'shipstatic.com';
-  return `https://${domainName}.${domain}`;
-}
-
-/**
- * Format domain name for display (hostname only, no protocol).
- * Expands internal domains to full hostname.
- *
- * @example formatDomainName("www", "shipstatic.dev") → "www.shipstatic.dev"
- * @example formatDomainName("example.com") → "example.com"
- */
-export function formatDomainName(domainName: string, baseDomain?: string): string {
-  // If domain contains dots, it's an external domain - return as-is
-  if (isExternalDomain(domainName)) {
-    return domainName;
-  }
-
-  // Otherwise it's an internal subdomain - expand it
-  const domain = baseDomain || 'shipstatic.com';
-  return `${domainName}.${domain}`;
+export function generateDomainUrl(domain: string): string {
+  return `https://${domain}`;
 }
 
 // =============================================================================
