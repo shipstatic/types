@@ -835,41 +835,41 @@ export interface KeysResource {
 // =============================================================================
 
 /**
- * All activity event types logged in the system
+ * All activity event types logged in the system.
+ * Uses dot notation consistently: {resource}.{action}
  */
 export type ActivityEvent =
   // Account events
-  | 'account_create'
-  | 'account_update'
-  | 'account_delete'
-  | 'account_key_generate'
-  | 'account_plan_paid'
-  | 'account_plan_transition'
-  | 'account_suspended'
+  | 'account.create'
+  | 'account.update'
+  | 'account.delete'
+  | 'account.key.generate'
+  | 'account.plan.paid'
+  | 'account.plan.transition'
+  | 'account.suspended'
   // Deployment events
-  | 'deployment_create'
-  | 'deployment_update'
-  | 'deployment_delete'
-  | 'deployment_claim'
+  | 'deployment.create'
+  | 'deployment.update'
+  | 'deployment.delete'
+  | 'deployment.claim'
   // Domain events
-  | 'domain_create'
-  | 'domain_update'
-  | 'domain_delete'
-  | 'domain_verify'
+  | 'domain.create'
+  | 'domain.update'
+  | 'domain.delete'
+  | 'domain.verify'
   // Token events
-  | 'token_create'
-  | 'token_consume'
+  | 'token.create'
+  | 'token.consume'
   // Admin events (not user-visible)
-  | 'admin_account_plan_update'
-  | 'admin_account_ref_update'
-  | 'admin_account_billing_update'
-  | 'admin_account_tags_update'
-  | 'admin_deployment_delete'
-  | 'admin_domain_delete'
-  | 'admin_billing_sync'
-  | 'admin_billing_terminated'
-  // Webhook events (logged directly from payment provider webhooks)
-  // These use dot notation matching the WebhookEvent.type format
+  | 'admin.account.plan.update'
+  | 'admin.account.ref.update'
+  | 'admin.account.billing.update'
+  | 'admin.account.tags.update'
+  | 'admin.deployment.delete'
+  | 'admin.domain.delete'
+  | 'admin.billing.sync'
+  | 'admin.billing.terminated'
+  // Webhook events (logged directly from payment provider)
   | 'billing.active'
   | 'billing.canceled'
   | 'billing.paused'
@@ -887,21 +887,21 @@ export type ActivityEvent =
  * Activity events visible to users in the dashboard
  */
 export type UserVisibleActivityEvent =
-  | 'account_create'
-  | 'account_update'
-  | 'account_delete'
-  | 'account_key_generate'
-  | 'account_plan_transition'
-  | 'deployment_create'
-  | 'deployment_update'
-  | 'deployment_delete'
-  | 'deployment_claim'
-  | 'domain_create'
-  | 'domain_update'
-  | 'domain_delete'
-  | 'domain_verify'
-  | 'token_create'
-  | 'token_consume';
+  | 'account.create'
+  | 'account.update'
+  | 'account.delete'
+  | 'account.key.generate'
+  | 'account.plan.transition'
+  | 'deployment.create'
+  | 'deployment.update'
+  | 'deployment.delete'
+  | 'deployment.claim'
+  | 'domain.create'
+  | 'domain.update'
+  | 'domain.delete'
+  | 'domain.verify'
+  | 'token.create'
+  | 'token.consume';
 
 /**
  * Activity record returned from the API
