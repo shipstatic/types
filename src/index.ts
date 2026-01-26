@@ -859,29 +859,29 @@ export type ActivityEvent =
   // Token events
   | 'token_create'
   | 'token_consume'
-  // System events (not user-visible)
+  // Admin events (not user-visible)
   | 'admin_account_plan_update'
   | 'admin_account_ref_update'
   | 'admin_account_billing_update'
   | 'admin_account_tags_update'
   | 'admin_deployment_delete'
   | 'admin_domain_delete'
-  // Billing events (internal, not shown to users except account_plan_transition)
-  | 'billing_suspended'
-  | 'billing_active'
-  | 'billing_canceled'
-  | 'billing_paused'
-  | 'billing_expired'
-  | 'billing_paid'
-  | 'billing_trialing'
-  | 'billing_scheduled_cancel'
-  | 'billing_unpaid'
-  | 'billing_update'
-  | 'billing_past_due'
-  | 'billing_terminated'
-  | 'billing_manual_sync'
-  | 'refund_create'
-  | 'dispute_create';
+  | 'admin_billing_sync'
+  | 'admin_billing_terminated'
+  // Webhook events (logged directly from payment provider webhooks)
+  // These use dot notation matching the WebhookEvent.type format
+  | 'billing.active'
+  | 'billing.canceled'
+  | 'billing.paused'
+  | 'billing.expired'
+  | 'billing.paid'
+  | 'billing.trialing'
+  | 'billing.scheduled_cancel'
+  | 'billing.unpaid'
+  | 'billing.update'
+  | 'billing.past_due'
+  | 'refund.created'
+  | 'dispute.created';
 
 /**
  * Activity events visible to users in the dashboard
