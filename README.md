@@ -55,7 +55,7 @@ import type { DeploymentResource, DomainResource, AccountResource } from '@ships
 ### Validation Utilities
 
 ```typescript
-import { validateApiKey, validateDeployToken, validateSubdomain } from '@shipstatic/types';
+import { validateApiKey, validateDeployToken, isDeployment } from '@shipstatic/types';
 ```
 
 ### Constants

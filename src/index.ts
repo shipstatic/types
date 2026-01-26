@@ -580,10 +580,10 @@ export function validateApiUrl(apiUrl: string): void {
 }
 
 /**
- * Validate subdomain format (deployment pattern)
+ * Check if a string matches the deployment ID pattern (word-word-alphanumeric7)
+ * Example: "happy-cat-abc1234"
  */
-export function validateSubdomain(input: string): boolean {
-  // Deployment subdomain format: word-word-7chars (e.g. "happy-cat-abc1234")
+export function isDeployment(input: string): boolean {
   return /^[a-z]+-[a-z]+-[a-z0-9]{7}$/i.test(input);
 }
 
