@@ -1031,14 +1031,6 @@ export interface UploadedFile {
   validated?: boolean;
 }
 
-/**
- * Rate limiting data structure
- */
-export interface RateLimitData {
-  count: number;
-  timestamp: number;
-}
-
 // =============================================================================
 // DOMAIN UTILITIES
 // =============================================================================
