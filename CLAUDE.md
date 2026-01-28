@@ -59,9 +59,10 @@ Single file: `src/index.ts` organized into sections:
 ## Quick Reference
 
 ```bash
-pnpm build                    # Build package
-pnpm test --run               # No tests (compile-time validation)
+pnpm build                    # Build package (TypeScript compilation validates types)
 ```
+
+**No runtime tests** - types are validated at compile time. If it builds, it's correct.
 
 ## Key Patterns
 
@@ -211,10 +212,6 @@ static newError(message: string): ShipError {
   return new ShipError(ErrorType.NewError, message, 400);
 }
 ```
-
-## No Tests
-
-Types are validated at compile time. If it builds, it's correct. Consumers test against these types in their own test suites.
 
 ## Design Principles
 

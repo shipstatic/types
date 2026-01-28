@@ -395,8 +395,8 @@ export class ShipError extends Error {
     return new ShipError(ErrorType.Config, message, undefined, details);
   }
 
-  static api(message: string, status: number = 500, code?: string, data?: any): ShipError {
-    return new ShipError(ErrorType.Api, message, status, { code, data });
+  static api(message: string, status: number = 500): ShipError {
+    return new ShipError(ErrorType.Api, message, status);
   }
 
   static database(message: string, status: number = 500): ShipError {
@@ -407,13 +407,9 @@ export class ShipError extends Error {
     return new ShipError(ErrorType.Api, message, status);
   }
 
-  // Helper getters for accessing common detail properties
+  // Helper getter for accessing file path from details
   get filePath(): string | undefined {
     return this.details?.filePath;
-  }
-
-  get code(): string | undefined {
-    return this.details?.code;
   }
 
   // Helper methods for error type checking using categorization
@@ -445,6 +441,27 @@ export class ShipError extends Error {
   isType(errorType: ErrorType): boolean {
     return this.type === errorType;
   }
+}
+
+/**
+ * Type guard to check if an unknown value is a ShipError.
+ *
+ * Uses structural checking instead of instanceof to handle module duplication
+ * in bundled applications where multiple copies of the ShipError class may exist.
+ *
+ * @example
+ * if (isShipError(error)) {
+ *   console.log(error.status, error.message);
+ * }
+ */
+export function isShipError(error: unknown): error is ShipError {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    'name' in error &&
+    error.name === 'ShipError' &&
+    'status' in error
+  );
 }
 
 // =============================================================================
