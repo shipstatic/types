@@ -589,7 +589,7 @@ export function validateApiUrl(apiUrl: string): void {
       throw ShipError.validation('API URL must not contain query parameters or fragments');
     }
   } catch (error) {
-    if (error instanceof ShipError) {
+    if (isShipError(error)) {
       throw error;
     }
     throw ShipError.validation('API URL must be a valid URL');
@@ -764,6 +764,7 @@ export interface DomainResource {
   get: (name: string) => Promise<Domain>;
   remove: (name: string) => Promise<void>;
   verify: (name: string) => Promise<{ message: string }>;
+  validate: (name: string) => Promise<{ valid: boolean; normalized?: string; error?: string }>;
   dns: (name: string) => Promise<DomainDnsResponse>;
   records: (name: string) => Promise<DomainRecordsResponse>;
   share: (name: string) => Promise<{ domain: string; hash: string }>;
