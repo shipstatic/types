@@ -66,11 +66,17 @@ export interface DeploymentListResponse {
 
 /**
  * Domain status constants
+ *
+ * - PENDING: DNS not configured
+ * - PARTIAL: DNS partially configured
+ * - SUCCESS: DNS fully verified
+ * - PAUSED: Domain paused due to plan enforcement (billing)
  */
 export const DomainStatus = {
   PENDING: 'pending',
   PARTIAL: 'partial',
-  SUCCESS: 'success'
+  SUCCESS: 'success',
+  PAUSED: 'paused'
 } as const;
 
 export type DomainStatusType = typeof DomainStatus[keyof typeof DomainStatus];
