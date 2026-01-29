@@ -157,6 +157,20 @@ export interface DomainRecordsResponse {
 }
 
 /**
+ * Response for domain validation
+ */
+export interface DomainValidateResponse {
+  /** Whether the domain is valid */
+  valid: boolean;
+  /** Normalized domain name (only present when valid) */
+  normalized?: string;
+  /** Whether the domain is available (only present when valid) */
+  available?: boolean;
+  /** Error message (only present when invalid) */
+  error?: string;
+}
+
+/**
  * Response for deployment removal
  */
 export interface DeploymentRemoveResponse {
@@ -764,7 +778,7 @@ export interface DomainResource {
   get: (name: string) => Promise<Domain>;
   remove: (name: string) => Promise<void>;
   verify: (name: string) => Promise<{ message: string }>;
-  validate: (name: string) => Promise<{ valid: boolean; normalized?: string; error?: string }>;
+  validate: (name: string) => Promise<DomainValidateResponse>;
   dns: (name: string) => Promise<DomainDnsResponse>;
   records: (name: string) => Promise<DomainRecordsResponse>;
   share: (name: string) => Promise<{ domain: string; hash: string }>;
