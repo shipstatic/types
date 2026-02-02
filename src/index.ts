@@ -1130,6 +1130,31 @@ export function generateDomainUrl(domain: string): string {
 // =============================================================================
 
 /**
+ * Tag validation constraints shared across UI and API.
+ * These rules define the single source of truth for tag validation.
+ */
+export const TAG_CONSTRAINTS = {
+  /** Minimum tag length in characters */
+  MIN_LENGTH: 3,
+  /** Maximum tag length in characters (concise tags, matches Stack Overflow's original limit) */
+  MAX_LENGTH: 25,
+  /** Maximum number of tags allowed per resource */
+  MAX_COUNT: 10,
+  /** Allowed separator characters between tag segments */
+  SEPARATORS: '._-',
+} as const;
+
+/**
+ * Tag validation pattern.
+ * Must start and end with alphanumeric (a-z, 0-9).
+ * Can contain separators (. _ -) between segments, but not consecutive.
+ *
+ * Valid examples: 'production', 'v1.2.3', 'api_v2', 'us-east-1'
+ * Invalid examples: 'ab' (too short), '-prod' (starts with separator), 'foo--bar' (consecutive separators)
+ */
+export const TAG_PATTERN = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
+
+/**
  * Serialize tags array to JSON string for database storage.
  * Returns null for empty or undefined arrays.
  *
