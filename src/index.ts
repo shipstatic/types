@@ -158,6 +158,8 @@ export interface DomainDnsResponse {
 export interface DomainRecordsResponse {
   /** The domain name */
   domain: string;
+  /** The apex (registered) domain where DNS records are managed */
+  apex: string;
   /** Required DNS records for configuration */
   records: DnsRecord[];
 }
