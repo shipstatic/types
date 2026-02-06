@@ -492,6 +492,9 @@ export function isShipError(error: unknown): error is ShipError {
 
 /**
  * Platform configuration response from API
+ *
+ * Contains ONLY dynamic, runtime-specific values (plan-based limits).
+ * Static constants (MIME types, validation rules) live as exported constants.
  */
 export interface ConfigResponse {
   /** Maximum individual file size in bytes */
@@ -500,8 +503,63 @@ export interface ConfigResponse {
   maxFilesCount: number;
   /** Maximum total deployment size in bytes */
   maxTotalSize: number;
-  /** Allowed MIME type categories for file validation */
-  allowedMimeTypes: string[];
+}
+
+/**
+ * Allowed MIME types and prefixes for file uploads.
+ *
+ * This is a static platform constant, not per-user configuration.
+ * Safe to share across frontend/backend due to atomic deploys.
+ *
+ * Validation rules:
+ * - Exact match: 'application/json' allows only 'application/json'
+ * - Prefix match: 'text/' allows 'text/plain', 'text/html', etc.
+ */
+export const ALLOWED_MIME_TYPES = [
+  // Common web content (prefix matches)
+  'text/',           // All text types
+  'image/',          // All image types
+  'audio/',          // All audio types
+  'video/',          // All video types
+  'font/',           // Modern font types (font/woff, font/woff2, font/ttf, font/otf)
+  'model/',          // 3D models
+
+  // Specific application types (exact matches)
+  'application/json',
+  'application/javascript',
+  'application/pdf',
+  'application/xml',
+  'application/manifest+json',
+  'application/toml',
+
+  // Legacy font MIME types (for Bootstrap, Font Awesome, etc.)
+  'application/font-woff',
+  'application/font-woff2',
+  'application/x-font-woff',
+  'application/x-woff',
+  'application/vnd.ms-fontobject',  // .eot files (IE compatibility)
+  'application/x-font-ttf',
+  'application/x-font-truetype',
+  'application/x-font-otf',
+  'application/x-font-opentype',
+] as const;
+
+/**
+ * Check if a MIME type is allowed for upload.
+ *
+ * Supports both exact matches and prefix matches:
+ * - 'application/json' matches 'application/json' exactly
+ * - 'text/' matches 'text/plain', 'text/html', etc.
+ *
+ * @example
+ * isAllowedMimeType('text/plain')     // true (prefix match)
+ * isAllowedMimeType('application/json') // true (exact match)
+ * isAllowedMimeType('application/wasm') // false (not allowed)
+ */
+export function isAllowedMimeType(mimeType: string): boolean {
+  return ALLOWED_MIME_TYPES.some(allowed =>
+    mimeType === allowed || mimeType.startsWith(allowed)
+  );
 }
 
 // =============================================================================
