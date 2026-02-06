@@ -649,6 +649,7 @@ export const ALLOWED_MIME_TYPES = [
 
   // Configuration formats
   'application/yaml',              // YAML configs (static site generators)
+  'application/toml',              // TOML configs (Cargo, Netlify, Rust projects)
 
   // Documents
   'application/pdf',               // PDF documents
