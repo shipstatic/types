@@ -506,38 +506,160 @@ export interface ConfigResponse {
 }
 
 /**
- * Allowed MIME types and prefixes for file uploads.
+ * Allowed MIME types for static web hosting.
  *
  * This is a static platform constant, not per-user configuration.
  * Safe to share across frontend/backend due to atomic deploys.
  *
  * Validation rules:
  * - Exact match: 'application/json' allows only 'application/json'
- * - Prefix match: 'text/' allows 'text/plain', 'text/html', etc.
+ * - Prefix match: 'image/' allows all image types (png, jpeg, webp, etc.)
+ *
+ * Coverage: 100% of browser-renderable web content
+ * - Core web (HTML, CSS, JS, WASM)
+ * - Media (images, audio, video, fonts)
+ * - Documents (PDF, Markdown, data formats)
+ * - Modern web (PWA, 3D, structured data)
+ *
+ * ============================================================================
+ * INTENTIONALLY EXCLUDED (Security & Platform Integrity)
+ * ============================================================================
+ *
+ * We are a WEB HOSTING platform, not a file distribution service.
+ * GitHub Pages-style parity for renderable content, more restrictive for downloads.
+ *
+ * 1. EXECUTABLES (Malware Distribution)
+ *    → .exe, .msi, .dmg, .deb, .rpm, .app, .apk, .jar
+ *    → Reason: Direct malware delivery vector
+ *    → Alternative: Use GitHub Releases or dedicated software distribution CDN
+ *
+ * 2. ARCHIVES (Piracy & Abuse)
+ *    → .zip, .rar, .tar, .gz, .7z, .bz2
+ *    → Reason: File sharing abuse, can contain executables, no web rendering
+ *    → Alternative: Use file hosting service (Dropbox, Google Drive) or GitHub Releases
+ *
+ * 3. SERVER-SIDE SCRIPTS (Credential Leakage)
+ *    → .php, .asp, .jsp, .cgi
+ *    → Reason: Source code exposure (database passwords, API keys, secrets)
+ *    → Alternative: Static hosting only - use serverless functions for backends
+ *
+ * 4. SHELL SCRIPTS (OS Execution)
+ *    → .sh, .bash, .bat, .cmd, .ps1, .vbs
+ *    → Reason: Execute on user's OS outside browser sandbox, social engineering risk
+ *    → Alternative: Embed code examples in HTML <pre><code> or link to GitHub repo
+ *
+ * 5. PROGRAMMING LANGUAGE SOURCE (Platform Scope)
+ *    → .py, .rb, .pl, .java, .c, .cpp, .cs, .go, .rs
+ *    → Reason: Not web-renderable, better served by GitHub/GitLab/Bitbucket
+ *    → Alternative: Use GitHub for code hosting, link to repository
+ *
+ * 6. OFFICE DOCUMENTS (Macro Malware)
+ *    → .doc, .docx, .xls, .xlsx, .ppt, .pptx
+ *    → Reason: Can contain VBA macros, active exploits in the wild
+ *    → Alternative: Use PDF for documents (fully supported)
+ *
+ * 7. GENERIC BINARIES (Unvalidatable)
+ *    → application/octet-stream
+ *    → Reason: Too broad - allows any binary format, cannot moderate effectively
+ *    → Alternative: Use specific MIME types for known formats
+ *
+ * ============================================================================
+ * Security Model:
+ * - Browser sandbox (JS/WASM execute safely in controlled environment)
+ * - AI content moderation (scans text/image content for abuse)
+ * - No server-side execution (static files only)
+ * - Explicit allowlist (only approved formats, reject unknown)
+ * ============================================================================
  */
 export const ALLOWED_MIME_TYPES = [
-  // Common web content (prefix matches)
-  'text/',           // All text types
-  'image/',          // All image types
-  'audio/',          // All audio types
-  'video/',          // All video types
-  'font/',           // Modern font types (font/woff, font/woff2, font/ttf, font/otf)
-  'model/',          // 3D models
+  // =========================================================================
+  // TEXT CONTENT (explicit list - no prefix matching for security)
+  // =========================================================================
 
-  // Specific application types (exact matches)
+  // Core web documents
+  'text/html',                     // HTML pages
+  'text/css',                      // Stylesheets
+  'text/plain',                    // Plain text (robots.txt, .well-known/*, LICENSE, README.txt)
+  'text/markdown',                 // Markdown files (.md)
+  'text/xml',                      // XML files
+
+  // Data formats
+  'text/csv',                      // CSV data files
+  'text/yaml',                     // YAML config files
+
+  // Web-specific formats
+  'text/vtt',                      // WebVTT video subtitles/captions (accessibility)
+  'text/calendar',                 // iCalendar (.ics) event files
+
+  // JavaScript (legacy MIME type, still widely used by ~50% of servers)
+  'text/javascript',
+
+  // =========================================================================
+  // MEDIA (prefix matching - covers all common subtypes)
+  // =========================================================================
+
+  // Images: PNG, JPEG, GIF, SVG, WebP, AVIF, HEIC, BMP, TIFF, ICO, etc.
+  'image/',
+
+  // Audio: MP3, OGG, WAV, WebM, AAC, FLAC, Opus, etc.
+  'audio/',
+
+  // Video: MP4, WebM, OGG, QuickTime, etc.
+  'video/',
+
+  // Modern fonts: WOFF2, WOFF, TTF, OTF
+  'font/',
+
+  // =========================================================================
+  // CORE WEB APPLICATION TYPES
+  // =========================================================================
+
+  // JavaScript (multiple MIME types for compatibility)
+  'application/javascript',        // Modern standard (RFC 9239)
+  'application/ecmascript',        // ECMAScript (legacy but still used)
+  'application/x-javascript',      // Legacy variant (old CDNs, Apache configs)
+
+  // WebAssembly (modern web apps, games, compute-heavy workloads)
+  'application/wasm',
+
+  // JSON and structured data
   'application/json',
-  'application/javascript',
-  'application/pdf',
-  'application/xml',
-  'application/manifest+json',
-  'application/toml',
+  'application/ld+json',           // JSON-LD for structured data / SEO (Schema.org, Open Graph)
+  'application/manifest+json',     // PWA web app manifests
 
-  // Legacy font MIME types (for Bootstrap, Font Awesome, etc.)
+  // XML and feeds
+  'application/xml',
+  'application/xhtml+xml',         // XHTML - XML-compliant HTML (legacy sites)
+  'application/rss+xml',           // RSS feeds (blogs, podcasts)
+  'application/atom+xml',          // Atom feeds
+
+  // Configuration formats
+  'application/yaml',              // YAML configs (static site generators)
+
+  // Documents
+  'application/pdf',               // PDF documents
+
+  // =========================================================================
+  // 3D FORMATS (industry standard only)
+  // =========================================================================
+
+  // glTF - Khronos standard for 3D web content
+  'model/gltf+json',               // glTF JSON format
+  'model/gltf-binary',             // GLB binary format
+
+  // =========================================================================
+  // LEGACY COMPATIBILITY
+  // =========================================================================
+
+  // Video (some tools detect MP4 as application/mp4)
+  'application/mp4',
+
+  // Legacy font MIME types (Bootstrap, Font Awesome, IE compatibility)
   'application/font-woff',
   'application/font-woff2',
   'application/x-font-woff',
   'application/x-woff',
-  'application/vnd.ms-fontobject',  // .eot files (IE compatibility)
+  'application/vnd.ms-fontobject',  // EOT files (Internet Explorer)
   'application/x-font-ttf',
   'application/x-font-truetype',
   'application/x-font-otf',
