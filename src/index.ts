@@ -594,6 +594,17 @@ export const ALLOWED_MIME_TYPES = [
   // JavaScript (legacy MIME type, still widely used by ~50% of servers)
   'text/javascript',
 
+  // Modern web development formats (uncompiled source)
+  'text/typescript',               // TypeScript source (.ts)
+  'text/tsx',                      // TypeScript JSX (.tsx)
+  'text/jsx',                      // React JSX (.jsx)
+  'text/x-scss',                   // SCSS preprocessor
+  'text/x-sass',                   // Sass preprocessor
+  'text/x-less',                   // Less preprocessor
+  'text/stylus',                   // Stylus preprocessor
+  'text/x-vue',                    // Vue single-file components (.vue)
+  'text/x-svelte',                 // Svelte components (.svelte)
+
   // =========================================================================
   // MEDIA (prefix matching - covers all common subtypes)
   // =========================================================================
@@ -626,6 +637,9 @@ export const ALLOWED_MIME_TYPES = [
   'application/json',
   'application/ld+json',           // JSON-LD for structured data / SEO (Schema.org, Open Graph)
   'application/manifest+json',     // PWA web app manifests
+
+  // Development tools
+  'application/source-map',        // Source maps (.js.map, .css.map) for debugging
 
   // XML and feeds
   'application/xml',
