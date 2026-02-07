@@ -1212,17 +1212,61 @@ export interface ActivityListResponse {
  * File status constants for validation state tracking
  */
 export const FileValidationStatus = {
+  /** File is pending validation */
   PENDING: 'pending',
+  /** File failed during processing (before validation) */
   PROCESSING_ERROR: 'processing_error',
-  EMPTY_FILE: 'empty_file',
+  /** File was excluded by validation warning (not an error) */
+  EXCLUDED: 'excluded',
+  /** File failed validation (blocks deployment) */
   VALIDATION_FAILED: 'validation_failed',
+  /** File passed validation and is ready for deployment */
   READY: 'ready',
 } as const;
 
 export type FileValidationStatusType = typeof FileValidationStatus[keyof typeof FileValidationStatus];
 
 /**
- * Client-side validation error structure
+ * Types of validation issues that can occur during file validation
+ */
+export type ValidationIssueType =
+  // Warnings (exclude file but don't block deployment)
+  | 'empty_file'
+
+  // Errors (block deployment)
+  | 'file_too_large'
+  | 'total_size_exceeded'
+  | 'invalid_mime_type'
+  | 'invalid_filename'
+  | 'mime_extension_mismatch'
+  | 'file_count_exceeded'
+  | 'processing_error';
+
+/**
+ * A validation issue with severity level
+ *
+ * Issues are categorized by severity:
+ * - **error**: Blocks deployment, user must fix
+ * - **warning**: Excludes file but allows deployment to proceed
+ */
+export interface ValidationIssue {
+  /** File path that triggered this issue */
+  file: string;
+
+  /** Severity level determines deployment behavior */
+  severity: 'error' | 'warning';
+
+  /** Issue type for programmatic handling */
+  type: ValidationIssueType;
+
+  /** Human-readable message explaining the issue */
+  message: string;
+}
+
+/**
+ * Legacy validation error structure
+ *
+ * @deprecated Use ValidationIssue[] from FileValidationResult instead
  */
 export interface ValidationError {
   error: string;
@@ -1243,18 +1287,44 @@ export interface ValidatableFile {
 }
 
 /**
- * File validation result
+ * File validation result with severity-based issue reporting
  *
- * NOTE: Validation is ATOMIC - if any file fails validation, ALL files are rejected.
- * This ensures deployments are all-or-nothing for data integrity.
+ * Validation checks files against constraints and categorizes issues by severity:
+ * - **Errors**: Block deployment (file too large, invalid type, etc.)
+ * - **Warnings**: Exclude files but allow deployment (empty files, etc.)
+ *
+ * @example
+ * ```typescript
+ * const result = validateFiles(files, config);
+ *
+ * if (!result.canDeploy) {
+ *   // Has errors - must fix before deploying
+ *   console.error('Deployment blocked:', result.errors);
+ * } else if (result.warnings.length > 0) {
+ *   // Has warnings - deployment proceeds, some files excluded
+ *   console.warn('Files excluded:', result.warnings);
+ *   deploy(result.validFiles);
+ * } else {
+ *   // All files valid
+ *   deploy(result.validFiles);
+ * }
+ * ```
  */
 export interface FileValidationResult<T extends ValidatableFile> {
   /** All files with updated status */
   files: T[];
-  /** Files that passed validation (empty if ANY file failed - atomic validation) */
+
+  /** Files ready for deployment (status: 'ready') */
   validFiles: T[];
-  /** Validation error if any files failed */
-  error: ValidationError | null;
+
+  /** Blocking errors that prevent deployment */
+  errors: ValidationIssue[];
+
+  /** Non-blocking warnings (files excluded but deployment allowed) */
+  warnings: ValidationIssue[];
+
+  /** Whether deployment can proceed (true if errors.length === 0) */
+  canDeploy: boolean;
 }
 
 /**
