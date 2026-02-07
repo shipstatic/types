@@ -600,7 +600,8 @@ export const ALLOWED_MIME_TYPES = [
   'text/jsx',                      // React JSX (.jsx)
   'text/x-scss',                   // SCSS preprocessor
   'text/x-sass',                   // Sass preprocessor
-  'text/x-less',                   // Less preprocessor
+  'text/less',                     // Less preprocessor
+  'text/x-less',                   // Less preprocessor (alternative)
   'text/stylus',                   // Stylus preprocessor
   'text/x-vue',                    // Vue single-file components (.vue)
   'text/x-svelte',                 // Svelte components (.svelte)
