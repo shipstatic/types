@@ -60,9 +60,10 @@ Single file: `src/index.ts` organized into sections:
 
 ```bash
 pnpm build                    # Build package (TypeScript compilation validates types)
+pnpm test --run               # Run validation constant tests
 ```
 
-**No runtime tests** - types are validated at compile time. If it builds, it's correct.
+**Runtime behavior tests:** `tests/validation-constants.test.ts` verifies validation constants and utilities (MIME types, file statuses, tag patterns). TypeScript types are validated at compile time.
 
 ## Key Patterns
 

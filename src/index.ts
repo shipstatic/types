@@ -585,10 +585,17 @@ export const ALLOWED_MIME_TYPES = [
 
   // Data formats
   'text/csv',                      // CSV data files
+  'text/tab-separated-values',     // TSV data files
   'text/yaml',                     // YAML config files
+  'text/vcard',                    // VCard contact files (.vcf)
+
+  // Modern documentation formats
+  'text/mdx',                      // MDX (Markdown with JSX) - Next.js, Docusaurus, Nextra
+  'text/x-mdx',                    // MDX (alternative MIME type)
 
   // Web-specific formats
   'text/vtt',                      // WebVTT video subtitles/captions (accessibility)
+  'text/srt',                      // SRT subtitles (SubRip format, legacy video captions)
   'text/calendar',                 // iCalendar (.ics) event files
 
   // JavaScript (legacy MIME type, still widely used by ~50% of servers)
@@ -596,6 +603,7 @@ export const ALLOWED_MIME_TYPES = [
 
   // Modern web development formats (uncompiled source)
   'text/typescript',               // TypeScript source (.ts)
+  'application/x-typescript',      // TypeScript (alternative MIME type, .d.ts declarations)
   'text/tsx',                      // TypeScript JSX (.tsx)
   'text/jsx',                      // React JSX (.jsx)
   'text/x-scss',                   // SCSS preprocessor
@@ -605,6 +613,19 @@ export const ALLOWED_MIME_TYPES = [
   'text/stylus',                   // Stylus preprocessor
   'text/x-vue',                    // Vue single-file components (.vue)
   'text/x-svelte',                 // Svelte components (.svelte)
+
+  // Developer documentation formats
+  'text/x-sql',                    // SQL files (database schemas, migrations)
+  'text/x-diff',                   // Diff files (code comparisons, patches)
+  'text/x-patch',                  // Patch files (version upgrades, migrations)
+  'text/x-protobuf',               // Protocol Buffers text format (gRPC schemas)
+  'text/x-ini',                    // INI configuration files
+
+  // Academic/research formats
+  'text/x-tex',                    // LaTeX documents
+  'text/x-latex',                  // LaTeX documents (alternative)
+  'text/x-bibtex',                 // BibTeX citations
+  'text/x-r-markdown',             // R Markdown (statistical documentation)
 
   // =========================================================================
   // MEDIA (prefix matching - covers all common subtypes)
@@ -637,7 +658,19 @@ export const ALLOWED_MIME_TYPES = [
   // JSON and structured data
   'application/json',
   'application/ld+json',           // JSON-LD for structured data / SEO (Schema.org, Open Graph)
+  'application/geo+json',          // GeoJSON for mapping (Leaflet, Mapbox)
   'application/manifest+json',     // PWA web app manifests
+  'application/x-ipynb+json',      // Jupyter Notebooks (data science, ML tutorials)
+
+  // JSON variants (AI/ML, streaming data, configs)
+  'application/x-ndjson',          // Newline-Delimited JSON (training datasets, logs)
+  'application/ndjson',            // NDJSON (alternative MIME type)
+  'text/x-ndjson',                 // NDJSON (text variant)
+  'application/jsonl',             // JSON Lines (Hugging Face, OpenAI fine-tuning)
+  'text/jsonl',                    // JSON Lines (text variant)
+  'application/json5',             // JSON5 (JSON with comments, trailing commas)
+  'text/json5',                    // JSON5 (text variant)
+  'application/schema+json',       // JSON Schema (API specs, model definitions)
 
   // Development tools
   'application/source-map',        // Source maps (.js.map, .css.map) for debugging
@@ -647,6 +680,8 @@ export const ALLOWED_MIME_TYPES = [
   'application/xhtml+xml',         // XHTML - XML-compliant HTML (legacy sites)
   'application/rss+xml',           // RSS feeds (blogs, podcasts)
   'application/atom+xml',          // Atom feeds
+  'application/feed+json',         // JSON Feed (modern RSS alternative)
+  'application/vnd.google-earth.kml+xml', // KML for mapping (Google Earth, GIS)
 
   // Configuration formats
   'application/yaml',              // YAML configs (static site generators)
@@ -654,6 +689,20 @@ export const ALLOWED_MIME_TYPES = [
 
   // Documents
   'application/pdf',               // PDF documents
+
+  // Media metadata
+  'application/x-subrip',          // SRT subtitles (SubRip format)
+
+  // Developer tools and schemas
+  'application/sql',               // SQL files (database schemas, queries)
+  'application/graphql',           // GraphQL schemas (API documentation)
+  'application/graphql+json',      // GraphQL with JSON encoding
+  'application/x-protobuf',        // Protocol Buffers binary (gRPC)
+  'application/x-ini',             // INI configuration files
+
+  // Academic formats
+  'application/x-tex',             // LaTeX documents
+  'application/x-bibtex',          // BibTeX citations
 
   // =========================================================================
   // 3D FORMATS (industry standard only)
@@ -1226,40 +1275,18 @@ export const FileValidationStatus = {
 
 export type FileValidationStatusType = typeof FileValidationStatus[keyof typeof FileValidationStatus];
 
-/**
- * Types of validation issues that can occur during file validation
- */
-export type ValidationIssueType =
-  // Warnings (exclude file but don't block deployment)
-  | 'empty_file'
-
-  // Errors (block deployment)
-  | 'file_too_large'
-  | 'total_size_exceeded'
-  | 'invalid_mime_type'
-  | 'invalid_filename'
-  | 'mime_extension_mismatch'
-  | 'file_count_exceeded'
-  | 'processing_error';
 
 /**
- * A validation issue with severity level
+ * A validation issue with a display-ready message
  *
- * Issues are categorized by severity:
- * - **error**: Blocks deployment, user must fix
- * - **warning**: Excludes file but allows deployment to proceed
+ * Issues are either errors (in errors[] array) or warnings (in warnings[] array).
+ * The array position determines severity - no need to duplicate it in the object.
  */
 export interface ValidationIssue {
   /** File path that triggered this issue */
   file: string;
 
-  /** Severity level determines deployment behavior */
-  severity: 'error' | 'warning';
-
-  /** Issue type for programmatic handling */
-  type: ValidationIssueType;
-
-  /** Human-readable message explaining the issue */
+  /** Display-ready message explaining the issue */
   message: string;
 }
 
