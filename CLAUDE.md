@@ -99,12 +99,12 @@ interface DeploymentResource {
   create: (input: DeployInput, options?: DeploymentCreateOptions) => Promise<Deployment>;
   list: () => Promise<DeploymentListResponse>;
   get: (id: string) => Promise<Deployment>;
-  set: (id: string, options: { tags: string[] }) => Promise<Deployment>;
+  set: (id: string, options: { labels: string[] }) => Promise<Deployment>;
   remove: (id: string) => Promise<void>;
 }
 
 interface DomainResource {
-  set: (name: string, options?: { deployment?: string; tags?: string[] }) => Promise<Domain>;
+  set: (name: string, options?: { deployment?: string; labels?: string[] }) => Promise<Domain>;
   list: () => Promise<DomainListResponse>;
   get: (name: string) => Promise<Domain>;
   remove: (name: string) => Promise<void>;
@@ -113,7 +113,7 @@ interface DomainResource {
 }
 
 interface TokenResource {
-  create: (options?: { ttl?: number; tags?: string[] }) => Promise<TokenCreateResponse>;
+  create: (options?: { ttl?: number; labels?: string[] }) => Promise<TokenCreateResponse>;
   list: () => Promise<TokenListResponse>;
   remove: (token: string) => Promise<void>;
 }

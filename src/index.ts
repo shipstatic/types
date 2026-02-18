@@ -33,8 +33,8 @@ export interface Deployment {
   status: DeploymentStatusType; // Mutable - can be updated
   /** Whether deployment has configuration */
   readonly config?: boolean;
-  /** Optional array of tags for categorization and filtering (lowercase, alphanumeric with separators) */
-  tags?: string[];
+  /** Optional array of labels for categorization and filtering (lowercase, alphanumeric with separators) */
+  labels?: string[];
   /** The client/tool used to create this deployment (e.g., 'web', 'sdk', 'cli') */
   readonly via?: string;
   /** The deployment URL */
@@ -91,8 +91,8 @@ export interface Domain {
   deployment: string | null; // Mutable - can be updated to point to different deployment
   /** Current domain status */
   status: DomainStatusType; // Mutable - can be updated
-  /** Optional array of tags for categorization and filtering (lowercase, alphanumeric with separators) */
-  tags?: string[];
+  /** Optional array of labels for categorization and filtering (lowercase, alphanumeric with separators) */
+  labels?: string[];
   /** The domain URL - internal (subdomain) or external (custom domain) */
   readonly url: string;
   /** Unix timestamp (seconds) when domain was created */
@@ -204,8 +204,8 @@ export interface Token {
   readonly account: string;
   /** Optional IP address locking for security */
   readonly ip?: string;
-  /** Optional array of tags for categorization and filtering (lowercase, alphanumeric with separators) */
-  tags?: string[];
+  /** Optional array of labels for categorization and filtering (lowercase, alphanumeric with separators) */
+  labels?: string[];
   /** Unix timestamp (seconds) when token was created */
   readonly created: number;
   /** Unix timestamp (seconds) when token expires, or null for never */
@@ -1003,8 +1003,8 @@ export type DeployInput = File[] | string | string[];
  * SDK implementations may extend with additional options (timeout, signal, callbacks, etc.).
  */
 export interface DeploymentCreateOptions {
-  /** Optional tags for categorization and filtering */
-  tags?: string[];
+  /** Optional labels for categorization and filtering */
+  labels?: string[];
   /** Optional subdomain suggestion for the deployment */
   subdomain?: string;
   /** Client identifier (e.g., 'cli', 'sdk', 'web') */
@@ -1018,7 +1018,7 @@ export interface DeploymentResource {
   create: (input: DeployInput, options?: DeploymentCreateOptions) => Promise<Deployment>;
   list: () => Promise<DeploymentListResponse>;
   get: (id: string) => Promise<Deployment>;
-  set: (id: string, options: { tags: string[] }) => Promise<Deployment>;
+  set: (id: string, options: { labels: string[] }) => Promise<Deployment>;
   remove: (id: string) => Promise<void>;
 }
 
@@ -1026,7 +1026,7 @@ export interface DeploymentResource {
  * Domain resource interface - the contract all implementations must follow
  */
 export interface DomainResource {
-  set: (name: string, options?: { deployment?: string; tags?: string[] }) => Promise<Domain>;
+  set: (name: string, options?: { deployment?: string; labels?: string[] }) => Promise<Domain>;
   list: () => Promise<DomainListResponse>;
   get: (name: string) => Promise<Domain>;
   remove: (name: string) => Promise<void>;
@@ -1048,7 +1048,7 @@ export interface AccountResource {
  * Token resource interface - the contract all implementations must follow
  */
 export interface TokenResource {
-  create: (options?: { ttl?: number; tags?: string[] }) => Promise<TokenCreateResponse>;
+  create: (options?: { ttl?: number; labels?: string[] }) => Promise<TokenCreateResponse>;
   list: () => Promise<TokenListResponse>;
   remove: (token: string) => Promise<void>;
 }
@@ -1149,7 +1149,7 @@ export type ActivityEvent =
   | 'admin.account.plan.update'
   | 'admin.account.ref.update'
   | 'admin.account.billing.update'
-  | 'admin.account.tags.update'
+  | 'admin.account.labels.update'
   | 'admin.deployment.delete'
   | 'admin.domain.delete'
   | 'admin.billing.sync'
@@ -1224,8 +1224,8 @@ export interface ActivityMeta {
   wasVerified?: boolean;
   /** Previous deployment ID before relinking */
   previousDeployment?: string;
-  /** Tags that were set/updated */
-  tags?: string[];
+  /** Labels that were set/updated */
+  labels?: string[];
 
   // Account events
   /** OAuth provider name */
@@ -1421,59 +1421,59 @@ export function generateDomainUrl(domain: string): string {
 }
 
 // =============================================================================
-// TAG UTILITIES
+// LABEL UTILITIES
 // =============================================================================
 
 /**
- * Tag validation constraints shared across UI and API.
- * These rules define the single source of truth for tag validation.
+ * Label validation constraints shared across UI and API.
+ * These rules define the single source of truth for label validation.
  */
-export const TAG_CONSTRAINTS = {
-  /** Minimum tag length in characters */
+export const LABEL_CONSTRAINTS = {
+  /** Minimum label length in characters */
   MIN_LENGTH: 3,
-  /** Maximum tag length in characters (concise tags, matches Stack Overflow's original limit) */
+  /** Maximum label length in characters (concise labels, matches Stack Overflow's original limit) */
   MAX_LENGTH: 25,
-  /** Maximum number of tags allowed per resource */
+  /** Maximum number of labels allowed per resource */
   MAX_COUNT: 10,
-  /** Allowed separator characters between tag segments */
+  /** Allowed separator characters between label segments */
   SEPARATORS: '._-',
 } as const;
 
 /**
- * Tag validation pattern.
+ * Label validation pattern.
  * Must start and end with alphanumeric (a-z, 0-9).
  * Can contain separators (. _ -) between segments, but not consecutive.
  *
  * Valid examples: 'production', 'v1.2.3', 'api_v2', 'us-east-1'
  * Invalid examples: 'ab' (too short), '-prod' (starts with separator), 'foo--bar' (consecutive separators)
  */
-export const TAG_PATTERN = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
+export const LABEL_PATTERN = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
 
 /**
- * Serialize tags array to JSON string for database storage.
+ * Serialize labels array to JSON string for database storage.
  * Returns null for empty or undefined arrays.
  *
- * @example serializeTags(['web', 'production']) → '["web","production"]'
- * @example serializeTags([]) → null
- * @example serializeTags(undefined) → null
+ * @example serializeLabels(['web', 'production']) → '["web","production"]'
+ * @example serializeLabels([]) → null
+ * @example serializeLabels(undefined) → null
  */
-export function serializeTags(tags: string[] | undefined): string | null {
-  if (!tags || tags.length === 0) return null;
-  return JSON.stringify(tags);
+export function serializeLabels(labels: string[] | undefined): string | null {
+  if (!labels || labels.length === 0) return null;
+  return JSON.stringify(labels);
 }
 
 /**
- * Deserialize tags from JSON string to array.
+ * Deserialize labels from JSON string to array.
  * Returns undefined for null/empty strings.
  *
- * @example deserializeTags('["web","production"]') → ['web', 'production']
- * @example deserializeTags(null) → undefined
- * @example deserializeTags('') → undefined
+ * @example deserializeLabels('["web","production"]') → ['web', 'production']
+ * @example deserializeLabels(null) → undefined
+ * @example deserializeLabels('') → undefined
  */
-export function deserializeTags(tagsJson: string | null): string[] | undefined {
-  if (!tagsJson) return undefined;
+export function deserializeLabels(labelsJson: string | null): string[] | undefined {
+  if (!labelsJson) return undefined;
   try {
-    const parsed = JSON.parse(tagsJson);
+    const parsed = JSON.parse(labelsJson);
     return Array.isArray(parsed) && parsed.length > 0 ? parsed : undefined;
   } catch {
     return undefined;

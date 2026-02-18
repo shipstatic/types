@@ -3,8 +3,8 @@ import {
   ALLOWED_MIME_TYPES,
   isAllowedMimeType,
   FileValidationStatus,
-  TAG_PATTERN,
-  TAG_CONSTRAINTS,
+  LABEL_PATTERN,
+  LABEL_CONSTRAINTS,
   type FileValidationStatusType
 } from '../src/index';
 
@@ -199,8 +199,8 @@ describe('Validation Constants - @shipstatic/types', () => {
     });
   });
 
-  describe('TAG_PATTERN', () => {
-    it('should match valid tags', () => {
+  describe('LABEL_PATTERN', () => {
+    it('should match valid labels', () => {
       const valid = [
         'prod',
         'staging',
@@ -211,12 +211,12 @@ describe('Validation Constants - @shipstatic/types', () => {
         'release.candidate',
       ];
 
-      valid.forEach(tag => {
-        expect(TAG_PATTERN.test(tag)).toBe(true);
+      valid.forEach(label => {
+        expect(LABEL_PATTERN.test(label)).toBe(true);
       });
     });
 
-    it('should reject invalid tag formats', () => {
+    it('should reject invalid label formats', () => {
       // Pattern checks FORMAT only, not length
       const invalidFormat = [
         '-prod',        // Starts with separator
@@ -225,61 +225,61 @@ describe('Validation Constants - @shipstatic/types', () => {
         'PROD',         // Uppercase
       ];
 
-      invalidFormat.forEach(tag => {
-        expect(TAG_PATTERN.test(tag)).toBe(false);
+      invalidFormat.forEach(label => {
+        expect(LABEL_PATTERN.test(label)).toBe(false);
       });
     });
 
     it('should not enforce length constraints in pattern', () => {
-      // Pattern allows any length - length is enforced separately via TAG_CONSTRAINTS
-      expect(TAG_PATTERN.test('a')).toBe(true);    // 1 char - passes pattern
-      expect(TAG_PATTERN.test('ab')).toBe(true);   // 2 chars - passes pattern
-      expect(TAG_PATTERN.test('abc')).toBe(true);  // 3 chars (min) - passes pattern
+      // Pattern allows any length - length is enforced separately via LABEL_CONSTRAINTS
+      expect(LABEL_PATTERN.test('a')).toBe(true);    // 1 char - passes pattern
+      expect(LABEL_PATTERN.test('ab')).toBe(true);   // 2 chars - passes pattern
+      expect(LABEL_PATTERN.test('abc')).toBe(true);  // 3 chars (min) - passes pattern
 
-      // Very long tags pass pattern (but would fail length validation)
-      expect(TAG_PATTERN.test('a'.repeat(100))).toBe(true);
+      // Very long labels pass pattern (but would fail length validation)
+      expect(LABEL_PATTERN.test('a'.repeat(100))).toBe(true);
     });
 
 
     it('should handle separator variations', () => {
       // Pattern should allow these separators
-      expect(TAG_PATTERN.test('my-tag')).toBe(true);  // hyphen
-      expect(TAG_PATTERN.test('my_tag')).toBe(true);  // underscore
-      expect(TAG_PATTERN.test('my.tag')).toBe(true);  // dot
+      expect(LABEL_PATTERN.test('my-label')).toBe(true);  // hyphen
+      expect(LABEL_PATTERN.test('my_label')).toBe(true);  // underscore
+      expect(LABEL_PATTERN.test('my.label')).toBe(true);  // dot
     });
   });
 
-  describe('TAG_CONSTRAINTS', () => {
+  describe('LABEL_CONSTRAINTS', () => {
     it('should define min length', () => {
-      expect(TAG_CONSTRAINTS.MIN_LENGTH).toBeGreaterThan(0);
-      expect(typeof TAG_CONSTRAINTS.MIN_LENGTH).toBe('number');
+      expect(LABEL_CONSTRAINTS.MIN_LENGTH).toBeGreaterThan(0);
+      expect(typeof LABEL_CONSTRAINTS.MIN_LENGTH).toBe('number');
     });
 
     it('should define max length', () => {
-      expect(TAG_CONSTRAINTS.MAX_LENGTH).toBeGreaterThan(TAG_CONSTRAINTS.MIN_LENGTH);
-      expect(typeof TAG_CONSTRAINTS.MAX_LENGTH).toBe('number');
+      expect(LABEL_CONSTRAINTS.MAX_LENGTH).toBeGreaterThan(LABEL_CONSTRAINTS.MIN_LENGTH);
+      expect(typeof LABEL_CONSTRAINTS.MAX_LENGTH).toBe('number');
     });
 
     it('should define max count', () => {
-      expect(TAG_CONSTRAINTS.MAX_COUNT).toBeGreaterThan(0);
-      expect(typeof TAG_CONSTRAINTS.MAX_COUNT).toBe('number');
+      expect(LABEL_CONSTRAINTS.MAX_COUNT).toBeGreaterThan(0);
+      expect(typeof LABEL_CONSTRAINTS.MAX_COUNT).toBe('number');
     });
 
     it('should define allowed separators', () => {
-      expect(TAG_CONSTRAINTS.SEPARATORS).toBeDefined();
-      expect(TAG_CONSTRAINTS.SEPARATORS.length).toBeGreaterThan(0);
+      expect(LABEL_CONSTRAINTS.SEPARATORS).toBeDefined();
+      expect(LABEL_CONSTRAINTS.SEPARATORS.length).toBeGreaterThan(0);
     });
 
     it('should have reasonable limits', () => {
       // Sanity checks
-      expect(TAG_CONSTRAINTS.MIN_LENGTH).toBeGreaterThanOrEqual(1);
-      expect(TAG_CONSTRAINTS.MIN_LENGTH).toBeLessThanOrEqual(10);
+      expect(LABEL_CONSTRAINTS.MIN_LENGTH).toBeGreaterThanOrEqual(1);
+      expect(LABEL_CONSTRAINTS.MIN_LENGTH).toBeLessThanOrEqual(10);
 
-      expect(TAG_CONSTRAINTS.MAX_LENGTH).toBeGreaterThanOrEqual(10);
-      expect(TAG_CONSTRAINTS.MAX_LENGTH).toBeLessThanOrEqual(100);
+      expect(LABEL_CONSTRAINTS.MAX_LENGTH).toBeGreaterThanOrEqual(10);
+      expect(LABEL_CONSTRAINTS.MAX_LENGTH).toBeLessThanOrEqual(100);
 
-      expect(TAG_CONSTRAINTS.MAX_COUNT).toBeGreaterThanOrEqual(1);
-      expect(TAG_CONSTRAINTS.MAX_COUNT).toBeLessThanOrEqual(100);
+      expect(LABEL_CONSTRAINTS.MAX_COUNT).toBeGreaterThanOrEqual(1);
+      expect(LABEL_CONSTRAINTS.MAX_COUNT).toBeLessThanOrEqual(100);
     });
   });
 });
