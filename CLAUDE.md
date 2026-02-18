@@ -63,7 +63,7 @@ pnpm build                    # Build package (TypeScript compilation validates 
 pnpm test --run               # Run validation constant tests
 ```
 
-**Runtime behavior tests:** `tests/validation-constants.test.ts` verifies validation constants and utilities (MIME types, file statuses, tag patterns). TypeScript types are validated at compile time.
+**Runtime behavior tests:** `tests/validation-constants.test.ts` verifies validation constants and utilities (MIME types, file statuses, label patterns). TypeScript types are validated at compile time.
 
 ## Key Patterns
 
@@ -119,7 +119,7 @@ interface TokenResource {
 }
 ```
 
-**Design principle:** Contracts define API-level options (tags, subdomain). SDK implementations extend with runtime options (timeout, signal, callbacks).
+**Design principle:** Contracts define API-level options (labels, subdomain). SDK implementations extend with runtime options (timeout, signal, callbacks).
 
 ### Status Constants
 
