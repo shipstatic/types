@@ -272,6 +272,8 @@ export interface Account {
   readonly created: number;
   /** Unix timestamp (seconds) when account was activated (first deployment) */
   readonly activated?: number;
+  /** Last 4 characters of the API key for identification (null when no key generated) */
+  readonly hint?: string;
 }
 
 /**
@@ -777,6 +779,7 @@ export interface PingResponse {
 export const API_KEY_PREFIX = 'ship-';
 export const API_KEY_HEX_LENGTH = 64;
 export const API_KEY_TOTAL_LENGTH = API_KEY_PREFIX.length + API_KEY_HEX_LENGTH; // 69
+export const API_KEY_HINT_LENGTH = 4;
 
 // Deploy Token Configuration
 export const DEPLOY_TOKEN_PREFIX = 'token-';
