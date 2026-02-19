@@ -44,17 +44,19 @@ Single file: `src/index.ts` organized into sections:
 | Core Entities | Deployment, Domain, Token, Account + list responses |
 | Error System | ErrorType enum, ShipError class, ErrorResponse |
 | Config Types | ConfigResponse, PlatformConfig |
-| Response Patterns | PingResponse |
-| Constants | API_KEY_PREFIX, DEPLOY_TOKEN_PREFIX, AuthMethod |
+| Common Response Patterns | PingResponse |
 | Validation Utilities | validateApiKey, validateDeployToken, validateApiUrl |
 | SPA Check Types | SPACheckRequest, SPACheckResponse |
 | Static File | StaticFile interface |
 | Platform Config | DEFAULT_API, ResolvedConfig |
+| Progress Tracking | ProgressCallback, DeploymentProgress |
+| Platform Constants | API_KEY_PREFIX, DEPLOY_TOKEN_PREFIX, AuthMethod |
 | Resource Contracts | DeploymentResource, DomainResource, etc. |
 | Billing Types | BillingStatus, CheckoutSession, BillingResource |
 | Activity Types | ActivityEvent, Activity, ActivityListResponse |
-| File Upload Types | FileValidationStatus, ValidationError, ValidatableFile |
-| URL Utilities | generateDeploymentUrl, generateDomainUrl |
+| File Upload Types | FileValidationStatus, ValidatableFile, ValidationIssue |
+| Domain Utilities | isPlatformDomain, isCustomDomain, extractSubdomain, generateDomainUrl |
+| Label Utilities | serializeLabels, deserializeLabels |
 
 ## Quick Reference
 
@@ -145,7 +147,7 @@ interface Deployment {
   readonly deployment: string;  // Never changes
   readonly created: number;     // Never changes
   status: DeploymentStatusType; // Can be updated
-  expires?: number;             // Can be updated
+  expires: number | null;       // Can be updated
 }
 ```
 
@@ -154,7 +156,7 @@ interface Deployment {
 | Package | Uses |
 |---------|------|
 | `@shipstatic/ship` | All types, ShipError, validation utilities |
-| `@shipstatic/drop` | FileValidationStatus, ValidationError, ValidatableFile |
+| `@shipstatic/drop` | FileValidationStatus, ValidatableFile |
 | `cloudflare/api` | All entity types, ShipError, constants |
 | `cloudflare/consumer` | ShipError, entity types |
 | `web/my` | Entity types, response types |
