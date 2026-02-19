@@ -32,19 +32,17 @@ export interface Deployment {
   /** Current deployment status */
   status: DeploymentStatusType; // Mutable - can be updated
   /** Whether deployment has configuration */
-  readonly config?: boolean;
-  /** Optional array of labels for categorization and filtering (lowercase, alphanumeric with separators) */
-  labels?: string[];
-  /** The client/tool used to create this deployment (e.g., 'web', 'sdk', 'cli') */
-  readonly via?: string;
+  readonly config: boolean;
+  /** Labels for categorization and filtering (lowercase, alphanumeric with separators). Always present, empty array when none. */
+  labels: string[];
+  /** The client/tool used to create this deployment (e.g., 'web', 'sdk', 'cli'), null if unknown */
+  readonly via: string | null;
   /** The deployment URL */
   readonly url: string;
   /** Unix timestamp (seconds) when deployment was created */
   readonly created: number;
-  /** Unix timestamp (seconds) when deployment expires */
-  expires?: number; // Mutable - can be updated
-  /** Short-lived JWT token for claiming this deployment (only present for public deployments) */
-  claimToken?: string; // Mutable - can be updated
+  /** Unix timestamp (seconds) when deployment expires, null if never */
+  expires: number | null; // Mutable - can be updated
 }
 
 
@@ -54,10 +52,10 @@ export interface Deployment {
 export interface DeploymentListResponse {
   /** Array of deployments */
   deployments: Deployment[];
-  /** Optional cursor for pagination */
-  cursor?: string;
-  /** Total number of deployments if available */
-  total?: number;
+  /** Cursor for pagination, null if no more pages */
+  cursor: string | null;
+  /** Total number of deployments */
+  total: number;
 }
 
 // =============================================================================
@@ -91,18 +89,16 @@ export interface Domain {
   deployment: string | null; // Mutable - can be updated to point to different deployment
   /** Current domain status */
   status: DomainStatusType; // Mutable - can be updated
-  /** Optional array of labels for categorization and filtering (lowercase, alphanumeric with separators) */
-  labels?: string[];
+  /** Labels for categorization and filtering (lowercase, alphanumeric with separators). Always present, empty array when none. */
+  labels: string[];
   /** The domain URL - internal (subdomain) or external (custom domain) */
   readonly url: string;
   /** Unix timestamp (seconds) when domain was created */
   readonly created: number;
-  /** Whether this was a create (201) or update (200) operation */
-  readonly isCreate?: boolean;
-  /** When deployment was last linked (Unix timestamp, null if never) */
-  linked?: number;
+  /** When deployment was last linked (Unix timestamp), null if never linked */
+  linked: number | null;
   /** Total deployment links */
-  links?: number;
+  links: number;
 }
 
 /**
@@ -111,10 +107,10 @@ export interface Domain {
 export interface DomainListResponse {
   /** Array of domains */
   domains: Domain[];
-  /** Optional cursor for pagination */
-  cursor?: string;
-  /** Total number of domains if available */
-  total?: number;
+  /** Cursor for pagination, null if no more pages */
+  cursor: string | null;
+  /** Total number of domains */
+  total: number;
 }
 
 /**
@@ -138,8 +134,8 @@ export interface DnsRecord {
  * DNS provider information for a domain
  */
 export interface DnsProvider {
-  /** Provider name (e.g., "Cloudflare", "GoDaddy") */
-  name?: string;
+  /** Provider name (e.g., "Cloudflare", "GoDaddy"), null if unknown */
+  name: string | null;
 }
 
 /**
@@ -170,12 +166,12 @@ export interface DomainRecordsResponse {
 export interface DomainValidateResponse {
   /** Whether the domain is valid */
   valid: boolean;
-  /** Normalized domain name (only present when valid) */
-  normalized?: string;
-  /** Whether the domain is available (only present when valid) */
-  available?: boolean;
-  /** Error message (only present when invalid) */
-  error?: string;
+  /** Normalized domain name, null when invalid */
+  normalized: string | null;
+  /** Whether the domain is available, null when invalid */
+  available: boolean | null;
+  /** Error message, null when valid */
+  error: string | null;
 }
 
 /**
@@ -187,7 +183,7 @@ export interface DeploymentRemoveResponse {
   /** The deployment ID */
   deployment: string;
   /** Human-readable message */
-  message?: string;
+  message: string;
 }
 
 // =============================================================================
@@ -202,16 +198,16 @@ export interface Token {
   readonly token: string;
   /** The account this token belongs to */
   readonly account: string;
-  /** Optional IP address locking for security */
-  readonly ip?: string;
-  /** Optional array of labels for categorization and filtering (lowercase, alphanumeric with separators) */
-  labels?: string[];
+  /** IP address locking for security, null if not locked */
+  readonly ip: string | null;
+  /** Labels for categorization and filtering (lowercase, alphanumeric with separators). Always present, empty array when none. */
+  labels: string[];
   /** Unix timestamp (seconds) when token was created */
   readonly created: number;
-  /** Unix timestamp (seconds) when token expires, or null for never */
-  readonly expires?: number;
-  /** Unix timestamp (seconds) when token was last used */
-  readonly used?: number;
+  /** Unix timestamp (seconds) when token expires, null for never */
+  readonly expires: number | null;
+  /** Unix timestamp (seconds) when token was last used, null if never used */
+  readonly used: number | null;
 }
 
 /**
@@ -221,7 +217,7 @@ export interface TokenListResponse {
   /** Array of tokens */
   tokens: Token[];
   /** Total count of tokens */
-  count?: number;
+  count: number;
 }
 
 /**
@@ -230,10 +226,10 @@ export interface TokenListResponse {
 export interface TokenCreateResponse {
   /** The actual token value (only returned on creation) */
   token: string;
-  /** Unix timestamp (seconds) when token expires, or null for never */
-  expires?: number;
-  /** Success message */
-  message?: string;
+  /** Labels for categorization and filtering. Always present, empty array when none. */
+  labels: string[];
+  /** Unix timestamp (seconds) when token expires, null for never */
+  expires: number | null;
 }
 
 // =============================================================================
@@ -262,18 +258,18 @@ export type AccountPlanType = typeof AccountPlan[keyof typeof AccountPlan];
 export interface Account {
   /** User email address */
   readonly email: string;
-  /** User display name */
-  readonly name: string;
-  /** User profile picture URL */
-  readonly picture?: string;
+  /** User display name, null if not set */
+  readonly name: string | null;
+  /** User profile picture URL, null if not set */
+  readonly picture: string | null;
   /** Account plan status */
   readonly plan: AccountPlanType;
   /** Unix timestamp (seconds) when account was created */
   readonly created: number;
-  /** Unix timestamp (seconds) when account was activated (first deployment) */
-  readonly activated?: number;
-  /** Last 4 characters of the API key for identification (null when no key generated) */
-  readonly hint?: string;
+  /** Unix timestamp (seconds) when account was activated (first deployment), null if not yet activated */
+  readonly activated: number | null;
+  /** Last 4 characters of the API key for identification, null when no key generated */
+  readonly hint: string | null;
 }
 
 /**
@@ -1071,14 +1067,14 @@ export interface TokenResource {
 export interface BillingStatus {
   /** Creem billing ID, or null if no active billing */
   billing: string | null;
-  /** Number of billing units (1 unit = 1 custom domain) */
-  units?: number;
-  /** Number of custom domains currently in use */
-  usage?: number;
-  /** Billing status from Creem (active, trialing, canceled, etc.) */
-  status?: string;
-  /** Link to Creem customer portal for billing management */
-  portal?: string | null;
+  /** Number of billing units (1 unit = 1 custom domain), null if no billing */
+  units: number | null;
+  /** Number of custom domains currently in use, null if no billing */
+  usage: number | null;
+  /** Billing status from Creem (active, trialing, canceled, etc.), null if no billing */
+  status: string | null;
+  /** Link to Creem customer portal for billing management, null if unavailable */
+  portal: string | null;
 }
 
 
@@ -1467,18 +1463,18 @@ export function serializeLabels(labels: string[] | undefined): string | null {
 
 /**
  * Deserialize labels from JSON string to array.
- * Returns undefined for null/empty strings.
+ * Always returns an array — empty array for null/empty/invalid input.
  *
  * @example deserializeLabels('["web","production"]') → ['web', 'production']
- * @example deserializeLabels(null) → undefined
- * @example deserializeLabels('') → undefined
+ * @example deserializeLabels(null) → []
+ * @example deserializeLabels('') → []
  */
-export function deserializeLabels(labelsJson: string | null): string[] | undefined {
-  if (!labelsJson) return undefined;
+export function deserializeLabels(labelsJson: string | null): string[] {
+  if (!labelsJson) return [];
   try {
     const parsed = JSON.parse(labelsJson);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : undefined;
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return undefined;
+    return [];
   }
 }
