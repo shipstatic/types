@@ -44,7 +44,7 @@ Single file: `src/index.ts` organized into sections:
 | Core Entities | Deployment, Domain, Token, Account + list responses |
 | Error System | ErrorType enum, ShipError class, ErrorResponse |
 | Config Types | ConfigResponse, PlatformConfig |
-| Response Patterns | SuccessResponse, PingResponse |
+| Response Patterns | PingResponse |
 | Constants | API_KEY_PREFIX, DEPLOY_TOKEN_PREFIX, AuthMethod |
 | Validation Utilities | validateApiKey, validateDeployToken, validateApiUrl |
 | SPA Check Types | SPACheckRequest, SPACheckResponse |
