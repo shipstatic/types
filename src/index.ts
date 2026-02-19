@@ -174,18 +174,6 @@ export interface DomainValidateResponse {
   error: string | null;
 }
 
-/**
- * Response for deployment removal
- */
-export interface DeploymentRemoveResponse {
-  /** Operation success status */
-  success: boolean;
-  /** The deployment ID */
-  deployment: string;
-  /** Human-readable message */
-  message: string;
-}
-
 // =============================================================================
 // TOKEN TYPES
 // =============================================================================
@@ -211,13 +199,30 @@ export interface Token {
 }
 
 /**
+ * Token as returned by the list endpoint.
+ * Security-redacted: shows truncated prefix instead of full hash, omits account.
+ */
+export interface TokenListItem {
+  /** Truncated token prefix for identification (e.g., "hash12345678...") */
+  readonly token: string;
+  /** Labels for categorization and filtering. Always present, empty array when none. */
+  labels: string[];
+  /** Unix timestamp (seconds) when token was created */
+  readonly created: number;
+  /** Unix timestamp (seconds) when token expires, null for never */
+  readonly expires: number | null;
+  /** Unix timestamp (seconds) when token was last used, null if never used */
+  readonly used: number | null;
+}
+
+/**
  * Response for listing tokens
  */
 export interface TokenListResponse {
-  /** Array of tokens */
-  tokens: Token[];
-  /** Total count of tokens */
-  count: number;
+  /** Array of tokens (security-redacted for list display) */
+  tokens: TokenListItem[];
+  /** Total number of tokens */
+  total: number;
 }
 
 /**
@@ -752,16 +757,6 @@ export function isAllowedMimeType(mimeType: string): boolean {
 // =============================================================================
 
 /**
- * Generic success response wrapper
- */
-export interface SuccessResponse<T = any> {
-  /** Always true for success */
-  success: true;
-  /** Response data */
-  data: T;
-}
-
-/**
  * Simple ping response for health checks
  */
 export interface PingResponse {
@@ -1290,25 +1285,13 @@ export interface ValidationIssue {
 }
 
 /**
- * Legacy validation error structure
- *
- * @deprecated Use ValidationIssue[] from FileValidationResult instead
- */
-export interface ValidationError {
-  error: string;
-  details: string;
-  errors: string[];
-  isClientError: true;
-}
-
-/**
  * Minimal file interface required for validation
  */
 export interface ValidatableFile {
   name: string;
   size: number;
   type: string;
-  status?: string;
+  status?: FileValidationStatusType;
   statusMessage?: string;
 }
 
