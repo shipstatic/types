@@ -182,10 +182,12 @@ export interface DomainValidateResponse {
  * Deployment token for automated deployments
  */
 export interface Token {
-  /** The token hash (not the actual token value) */
+  /** 7-char management identifier */
   readonly token: string;
   /** The account this token belongs to */
   readonly account: string;
+  /** SHA256 hash of the raw credential (auth lookups only, never exposed to users) */
+  readonly hash: string;
   /** IP address locking for security, null if not locked */
   readonly ip: string | null;
   /** Labels for categorization and filtering (lowercase, alphanumeric with separators). Always present, empty array when none. */
@@ -200,10 +202,10 @@ export interface Token {
 
 /**
  * Token as returned by the list endpoint.
- * Security-redacted: shows truncated prefix instead of full hash, omits account.
+ * Shows 7-char management ID, omits account and hash.
  */
 export interface TokenListItem {
-  /** Truncated token prefix for identification (e.g., "hash12345678...") */
+  /** 7-char management identifier (e.g., "a1b2c3d") */
   readonly token: string;
   /** Labels for categorization and filtering. Always present, empty array when none. */
   labels: string[];
@@ -229,8 +231,10 @@ export interface TokenListResponse {
  * Response for token creation
  */
 export interface TokenCreateResponse {
-  /** The actual token value (only returned on creation) */
+  /** 7-char management identifier */
   token: string;
+  /** The raw credential value (shown once at creation, then never again) */
+  secret: string;
   /** Labels for categorization and filtering. Always present, empty array when none. */
   labels: string[];
   /** Unix timestamp (seconds) when token expires, null for never */
