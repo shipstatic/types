@@ -65,7 +65,7 @@ pnpm build                    # Build package (TypeScript compilation validates 
 pnpm test --run               # Run validation constant tests
 ```
 
-**Runtime behavior tests:** `tests/validation-constants.test.ts` verifies validation constants and utilities (MIME types, file statuses, label patterns). TypeScript types are validated at compile time.
+**Runtime behavior tests:** `tests/validation-constants.test.ts` verifies validation constants and utilities (blocked extensions, file statuses, label patterns). TypeScript types are validated at compile time.
 
 ## Key Patterns
 
