@@ -498,266 +498,69 @@ export function isShipError(error: unknown): error is ShipError {
 // =============================================================================
 
 /**
- * Platform configuration response from API
- *
- * Contains ONLY dynamic, runtime-specific values (plan-based limits).
- * Static constants (MIME types, validation rules) live as exported constants.
+ * Dynamic platform configuration returned by the /config endpoint.
+ * Contains plan-based limits that vary by account.
  */
 export interface ConfigResponse {
-  /** Maximum individual file size in bytes */
   maxFileSize: number;
-  /** Maximum number of files per deployment */
   maxFilesCount: number;
-  /** Maximum total deployment size in bytes */
   maxTotalSize: number;
 }
 
+// =============================================================================
+// EXTENSION BLOCKLIST
+// =============================================================================
+
 /**
- * Allowed MIME types for static web hosting.
+ * Blocked file extensions — files that cannot be uploaded.
  *
- * This is a static platform constant, not per-user configuration.
- * Safe to share across frontend/backend due to atomic deploys.
+ * We accept any file type by default and derive Content-Type from the
+ * extension at serve time (via mime-db in the API worker). Unknown extensions
+ * are served as `application/octet-stream` with `X-Content-Type-Options: nosniff`.
  *
- * Validation rules:
- * - Exact match: 'application/json' allows only 'application/json'
- * - Prefix match: 'image/' allows all image types (png, jpeg, webp, etc.)
- *
- * Coverage: 100% of browser-renderable web content
- * - Core web (HTML, CSS, JS, WASM)
- * - Media (images, audio, video, fonts)
- * - Documents (PDF, Markdown, data formats)
- * - Modern web (PWA, 3D, structured data)
- *
- * ============================================================================
- * INTENTIONALLY EXCLUDED (Security & Platform Integrity)
- * ============================================================================
- *
- * We are a WEB HOSTING platform, not a file distribution service.
- * GitHub Pages-style parity for renderable content, more restrictive for downloads.
- *
- * 1. EXECUTABLES (Malware Distribution)
- *    → .exe, .msi, .dmg, .deb, .rpm, .app, .apk, .jar
- *    → Reason: Direct malware delivery vector
- *    → Alternative: Use GitHub Releases or dedicated software distribution CDN
- *
- * 2. ARCHIVES (Piracy & Abuse)
- *    → .zip, .rar, .tar, .gz, .7z, .bz2
- *    → Reason: File sharing abuse, can contain executables, no web rendering
- *    → Alternative: Use file hosting service (Dropbox, Google Drive) or GitHub Releases
- *
- * 3. SERVER-SIDE SCRIPTS (Credential Leakage)
- *    → .php, .asp, .jsp, .cgi
- *    → Reason: Source code exposure (database passwords, API keys, secrets)
- *    → Alternative: Static hosting only - use serverless functions for backends
- *
- * 4. SHELL SCRIPTS (OS Execution)
- *    → .sh, .bash, .bat, .cmd, .ps1, .vbs
- *    → Reason: Execute on user's OS outside browser sandbox, social engineering risk
- *    → Alternative: Embed code examples in HTML <pre><code> or link to GitHub repo
- *
- * 5. PROGRAMMING LANGUAGE SOURCE (Platform Scope)
- *    → .py, .rb, .pl, .java, .c, .cpp, .cs, .go, .rs
- *    → Reason: Not web-renderable, better served by GitHub/GitLab/Bitbucket
- *    → Alternative: Use GitHub for code hosting, link to repository
- *
- * 6. OFFICE DOCUMENTS (Macro Malware)
- *    → .doc, .docx, .xls, .xlsx, .ppt, .pptx
- *    → Reason: Can contain VBA macros, active exploits in the wild
- *    → Alternative: Use PDF for documents (fully supported)
- *
- * 7. GENERIC BINARIES (Unvalidatable)
- *    → application/octet-stream
- *    → Reason: Too broad - allows any binary format, cannot moderate effectively
- *    → Alternative: Use specific MIME types for known formats
- *
- * ============================================================================
- * Security Model:
- * - Browser sandbox (JS/WASM execute safely in controlled environment)
- * - AI content moderation (scans text/image content for abuse)
- * - No server-side execution (static files only)
- * - Explicit allowlist (only approved formats, reject unknown)
- * ============================================================================
+ * The blocklist targets file types that pose direct security risks when hosted:
+ * executables, disk images, malware vectors, dangerous scripts, and shortcuts.
  */
-export const ALLOWED_MIME_TYPES = [
-  // =========================================================================
-  // TEXT CONTENT (explicit list - no prefix matching for security)
-  // =========================================================================
-
-  // Core web documents
-  'text/html',                     // HTML pages
-  'text/css',                      // Stylesheets
-  'text/plain',                    // Plain text (robots.txt, .well-known/*, LICENSE, README.txt)
-  'text/markdown',                 // Markdown files (.md)
-  'text/xml',                      // XML files
-
-  // Data formats
-  'text/csv',                      // CSV data files
-  'text/tab-separated-values',     // TSV data files
-  'text/yaml',                     // YAML config files
-  'text/vcard',                    // VCard contact files (.vcf)
-
-  // Modern documentation formats
-  'text/mdx',                      // MDX (Markdown with JSX) - Next.js, Docusaurus, Nextra
-  'text/x-mdx',                    // MDX (alternative MIME type)
-
-  // Web-specific formats
-  'text/vtt',                      // WebVTT video subtitles/captions (accessibility)
-  'text/srt',                      // SRT subtitles (SubRip format, legacy video captions)
-  'text/calendar',                 // iCalendar (.ics) event files
-
-  // JavaScript (legacy MIME type, still widely used by ~50% of servers)
-  'text/javascript',
-
-  // Modern web development formats (uncompiled source)
-  'text/typescript',               // TypeScript source (.ts)
-  'application/x-typescript',      // TypeScript (alternative MIME type, .d.ts declarations)
-  'text/tsx',                      // TypeScript JSX (.tsx)
-  'text/jsx',                      // React JSX (.jsx)
-  'text/x-scss',                   // SCSS preprocessor
-  'text/x-sass',                   // Sass preprocessor
-  'text/less',                     // Less preprocessor
-  'text/x-less',                   // Less preprocessor (alternative)
-  'text/stylus',                   // Stylus preprocessor
-  'text/x-vue',                    // Vue single-file components (.vue)
-  'text/x-svelte',                 // Svelte components (.svelte)
-
-  // Developer documentation formats
-  'text/x-sql',                    // SQL files (database schemas, migrations)
-  'text/x-diff',                   // Diff files (code comparisons, patches)
-  'text/x-patch',                  // Patch files (version upgrades, migrations)
-  'text/x-protobuf',               // Protocol Buffers text format (gRPC schemas)
-  'text/x-ini',                    // INI configuration files
-
-  // Academic/research formats
-  'text/x-tex',                    // LaTeX documents
-  'text/x-latex',                  // LaTeX documents (alternative)
-  'text/x-bibtex',                 // BibTeX citations
-  'text/x-r-markdown',             // R Markdown (statistical documentation)
-
-  // =========================================================================
-  // MEDIA (prefix matching - covers all common subtypes)
-  // =========================================================================
-
-  // Images: PNG, JPEG, GIF, SVG, WebP, AVIF, HEIC, BMP, TIFF, ICO, etc.
-  'image/',
-
-  // Audio: MP3, OGG, WAV, WebM, AAC, FLAC, Opus, etc.
-  'audio/',
-
-  // Video: MP4, WebM, OGG, QuickTime, etc.
-  'video/',
-
-  // Modern fonts: WOFF2, WOFF, TTF, OTF
-  'font/',
-
-  // =========================================================================
-  // CORE WEB APPLICATION TYPES
-  // =========================================================================
-
-  // JavaScript (multiple MIME types for compatibility)
-  'application/javascript',        // Modern standard (RFC 9239)
-  'application/ecmascript',        // ECMAScript (legacy but still used)
-  'application/x-javascript',      // Legacy variant (old CDNs, Apache configs)
-
-  // WebAssembly (modern web apps, games, compute-heavy workloads)
-  'application/wasm',
-
-  // JSON and structured data
-  'application/json',
-  'application/ld+json',           // JSON-LD for structured data / SEO (Schema.org, Open Graph)
-  'application/geo+json',          // GeoJSON for mapping (Leaflet, Mapbox)
-  'application/manifest+json',     // PWA web app manifests
-  'application/x-ipynb+json',      // Jupyter Notebooks (data science, ML tutorials)
-
-  // JSON variants (AI/ML, streaming data, configs)
-  'application/x-ndjson',          // Newline-Delimited JSON (training datasets, logs)
-  'application/ndjson',            // NDJSON (alternative MIME type)
-  'text/x-ndjson',                 // NDJSON (text variant)
-  'application/jsonl',             // JSON Lines (Hugging Face, OpenAI fine-tuning)
-  'text/jsonl',                    // JSON Lines (text variant)
-  'application/json5',             // JSON5 (JSON with comments, trailing commas)
-  'text/json5',                    // JSON5 (text variant)
-  'application/schema+json',       // JSON Schema (API specs, model definitions)
-
-  // Development tools
-  'application/source-map',        // Source maps (.js.map, .css.map) for debugging
-
-  // XML and feeds
-  'application/xml',
-  'application/xhtml+xml',         // XHTML - XML-compliant HTML (legacy sites)
-  'application/rss+xml',           // RSS feeds (blogs, podcasts)
-  'application/atom+xml',          // Atom feeds
-  'application/feed+json',         // JSON Feed (modern RSS alternative)
-  'application/vnd.google-earth.kml+xml', // KML for mapping (Google Earth, GIS)
-
-  // Configuration formats
-  'application/yaml',              // YAML configs (static site generators)
-  'application/toml',              // TOML configs (Cargo, Netlify, Rust projects)
-
-  // Documents
-  'application/pdf',               // PDF documents
-
-  // Media metadata
-  'application/x-subrip',          // SRT subtitles (SubRip format)
-
-  // Developer tools and schemas
-  'application/sql',               // SQL files (database schemas, queries)
-  'application/graphql',           // GraphQL schemas (API documentation)
-  'application/graphql+json',      // GraphQL with JSON encoding
-  'application/x-protobuf',        // Protocol Buffers binary (gRPC)
-  'application/x-ini',             // INI configuration files
-
-  // Academic formats
-  'application/x-tex',             // LaTeX documents
-  'application/x-bibtex',          // BibTeX citations
-
-  // =========================================================================
-  // 3D FORMATS (industry standard only)
-  // =========================================================================
-
-  // glTF - Khronos standard for 3D web content
-  'model/gltf+json',               // glTF JSON format
-  'model/gltf-binary',             // GLB binary format
-
-  // =========================================================================
-  // LEGACY COMPATIBILITY
-  // =========================================================================
-
-  // Video (some tools detect MP4 as application/mp4)
-  'application/mp4',
-
-  // Legacy font MIME types (Bootstrap, Font Awesome, IE compatibility)
-  'application/font-woff',
-  'application/font-woff2',
-  'application/x-font-woff',
-  'application/x-woff',
-  'application/vnd.ms-fontobject',  // EOT files (Internet Explorer)
-  'application/x-font-ttf',
-  'application/x-font-truetype',
-  'application/x-font-otf',
-  'application/x-font-opentype',
-] as const;
+export const BLOCKED_EXTENSIONS: ReadonlySet<string> = new Set([
+  // Executables
+  'exe', 'msi', 'dll', 'scr', 'bat', 'cmd', 'com', 'pif', 'app', 'deb', 'rpm',
+  // Installers
+  'pkg', 'mpkg',
+  // Disk images
+  'dmg', 'iso', 'img',
+  // Malware vectors
+  'cab', 'cpl', 'chm',
+  // Dangerous scripts
+  'ps1', 'vbs', 'vbe', 'ws', 'wsf', 'wsc', 'wsh', 'reg',
+  // Java
+  'jar', 'jnlp',
+  // Mobile/browser packages
+  'apk', 'crx',
+  // Shortcut/link
+  'lnk', 'inf', 'hta',
+]);
 
 /**
- * Check if a MIME type is allowed for upload.
- *
- * Supports both exact matches and prefix matches:
- * - 'application/json' matches 'application/json' exactly
- * - 'text/' matches 'text/plain', 'text/html', etc.
+ * Check if a filename has a blocked extension.
+ * Extracts the extension from the filename and checks against the blocklist.
+ * Case-insensitive. Returns false for files without extensions.
  *
  * @example
- * isAllowedMimeType('text/plain')     // true (prefix match)
- * isAllowedMimeType('application/json') // true (exact match)
- * isAllowedMimeType('application/wasm') // false (not allowed)
+ * isBlockedExtension('virus.exe')     // true
+ * isBlockedExtension('app.dmg')       // true
+ * isBlockedExtension('style.css')     // false
+ * isBlockedExtension('data.custom')   // false
+ * isBlockedExtension('README')        // false
  */
-export function isAllowedMimeType(mimeType: string): boolean {
-  return ALLOWED_MIME_TYPES.some(allowed =>
-    mimeType === allowed || mimeType.startsWith(allowed)
-  );
+export function isBlockedExtension(filename: string): boolean {
+  const dotIndex = filename.lastIndexOf('.');
+  if (dotIndex === -1 || dotIndex === filename.length - 1) return false;
+  const ext = filename.slice(dotIndex + 1).toLowerCase();
+  return BLOCKED_EXTENSIONS.has(ext);
 }
 
 // =============================================================================
-// COMMON RESPONSE PATTERNS  
+// COMMON RESPONSE PATTERNS
 // =============================================================================
 
 /**
@@ -1294,7 +1097,6 @@ export interface ValidationIssue {
 export interface ValidatableFile {
   name: string;
   size: number;
-  type: string;
   status?: FileValidationStatusType;
   statusMessage?: string;
 }

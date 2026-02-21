@@ -1,181 +1,144 @@
 import { describe, it, expect } from 'vitest';
 import {
-  ALLOWED_MIME_TYPES,
-  isAllowedMimeType,
+  BLOCKED_EXTENSIONS,
+  isBlockedExtension,
   FileValidationStatus,
   LABEL_PATTERN,
   LABEL_CONSTRAINTS,
+  type ConfigResponse,
   type FileValidationStatusType
 } from '../src/index';
 
 describe('Validation Constants - @shipstatic/types', () => {
-  describe('ALLOWED_MIME_TYPES', () => {
-    it('should have no duplicate entries', () => {
-      const seen = new Set<string>();
-      const duplicates: string[] = [];
-
-      ALLOWED_MIME_TYPES.forEach(mime => {
-        if (seen.has(mime)) {
-          duplicates.push(mime);
-        }
-        seen.add(mime);
-      });
-
-      expect(duplicates).toEqual([]);
-      expect(seen.size).toBe(ALLOWED_MIME_TYPES.length);
+  describe('BLOCKED_EXTENSIONS', () => {
+    it('should block executable extensions', () => {
+      const executables = ['exe', 'msi', 'dll', 'scr', 'bat', 'cmd', 'com', 'pif', 'app', 'deb', 'rpm'];
+      for (const ext of executables) {
+        expect(BLOCKED_EXTENSIONS.has(ext)).toBe(true);
+      }
     });
 
-    it('should include common web file types', () => {
-      const required = [
-        'text/html',
-        'text/css',
-        'text/plain',
-        'application/javascript',
-        'application/json',
-        'image/', // Prefix for all images
-        'audio/', // Prefix for all audio
-        'video/', // Prefix for all video
-        'font/',  // Prefix for all fonts
-      ];
-
-      required.forEach(mime => {
-        expect(ALLOWED_MIME_TYPES).toContain(mime);
-      });
+    it('should block disk image extensions', () => {
+      const diskImages = ['dmg', 'iso', 'img'];
+      for (const ext of diskImages) {
+        expect(BLOCKED_EXTENSIONS.has(ext)).toBe(true);
+      }
     });
 
-    it('should block executable MIME types', () => {
-      const blocked = [
-        'application/x-msdownload',
-        'application/x-executable',
-        'application/x-sh',
-        'application/x-bat',
-        'application/exe',
-        'application/x-exe',
-      ];
-
-      blocked.forEach(mime => {
-        expect(ALLOWED_MIME_TYPES).not.toContain(mime);
-      });
+    it('should block dangerous script extensions', () => {
+      const scripts = ['ps1', 'vbs', 'vbe', 'ws', 'wsf', 'wsc', 'wsh', 'reg'];
+      for (const ext of scripts) {
+        expect(BLOCKED_EXTENSIONS.has(ext)).toBe(true);
+      }
     });
 
-    it('should include legacy compatibility types', () => {
-      const legacy = [
-        'application/font-woff',
-        'application/x-font-woff',
-        'text/javascript', // Legacy but still widely used
-      ];
-
-      legacy.forEach(mime => {
-        expect(ALLOWED_MIME_TYPES).toContain(mime);
-      });
+    it('should block installer extensions', () => {
+      const installers = ['pkg', 'mpkg'];
+      for (const ext of installers) {
+        expect(BLOCKED_EXTENSIONS.has(ext)).toBe(true);
+      }
     });
 
-    it('should include modern web formats', () => {
-      const modern = [
-        'application/wasm',
-        'application/manifest+json',
-        'model/gltf+json',
-        'model/gltf-binary',
-      ];
+    it('should block Java extensions', () => {
+      expect(BLOCKED_EXTENSIONS.has('jar')).toBe(true);
+      expect(BLOCKED_EXTENSIONS.has('jnlp')).toBe(true);
+    });
 
-      modern.forEach(mime => {
-        expect(ALLOWED_MIME_TYPES).toContain(mime);
-      });
+    it('should block mobile and browser package extensions', () => {
+      expect(BLOCKED_EXTENSIONS.has('apk')).toBe(true);
+      expect(BLOCKED_EXTENSIONS.has('crx')).toBe(true);
+    });
+
+    it('should block shortcut/link extensions', () => {
+      const shortcuts = ['lnk', 'inf', 'hta'];
+      for (const ext of shortcuts) {
+        expect(BLOCKED_EXTENSIONS.has(ext)).toBe(true);
+      }
+    });
+
+    it('should NOT block web file extensions', () => {
+      const webExtensions = ['html', 'css', 'js', 'json', 'png', 'jpg', 'svg', 'woff2', 'pdf', 'wasm'];
+      for (const ext of webExtensions) {
+        expect(BLOCKED_EXTENSIONS.has(ext)).toBe(false);
+      }
+    });
+
+    it('should NOT block unknown extensions', () => {
+      const unknownExtensions = ['xyz', 'custom', 'parquet', 'avro'];
+      for (const ext of unknownExtensions) {
+        expect(BLOCKED_EXTENSIONS.has(ext)).toBe(false);
+      }
     });
   });
 
-  describe('isAllowedMimeType()', () => {
-    describe('exact matches', () => {
-      it('should allow exact text MIME types', () => {
-        expect(isAllowedMimeType('text/html')).toBe(true);
-        expect(isAllowedMimeType('text/css')).toBe(true);
-        expect(isAllowedMimeType('text/plain')).toBe(true);
-        expect(isAllowedMimeType('text/markdown')).toBe(true);
-      });
-
-      it('should allow exact application MIME types', () => {
-        expect(isAllowedMimeType('application/javascript')).toBe(true);
-        expect(isAllowedMimeType('application/json')).toBe(true);
-        expect(isAllowedMimeType('application/wasm')).toBe(true);
-        expect(isAllowedMimeType('application/pdf')).toBe(true);
-      });
+  describe('isBlockedExtension()', () => {
+    it('should detect blocked extensions from filenames', () => {
+      expect(isBlockedExtension('virus.exe')).toBe(true);
+      expect(isBlockedExtension('installer.msi')).toBe(true);
+      expect(isBlockedExtension('script.bat')).toBe(true);
+      expect(isBlockedExtension('disk.dmg')).toBe(true);
+      expect(isBlockedExtension('archive.jar')).toBe(true);
     });
 
-    describe('prefix matches', () => {
-      it('should allow all image/* types', () => {
-        expect(isAllowedMimeType('image/png')).toBe(true);
-        expect(isAllowedMimeType('image/jpeg')).toBe(true);
-        expect(isAllowedMimeType('image/gif')).toBe(true);
-        expect(isAllowedMimeType('image/svg+xml')).toBe(true);
-        expect(isAllowedMimeType('image/webp')).toBe(true);
-        expect(isAllowedMimeType('image/avif')).toBe(true);
-      });
-
-      it('should allow all audio/* types', () => {
-        expect(isAllowedMimeType('audio/mpeg')).toBe(true);
-        expect(isAllowedMimeType('audio/ogg')).toBe(true);
-        expect(isAllowedMimeType('audio/wav')).toBe(true);
-        expect(isAllowedMimeType('audio/webm')).toBe(true);
-      });
-
-      it('should allow all video/* types', () => {
-        expect(isAllowedMimeType('video/mp4')).toBe(true);
-        expect(isAllowedMimeType('video/webm')).toBe(true);
-        expect(isAllowedMimeType('video/ogg')).toBe(true);
-      });
-
-      it('should allow all font/* types', () => {
-        expect(isAllowedMimeType('font/woff')).toBe(true);
-        expect(isAllowedMimeType('font/woff2')).toBe(true);
-        expect(isAllowedMimeType('font/ttf')).toBe(true);
-        expect(isAllowedMimeType('font/otf')).toBe(true);
-      });
+    it('should be case-insensitive', () => {
+      expect(isBlockedExtension('virus.EXE')).toBe(true);
+      expect(isBlockedExtension('virus.Exe')).toBe(true);
+      expect(isBlockedExtension('disk.DMG')).toBe(true);
     });
 
-    describe('case sensitivity', () => {
-      it('should be case-sensitive (lowercase required)', () => {
-        // Correct case
-        expect(isAllowedMimeType('text/html')).toBe(true);
-
-        // Wrong case - should fail
-        expect(isAllowedMimeType('TEXT/HTML')).toBe(false);
-        expect(isAllowedMimeType('Text/Html')).toBe(false);
-      });
+    it('should allow web files', () => {
+      expect(isBlockedExtension('index.html')).toBe(false);
+      expect(isBlockedExtension('style.css')).toBe(false);
+      expect(isBlockedExtension('app.js')).toBe(false);
+      expect(isBlockedExtension('data.json')).toBe(false);
+      expect(isBlockedExtension('photo.png')).toBe(false);
     });
 
-    describe('security - blocked types', () => {
-      it('should block executable MIME types', () => {
-        expect(isAllowedMimeType('application/x-msdownload')).toBe(false);
-        expect(isAllowedMimeType('application/x-executable')).toBe(false);
-        expect(isAllowedMimeType('application/x-sh')).toBe(false);
-        expect(isAllowedMimeType('application/x-bat')).toBe(false);
-      });
-
-      it('should block script types that could be dangerous', () => {
-        expect(isAllowedMimeType('application/x-shellscript')).toBe(false);
-        expect(isAllowedMimeType('application/x-perl')).toBe(false);
-        expect(isAllowedMimeType('application/x-python')).toBe(false);
-      });
+    it('should allow unknown extensions', () => {
+      expect(isBlockedExtension('data.parquet')).toBe(false);
+      expect(isBlockedExtension('file.custom')).toBe(false);
+      expect(isBlockedExtension('model.onnx')).toBe(false);
     });
 
-    describe('edge cases', () => {
-      it('should handle MIME types with parameters', () => {
-        // MIME with parameters matches because of startsWith() behavior
-        // 'text/html; charset=utf-8' starts with 'text/html'
-        expect(isAllowedMimeType('text/html; charset=utf-8')).toBe(true);
+    it('should allow files without extensions', () => {
+      expect(isBlockedExtension('README')).toBe(false);
+      expect(isBlockedExtension('Makefile')).toBe(false);
+      expect(isBlockedExtension('LICENSE')).toBe(false);
+    });
 
-        // This is CORRECT behavior - no need to strip parameters
-        // The startsWith() check naturally handles this
-      });
+    it('should handle edge cases', () => {
+      expect(isBlockedExtension('')).toBe(false);
+      expect(isBlockedExtension('file.')).toBe(false);
+      expect(isBlockedExtension('.gitignore')).toBe(false);
+    });
 
-      it('should handle empty string', () => {
-        expect(isAllowedMimeType('')).toBe(false);
-      });
+    it('should check last extension only (double extensions)', () => {
+      expect(isBlockedExtension('image.jpg.exe')).toBe(true);
+      expect(isBlockedExtension('safe.exe.txt')).toBe(false);
+    });
+  });
 
-      it('should handle invalid MIME format', () => {
-        expect(isAllowedMimeType('not-a-mime-type')).toBe(false);
-        expect(isAllowedMimeType('/')).toBe(false);
-      });
+  describe('ConfigResponse', () => {
+    it('should have correct shape with 3 fields', () => {
+      const config: ConfigResponse = {
+        maxFileSize: 20 * 1024 * 1024,
+        maxFilesCount: 500,
+        maxTotalSize: 50 * 1024 * 1024,
+      };
+
+      expect(typeof config.maxFileSize).toBe('number');
+      expect(typeof config.maxFilesCount).toBe('number');
+      expect(typeof config.maxTotalSize).toBe('number');
+    });
+
+    it('should only contain numeric limit fields', () => {
+      const config: ConfigResponse = {
+        maxFileSize: 20 * 1024 * 1024,
+        maxFilesCount: 500,
+        maxTotalSize: 50 * 1024 * 1024,
+      };
+
+      expect(Object.keys(config)).toEqual(['maxFileSize', 'maxFilesCount', 'maxTotalSize']);
     });
   });
 
@@ -217,12 +180,11 @@ describe('Validation Constants - @shipstatic/types', () => {
     });
 
     it('should reject invalid label formats', () => {
-      // Pattern checks FORMAT only, not length
       const invalidFormat = [
-        '-prod',        // Starts with separator
-        'prod-',        // Ends with separator
-        'pr od',        // Contains space
-        'PROD',         // Uppercase
+        '-prod',
+        'prod-',
+        'pr od',
+        'PROD',
       ];
 
       invalidFormat.forEach(label => {
@@ -231,21 +193,17 @@ describe('Validation Constants - @shipstatic/types', () => {
     });
 
     it('should not enforce length constraints in pattern', () => {
-      // Pattern allows any length - length is enforced separately via LABEL_CONSTRAINTS
-      expect(LABEL_PATTERN.test('a')).toBe(true);    // 1 char - passes pattern
-      expect(LABEL_PATTERN.test('ab')).toBe(true);   // 2 chars - passes pattern
-      expect(LABEL_PATTERN.test('abc')).toBe(true);  // 3 chars (min) - passes pattern
-
-      // Very long labels pass pattern (but would fail length validation)
+      expect(LABEL_PATTERN.test('a')).toBe(true);
+      expect(LABEL_PATTERN.test('ab')).toBe(true);
+      expect(LABEL_PATTERN.test('abc')).toBe(true);
       expect(LABEL_PATTERN.test('a'.repeat(100))).toBe(true);
     });
 
 
     it('should handle separator variations', () => {
-      // Pattern should allow these separators
-      expect(LABEL_PATTERN.test('my-label')).toBe(true);  // hyphen
-      expect(LABEL_PATTERN.test('my_label')).toBe(true);  // underscore
-      expect(LABEL_PATTERN.test('my.label')).toBe(true);  // dot
+      expect(LABEL_PATTERN.test('my-label')).toBe(true);
+      expect(LABEL_PATTERN.test('my_label')).toBe(true);
+      expect(LABEL_PATTERN.test('my.label')).toBe(true);
     });
   });
 
@@ -271,7 +229,6 @@ describe('Validation Constants - @shipstatic/types', () => {
     });
 
     it('should have reasonable limits', () => {
-      // Sanity checks
       expect(LABEL_CONSTRAINTS.MIN_LENGTH).toBeGreaterThanOrEqual(1);
       expect(LABEL_CONSTRAINTS.MIN_LENGTH).toBeLessThanOrEqual(10);
 
