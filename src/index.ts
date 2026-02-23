@@ -261,6 +261,14 @@ export const AccountPlan = {
 export type AccountPlanType = typeof AccountPlan[keyof typeof AccountPlan];
 
 /**
+ * Account usage metrics — always available regardless of billing provider.
+ */
+export interface AccountUsage {
+  /** Number of active custom domains (excludes paused) */
+  customDomains: number;
+}
+
+/**
  * Core account object - used in both API responses and SDK
  * All fields are readonly to prevent accidental mutations
  */
@@ -273,6 +281,8 @@ export interface Account {
   readonly picture: string | null;
   /** Account plan status */
   readonly plan: AccountPlanType;
+  /** Account usage metrics (custom domains, etc.) */
+  readonly usage: AccountUsage;
   /** Unix timestamp (seconds) when account was created */
   readonly created: number;
   /** Unix timestamp (seconds) when account was activated (first deployment), null if not yet activated */
@@ -871,8 +881,6 @@ export interface BillingStatus {
   billing: string | null;
   /** Number of billing units (1 unit = 1 custom domain), null if no billing */
   units: number | null;
-  /** Number of custom domains currently in use, null if no billing */
-  usage: number | null;
   /** Billing status from Creem (active, trialing, canceled, etc.), null if no billing */
   status: string | null;
   /** Link to Creem customer portal for billing management, null if unavailable */
