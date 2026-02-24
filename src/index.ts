@@ -815,7 +815,7 @@ export type DeployInput = File[] | string | string[];
  * Options for deployment creation at the API contract level.
  * SDK implementations may extend with additional options (timeout, signal, callbacks, etc.).
  */
-export interface DeploymentCreateOptions {
+export interface DeploymentUploadOptions {
   /** Optional labels for categorization and filtering */
   labels?: string[];
   /** Optional subdomain suggestion for the deployment */
@@ -828,7 +828,7 @@ export interface DeploymentCreateOptions {
  * Deployment resource interface - the contract all implementations must follow
  */
 export interface DeploymentResource {
-  create: (input: DeployInput, options?: DeploymentCreateOptions) => Promise<Deployment>;
+  upload: (input: DeployInput, options?: DeploymentUploadOptions) => Promise<Deployment>;
   list: () => Promise<DeploymentListResponse>;
   get: (id: string) => Promise<Deployment>;
   set: (id: string, options: { labels: string[] }) => Promise<Deployment>;
