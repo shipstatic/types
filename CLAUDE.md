@@ -98,7 +98,7 @@ Interfaces that SDK implementations must follow. These define the **minimal cont
 
 ```typescript
 interface DeploymentResource {
-  create: (input: DeployInput, options?: DeploymentCreateOptions) => Promise<Deployment>;
+  upload: (input: DeployInput, options?: DeploymentUploadOptions) => Promise<Deployment>;
   list: () => Promise<DeploymentListResponse>;
   get: (id: string) => Promise<Deployment>;
   set: (id: string, options: { labels: string[] }) => Promise<Deployment>;
