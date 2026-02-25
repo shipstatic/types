@@ -19,28 +19,54 @@ npm install @shipstatic/types
 ### Core Entities
 
 ```typescript
-import type { Deployment, Domain, Account, Token, StaticFile } from '@shipstatic/types';
+import type {
+  Deployment, DeploymentListResponse,
+  Domain, DomainListResponse, DnsRecord, DomainDnsResponse, DomainRecordsResponse, DomainValidateResponse,
+  Token, TokenListItem, TokenListResponse, TokenCreateResponse,
+  Account, AccountUsage, AccountOverrides,
+  StaticFile
+} from '@shipstatic/types';
 ```
 
 ### Error System
 
 ```typescript
-import { ShipError, ErrorType } from '@shipstatic/types';
+import { ShipError, ErrorType, isShipError } from '@shipstatic/types';
 
 throw ShipError.validation('File too large');
 throw ShipError.notFound('Deployment', id);
+throw ShipError.authentication();
+throw ShipError.business('Plan limit reached');
 
-if (error.isClientError()) { /* handle */ }
+if (isShipError(error)) {
+  console.log(error.status, error.type, error.message);
+}
+
+if (error.isClientError()) { /* Business | Config | File | Validation */ }
+if (error.isAuthError()) { /* handle auth */ }
+```
+
+### Status Constants
+
+```typescript
+import {
+  DeploymentStatus,   // pending | success | failed | deleting
+  DomainStatus,       // pending | partial | success | paused
+  AccountPlan,        // free | standard | sponsored | enterprise | suspended | terminating | terminated
+  FileValidationStatus, // pending | processing_error | excluded | validation_failed | ready
+  AuthMethod,         // jwt | apiKey | token | webhook | system
+} from '@shipstatic/types';
 ```
 
 ### API Response Types
 
 ```typescript
 import type {
-  DeploymentListResponse,
-  DomainListResponse,
   ConfigResponse,
-  BillingStatus
+  BillingStatus,
+  CheckoutSession,
+  ActivityListResponse,
+  PingResponse,
 } from '@shipstatic/types';
 ```
 
@@ -49,13 +75,62 @@ import type {
 SDK interface definitions:
 
 ```typescript
-import type { DeploymentResource, DomainResource, AccountResource } from '@shipstatic/types';
+import type {
+  DeploymentResource,
+  DomainResource,
+  AccountResource,
+  TokenResource,
+  BillingResource,
+  KeysResource,
+} from '@shipstatic/types';
 ```
 
 ### Validation Utilities
 
 ```typescript
-import { validateApiKey, validateDeployToken, isDeployment } from '@shipstatic/types';
+import {
+  validateApiKey,
+  validateDeployToken,
+  validateApiUrl,
+  isDeployment,
+  isBlockedExtension,
+  BLOCKED_EXTENSIONS,
+} from '@shipstatic/types';
+```
+
+### File Upload Types
+
+```typescript
+import type {
+  ValidatableFile,
+  FileValidationResult,
+  ValidationIssue,
+  UploadedFile,
+  ProgressInfo,
+} from '@shipstatic/types';
+```
+
+### Domain Utilities
+
+```typescript
+import {
+  isPlatformDomain,
+  isCustomDomain,
+  extractSubdomain,
+  generateDeploymentUrl,
+  generateDomainUrl,
+} from '@shipstatic/types';
+```
+
+### Label Utilities
+
+```typescript
+import {
+  LABEL_CONSTRAINTS,
+  LABEL_PATTERN,
+  serializeLabels,
+  deserializeLabels,
+} from '@shipstatic/types';
 ```
 
 ### Constants
@@ -64,16 +139,15 @@ import { validateApiKey, validateDeployToken, isDeployment } from '@shipstatic/t
 import {
   DEFAULT_API,
   API_KEY_PREFIX,
-  DeploymentStatus,
-  DomainStatus,
-  AccountPlan
+  DEPLOY_TOKEN_PREFIX,
+  DEPLOYMENT_CONFIG_FILENAME,
 } from '@shipstatic/types';
 ```
 
 ## Usage
 
 ```typescript
-import { ShipError, type Deployment, DeploymentStatus } from '@shipstatic/types';
+import { ShipError, isShipError, type Deployment, DeploymentStatus } from '@shipstatic/types';
 
 function processDeployment(deployment: Deployment) {
   if (deployment.status === DeploymentStatus.FAILED) {
