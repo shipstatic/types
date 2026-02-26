@@ -965,6 +965,7 @@ export type ActivityEvent =
   | 'admin.domain.delete'
   | 'admin.billing.sync'
   | 'admin.billing.terminated'
+  | 'admin.impersonate'
   // Webhook events (logged directly from payment provider)
   | 'billing.active'
   | 'billing.canceled'
