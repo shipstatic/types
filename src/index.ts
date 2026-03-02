@@ -978,7 +978,11 @@ export type ActivityEvent =
   | 'billing.update'
   | 'billing.past_due'
   | 'refund.created'
-  | 'dispute.created';
+  | 'dispute.created'
+  // Billing operational events (admin/debug only, not user-visible)
+  | 'billing.sync'    // Outbound: unit count pushed to payment provider
+  | 'billing.stale'   // Dropped: webhook predates last known state
+  | 'billing.race';   // Dropped: concurrent webhook already updated state
 
 /**
  * Activity events visible to users in the dashboard
