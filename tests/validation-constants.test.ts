@@ -125,14 +125,20 @@ describe('Validation Constants - @shipstatic/types', () => {
       expect(UNBUILT_PROJECT_MARKERS.has('node_modules')).toBe(true);
     });
 
+    it('should contain package.json', () => {
+      expect(UNBUILT_PROJECT_MARKERS.has('package.json')).toBe(true);
+    });
+
     it('should NOT match partial names', () => {
       expect(UNBUILT_PROJECT_MARKERS.has('node')).toBe(false);
       expect(UNBUILT_PROJECT_MARKERS.has('modules')).toBe(false);
+      expect(UNBUILT_PROJECT_MARKERS.has('package')).toBe(false);
     });
 
     it('should be case-sensitive', () => {
       expect(UNBUILT_PROJECT_MARKERS.has('Node_Modules')).toBe(false);
       expect(UNBUILT_PROJECT_MARKERS.has('NODE_MODULES')).toBe(false);
+      expect(UNBUILT_PROJECT_MARKERS.has('Package.json')).toBe(false);
     });
   });
 
@@ -146,8 +152,14 @@ describe('Validation Constants - @shipstatic/types', () => {
       expect(hasUnbuiltMarker('node_modules')).toBe(true);
     });
 
+    it('should detect package.json in paths', () => {
+      expect(hasUnbuiltMarker('package.json')).toBe(true);
+      expect(hasUnbuiltMarker('myproject/package.json')).toBe(true);
+    });
+
     it('should handle backslash paths', () => {
       expect(hasUnbuiltMarker('project\\node_modules\\react\\index.js')).toBe(true);
+      expect(hasUnbuiltMarker('project\\package.json')).toBe(true);
     });
 
     it('should return false for clean build output paths', () => {
@@ -165,6 +177,7 @@ describe('Validation Constants - @shipstatic/types', () => {
     it('should be case-sensitive', () => {
       expect(hasUnbuiltMarker('Node_Modules/react/index.js')).toBe(false);
       expect(hasUnbuiltMarker('NODE_MODULES/react/index.js')).toBe(false);
+      expect(hasUnbuiltMarker('Package.JSON')).toBe(false);
     });
 
     it('should handle edge cases', () => {
