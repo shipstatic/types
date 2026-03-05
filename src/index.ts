@@ -572,11 +572,41 @@ export function isBlockedExtension(filename: string): boolean {
 }
 
 // =============================================================================
+// FILENAME CHARACTER VALIDATION
+// =============================================================================
+
+/**
+ * Characters that are unsafe in filenames for static hosting.
+ *
+ * Blocks only characters that genuinely break the upload→serve round-trip:
+ * - # ? %        URL round-trip breakers (fragment, query, encoding ambiguity)
+ * - \            Path separator confusion (upload splits on backslash)
+ * - < > "        XSS vectors with zero legitimate use in filenames
+ * - \x00-\x1f \x7f  Control characters (header injection, display corruption)
+ *
+ * Everything else is allowed — browser percent-encodes, Worker decodes, R2 matches.
+ */
+export const UNSAFE_FILENAME_CHARS = /[\x00-\x1f\x7f#?%\\<>"]/;
+
+/**
+ * Check if a filename contains unsafe characters.
+ *
+ * @example
+ * hasUnsafeChars('saved_resource(1).html')  // false — parentheses are safe
+ * hasUnsafeChars('page[slug].js')           // false — brackets are safe
+ * hasUnsafeChars('file#anchor.html')        // true  — # breaks URL resolution
+ * hasUnsafeChars('file<tag>.html')          // true  — < is an XSS vector
+ */
+export function hasUnsafeChars(filename: string): boolean {
+  return UNSAFE_FILENAME_CHARS.test(filename);
+}
+
+// =============================================================================
 // UNBUILT PROJECT MARKERS
 // =============================================================================
 
 /**
- * Directory names that indicate an unbuilt project was uploaded instead of build output.
+ * Path segment names that indicate an unbuilt project was uploaded instead of build output.
  * Used for early detection in CLI, browser, and server validation.
  */
 export const UNBUILT_PROJECT_MARKERS: ReadonlySet<string> = new Set([
@@ -585,7 +615,7 @@ export const UNBUILT_PROJECT_MARKERS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Check if a file path contains an unbuilt project marker directory.
+ * Check if a file path contains an unbuilt project marker.
  *
  * @example
  * hasUnbuiltMarker('node_modules/react/index.js')  // true
