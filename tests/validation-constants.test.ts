@@ -4,6 +4,8 @@ import {
   isBlockedExtension,
   UNBUILT_PROJECT_MARKERS,
   hasUnbuiltMarker,
+  UNSAFE_FILENAME_CHARS,
+  hasUnsafeChars,
   FileValidationStatus,
   LABEL_PATTERN,
   LABEL_CONSTRAINTS,
@@ -184,6 +186,66 @@ describe('Validation Constants - @shipstatic/types', () => {
       expect(hasUnbuiltMarker('')).toBe(false);
       expect(hasUnbuiltMarker('/')).toBe(false);
       expect(hasUnbuiltMarker('//')).toBe(false);
+    });
+  });
+
+  describe('UNSAFE_FILENAME_CHARS', () => {
+    it('should block URL round-trip breakers', () => {
+      expect(hasUnsafeChars('file#anchor.html')).toBe(true);
+      expect(hasUnsafeChars('file?query.html')).toBe(true);
+      expect(hasUnsafeChars('file%20name.html')).toBe(true);
+    });
+
+    it('should block backslash (path separator confusion)', () => {
+      expect(hasUnsafeChars('file\\path.html')).toBe(true);
+    });
+
+    it('should block XSS vectors', () => {
+      expect(hasUnsafeChars('file<tag>.html')).toBe(true);
+      expect(hasUnsafeChars('file>end.html')).toBe(true);
+      expect(hasUnsafeChars('file"quote.html')).toBe(true);
+    });
+
+    it('should block control characters', () => {
+      expect(hasUnsafeChars('file\x00null.html')).toBe(true);
+      expect(hasUnsafeChars('file\ttab.html')).toBe(true);
+      expect(hasUnsafeChars('file\nnewline.html')).toBe(true);
+      expect(hasUnsafeChars('file\rreturn.html')).toBe(true);
+      expect(hasUnsafeChars('file\x1fcontrol.html')).toBe(true);
+      expect(hasUnsafeChars('file\x7fdelete.html')).toBe(true);
+    });
+
+    it('should allow all characters that survive the URL round-trip', () => {
+      const safeNames = [
+        'saved_resource(1).html',
+        'page[slug].js',
+        'route{id}.html',
+        "O'Brien.html",
+        'file&param.html',
+        'config;v2.json',
+        'price$10.txt',
+        'file~backup.html',
+        'file|pipe.txt',
+        'file^caret.txt',
+        'file`tick`.js',
+        'file*star.txt',
+        'file!bang.txt',
+        'file+plus.txt',
+        'file,comma.txt',
+        'file=equals.txt',
+        'file@at.txt',
+        'file:colon.txt',
+        'my file.txt',
+        'Dashboard Overview_files/js(1)',
+      ];
+
+      for (const name of safeNames) {
+        expect(hasUnsafeChars(name)).toBe(false);
+      }
+    });
+
+    it('should be the single source of truth (regex is exported)', () => {
+      expect(UNSAFE_FILENAME_CHARS).toBeInstanceOf(RegExp);
     });
   });
 
