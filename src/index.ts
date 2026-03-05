@@ -581,6 +581,7 @@ export function isBlockedExtension(filename: string): boolean {
  */
 export const UNBUILT_PROJECT_MARKERS: ReadonlySet<string> = new Set([
   'node_modules',
+  'package.json',
 ]);
 
 /**
@@ -588,6 +589,7 @@ export const UNBUILT_PROJECT_MARKERS: ReadonlySet<string> = new Set([
  *
  * @example
  * hasUnbuiltMarker('node_modules/react/index.js')  // true
+ * hasUnbuiltMarker('package.json')                  // true
  * hasUnbuiltMarker('dist/index.html')               // false
  */
 export function hasUnbuiltMarker(filePath: string): boolean {
