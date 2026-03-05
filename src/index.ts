@@ -572,6 +572,30 @@ export function isBlockedExtension(filename: string): boolean {
 }
 
 // =============================================================================
+// UNBUILT PROJECT MARKERS
+// =============================================================================
+
+/**
+ * Directory names that indicate an unbuilt project was uploaded instead of build output.
+ * Used for early detection in CLI, browser, and server validation.
+ */
+export const UNBUILT_PROJECT_MARKERS: ReadonlySet<string> = new Set([
+  'node_modules',
+]);
+
+/**
+ * Check if a file path contains an unbuilt project marker directory.
+ *
+ * @example
+ * hasUnbuiltMarker('node_modules/react/index.js')  // true
+ * hasUnbuiltMarker('dist/index.html')               // false
+ */
+export function hasUnbuiltMarker(filePath: string): boolean {
+  const segments = filePath.replace(/\\/g, '/').split('/').filter(Boolean);
+  return segments.some(s => UNBUILT_PROJECT_MARKERS.has(s));
+}
+
+// =============================================================================
 // COMMON RESPONSE PATTERNS
 // =============================================================================
 

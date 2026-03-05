@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   BLOCKED_EXTENSIONS,
   isBlockedExtension,
+  UNBUILT_PROJECT_MARKERS,
+  hasUnbuiltMarker,
   FileValidationStatus,
   LABEL_PATTERN,
   LABEL_CONSTRAINTS,
@@ -115,6 +117,60 @@ describe('Validation Constants - @shipstatic/types', () => {
     it('should check last extension only (double extensions)', () => {
       expect(isBlockedExtension('image.jpg.exe')).toBe(true);
       expect(isBlockedExtension('safe.exe.txt')).toBe(false);
+    });
+  });
+
+  describe('UNBUILT_PROJECT_MARKERS', () => {
+    it('should contain node_modules', () => {
+      expect(UNBUILT_PROJECT_MARKERS.has('node_modules')).toBe(true);
+    });
+
+    it('should NOT match partial names', () => {
+      expect(UNBUILT_PROJECT_MARKERS.has('node')).toBe(false);
+      expect(UNBUILT_PROJECT_MARKERS.has('modules')).toBe(false);
+    });
+
+    it('should be case-sensitive', () => {
+      expect(UNBUILT_PROJECT_MARKERS.has('Node_Modules')).toBe(false);
+      expect(UNBUILT_PROJECT_MARKERS.has('NODE_MODULES')).toBe(false);
+    });
+  });
+
+  describe('hasUnbuiltMarker()', () => {
+    it('should detect node_modules in paths', () => {
+      expect(hasUnbuiltMarker('node_modules/react/index.js')).toBe(true);
+      expect(hasUnbuiltMarker('project/node_modules/lodash/lodash.js')).toBe(true);
+    });
+
+    it('should detect node_modules as a standalone segment', () => {
+      expect(hasUnbuiltMarker('node_modules')).toBe(true);
+    });
+
+    it('should handle backslash paths', () => {
+      expect(hasUnbuiltMarker('project\\node_modules\\react\\index.js')).toBe(true);
+    });
+
+    it('should return false for clean build output paths', () => {
+      expect(hasUnbuiltMarker('dist/index.html')).toBe(false);
+      expect(hasUnbuiltMarker('build/static/app.js')).toBe(false);
+      expect(hasUnbuiltMarker('out/index.html')).toBe(false);
+      expect(hasUnbuiltMarker('index.html')).toBe(false);
+    });
+
+    it('should not match partial directory names', () => {
+      expect(hasUnbuiltMarker('my_node_modules_backup/file.js')).toBe(false);
+      expect(hasUnbuiltMarker('not_node_modules/file.js')).toBe(false);
+    });
+
+    it('should be case-sensitive', () => {
+      expect(hasUnbuiltMarker('Node_Modules/react/index.js')).toBe(false);
+      expect(hasUnbuiltMarker('NODE_MODULES/react/index.js')).toBe(false);
+    });
+
+    it('should handle edge cases', () => {
+      expect(hasUnbuiltMarker('')).toBe(false);
+      expect(hasUnbuiltMarker('/')).toBe(false);
+      expect(hasUnbuiltMarker('//')).toBe(false);
     });
   });
 
