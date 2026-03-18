@@ -878,6 +878,10 @@ export interface DeploymentUploadOptions {
   subdomain?: string;
   /** Client identifier (e.g., 'cli', 'sdk', 'web') */
   via?: string;
+  /** @internal Trigger server-side build. Only available via /upload endpoint. */
+  build?: boolean;
+  /** @internal Trigger server-side prerender. Only available via /upload endpoint. */
+  prerender?: boolean;
 }
 
 /**
