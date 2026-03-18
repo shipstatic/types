@@ -1,5 +1,5 @@
 /**
- * @file Shared TypeScript types, constants, and utilities for the Shipstatic platform.
+ * @file Shared TypeScript types, constants, and utilities for the ShipStatic platform.
  * This package is the single source of truth for all shared data structures.
  */
 
@@ -315,7 +315,7 @@ export interface AccountOverrides {
 // =============================================================================
 
 /**
- * All possible error types in the Shipstatic platform
+ * All possible error types in the ShipStatic platform
  * Names are developer-friendly while wire format stays consistent
  */
 export enum ErrorType {
@@ -1231,8 +1231,8 @@ export interface UploadedFile {
  * Check if a domain is a platform domain (subdomain of our platform).
  * Platform domains are free and don't require DNS verification.
  *
- * @example isPlatformDomain("www.shipstatic.dev", "shipstatic.dev") → true
- * @example isPlatformDomain("example.com", "shipstatic.dev") → false
+ * @example isPlatformDomain("www.shipstatic.com", "shipstatic.com") → true
+ * @example isPlatformDomain("example.com", "shipstatic.com") → false
  */
 export function isPlatformDomain(domain: string, platformDomain: string): boolean {
   return domain.endsWith(`.${platformDomain}`);
@@ -1242,8 +1242,8 @@ export function isPlatformDomain(domain: string, platformDomain: string): boolea
  * Check if a domain is a custom domain (not a platform subdomain).
  * Custom domains are billable and require DNS verification.
  *
- * @example isCustomDomain("example.com", "shipstatic.dev") → true
- * @example isCustomDomain("www.shipstatic.dev", "shipstatic.dev") → false
+ * @example isCustomDomain("example.com", "shipstatic.com") → true
+ * @example isCustomDomain("www.shipstatic.com", "shipstatic.com") → false
  */
 export function isCustomDomain(domain: string, platformDomain: string): boolean {
   return !isPlatformDomain(domain, platformDomain);
@@ -1253,8 +1253,8 @@ export function isCustomDomain(domain: string, platformDomain: string): boolean 
  * Extract subdomain from a platform domain.
  * Returns null if not a platform domain.
  *
- * @example extractSubdomain("www.shipstatic.dev", "shipstatic.dev") → "www"
- * @example extractSubdomain("example.com", "shipstatic.dev") → null
+ * @example extractSubdomain("www.shipstatic.com", "shipstatic.com") → "www"
+ * @example extractSubdomain("example.com", "shipstatic.com") → null
  */
 export function extractSubdomain(domain: string, platformDomain: string): string | null {
   if (!isPlatformDomain(domain, platformDomain)) {
