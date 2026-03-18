@@ -1,6 +1,6 @@
 # @shipstatic/types
 
-Shared TypeScript types for the Shipstatic platform.
+Shared TypeScript types for the ShipStatic platform.
 
 Single source of truth for types used across API, SDK, CLI, and web applications.
 

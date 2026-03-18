@@ -4,7 +4,7 @@ Claude Code instructions for the **Types** package.
 
 ## Package Identity
 
-**@shipstatic/types** is the single source of truth for all shared TypeScript types, constants, and utilities across the Shipstatic platform. If a type is used by more than one package, it belongs here.
+**@shipstatic/types** is the single source of truth for all shared TypeScript types, constants, and utilities across the ShipStatic platform. If a type is used by more than one package, it belongs here.
 
 **Maturity:** Release candidate — changes should be deliberate.
 
