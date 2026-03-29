@@ -101,7 +101,7 @@ Use `readonly` for stable fields (`id`, `created`, `url`). Leave mutable fields 
 | Package | Uses |
 |---------|------|
 | `@shipstatic/ship` | All types, ShipError, validation utilities |
-| `@shipstatic/drop` | `FileValidationStatus`, `ValidatableFile` |
+| `@shipstatic/drop` | `FileValidationStatus`, `ValidatableFile`, `hasUnbuiltMarker` |
 | `cloudflare/api` | All entity types, ShipError, constants |
 | `cloudflare/consumer` | ShipError, entity types |
 | `web/my` | Entity types, response types |
