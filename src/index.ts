@@ -870,8 +870,6 @@ export type DeployInput = File[] | string | string[];
 export interface DeploymentUploadOptions {
   /** Optional labels for categorization and filtering */
   labels?: string[];
-  /** Optional subdomain suggestion for the deployment */
-  subdomain?: string;
   /** Client identifier (e.g., 'cli', 'sdk', 'web') */
   via?: string;
   /** @internal Trigger server-side build. Only available via /upload endpoint. */
