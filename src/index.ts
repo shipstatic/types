@@ -23,7 +23,7 @@ export type DeploymentStatusType = typeof DeploymentStatus[keyof typeof Deployme
  * Core deployment object - used in both API responses and SDK
  */
 export interface Deployment {
-  /** The deployment ID */
+  /** The deployment hostname (e.g., 'happy-cat-abc1234.shipstatic.com') */
   readonly deployment: string;
   /** Number of files in this deployment */
   readonly files: number;
@@ -37,8 +37,6 @@ export interface Deployment {
   labels: string[];
   /** The client/tool used to create this deployment (e.g., 'web', 'sdk', 'cli'), null if unknown */
   readonly via: string | null;
-  /** The deployment URL */
-  readonly url: string;
   /** Unix timestamp (seconds) when deployment was created */
   readonly created: number;
   /** Unix timestamp (seconds) when deployment expires, null if never */
@@ -85,14 +83,12 @@ export type DomainStatusType = typeof DomainStatus[keyof typeof DomainStatus];
 export interface Domain {
   /** The domain name */
   readonly domain: string;
-  /** The deployment name this domain points to (null = domain added but not yet linked) */
+  /** The deployment hostname this domain points to (null = domain added but not yet linked) */
   deployment: string | null; // Mutable - can be updated to point to different deployment
   /** Current domain status */
   status: DomainStatusType; // Mutable - can be updated
   /** Labels for categorization and filtering (lowercase, alphanumeric with separators). Always present, empty array when none. */
   labels: string[];
-  /** The domain URL - internal (subdomain) or external (custom domain) */
-  readonly url: string;
   /** Unix timestamp (seconds) when domain was created */
   readonly created: number;
   /** When deployment was last linked (Unix timestamp), null if never linked */
@@ -733,11 +729,11 @@ export function validateApiUrl(apiUrl: string): void {
 }
 
 /**
- * Check if a string matches the deployment ID pattern (word-word-alphanumeric7)
- * Example: "happy-cat-abc1234"
+ * Check if a string matches the deployment identifier pattern (word-word-alphanumeric7).
+ * Example: "happy-cat-abc1234.shipstatic.com"
  */
 export function isDeployment(input: string): boolean {
-  return /^[a-z]+-[a-z]+-[a-z0-9]{7}$/i.test(input);
+  return /^[a-z]+-[a-z]+-[a-z0-9]{7}(\.[a-z0-9.-]+)?$/i.test(input);
 }
 
 // =============================================================================
@@ -1268,16 +1264,14 @@ export function extractSubdomain(domain: string, platformDomain: string): string
 }
 
 /**
- * Generate deployment URL from deployment ID and platform domain
+ * Generate HTTPS URL for a deployment hostname.
  */
-export function generateDeploymentUrl(deployment: string, platformDomain?: string): string {
-  const domain = platformDomain || 'shipstatic.com';
-  return `https://${deployment}.${domain}`;
+export function generateDeploymentUrl(deployment: string): string {
+  return `https://${deployment}`;
 }
 
 /**
- * Generate URL for a domain.
- * Domains are stored as FQDNs, so this just prepends https://
+ * Generate HTTPS URL for a domain.
  */
 export function generateDomainUrl(domain: string): string {
   return `https://${domain}`;
