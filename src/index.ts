@@ -45,6 +45,15 @@ export interface Deployment {
 
 
 /**
+ * Response from deployment creation. Extends Deployment with one-time fields
+ * only present on creation (not on subsequent GET requests).
+ */
+export interface DeploymentCreateResponse extends Deployment {
+  /** Claim token for public deployments. Present when deployed without credentials. */
+  readonly claim?: string;
+}
+
+/**
  * Response for listing deployments
  */
 export interface DeploymentListResponse {
@@ -882,7 +891,7 @@ export interface DeploymentUploadOptions {
  * Deployment resource interface - the contract all implementations must follow
  */
 export interface DeploymentResource {
-  upload: (input: DeployInput, options?: DeploymentUploadOptions) => Promise<Deployment>;
+  upload: (input: DeployInput, options?: DeploymentUploadOptions) => Promise<DeploymentCreateResponse>;
   list: () => Promise<DeploymentListResponse>;
   get: (id: string) => Promise<Deployment>;
   set: (id: string, options: { labels: string[] }) => Promise<Deployment>;
