@@ -25,6 +25,8 @@ export type DeploymentStatusType = typeof DeploymentStatus[keyof typeof Deployme
 export interface Deployment {
   /** The deployment hostname (e.g., 'happy-cat-abc1234.shipstatic.com') */
   readonly deployment: string;
+  /** Full URL to the deployment (e.g., 'https://happy-cat-abc1234.shipstatic.com') */
+  readonly url: string;
   /** Number of files in this deployment */
   readonly files: number;
   /** Total size of all files in bytes */
@@ -49,7 +51,7 @@ export interface Deployment {
  * only present on creation (not on subsequent GET requests).
  */
 export interface DeploymentCreateResponse extends Deployment {
-  /** Claim token for public deployments. Present when deployed without credentials. */
+  /** Claim URL for public deployments. Present when deployed without credentials. */
   readonly claim?: string;
 }
 
@@ -92,6 +94,8 @@ export type DomainStatusType = typeof DomainStatus[keyof typeof DomainStatus];
 export interface Domain {
   /** The domain name */
   readonly domain: string;
+  /** Full URL to the domain (e.g., 'https://www.example.com') */
+  readonly url: string;
   /** The deployment hostname this domain points to (null = domain added but not yet linked) */
   deployment: string | null; // Mutable - can be updated to point to different deployment
   /** Current domain status */
