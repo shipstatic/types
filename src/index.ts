@@ -889,6 +889,8 @@ export interface DeploymentUploadOptions {
   build?: boolean;
   /** @internal Trigger server-side prerender. Only available via /upload endpoint. */
   prerender?: boolean;
+  /** @internal Trigger server-side SPA detection. Only available via /upload endpoint. */
+  spa?: boolean;
 }
 
 /**
