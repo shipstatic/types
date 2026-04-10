@@ -675,6 +675,9 @@ export type AuthMethodType = typeof AuthMethod[keyof typeof AuthMethod];
 // Deployment Configuration
 export const DEPLOYMENT_CONFIG_FILENAME = 'ship.json';
 
+/** Default ship.json config for SPA routing. Single source of truth — used by both API and SDK. */
+export const SPA_DEFAULT_CONFIG = { rewrites: [{ source: '/(.*)', destination: '/index.html' }] } as const;
+
 // =============================================================================
 // VALIDATION UTILITIES
 // =============================================================================
