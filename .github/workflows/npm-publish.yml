@@ -8,23 +8,26 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v3
-      
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
-      
-      - uses: pnpm/action-setup@v2
+
+      - uses: pnpm/action-setup@v4
         with:
-          version: 8
-      
-      - run: pnpm install --no-frozen-lockfile
+          version: 10.12.4
+
+      - run: pnpm install
       
       - run: pnpm run build
       
-      - run: pnpm publish --access public --no-git-checks
+      - run: pnpm publish --access public --no-git-checks --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
       
