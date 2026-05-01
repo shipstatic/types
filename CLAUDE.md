@@ -32,6 +32,7 @@ Single file: `src/index.ts`, organized into named sections in this order:
 | File Upload Types | `FileValidationStatus`, `ValidationIssue`, `ValidatableFile`, `FileValidationResult`, `UploadedFile` |
 | Domain Utilities | `isPlatformDomain`, `isCustomDomain`, `extractSubdomain`, `generate*Url` |
 | Label Utilities | `LABEL_CONSTRAINTS`, `LABEL_PATTERN`, `serializeLabels`, `deserializeLabels` |
+| Password Utilities | `PASSWORD_CONSTRAINTS` |
 
 ## Quick Reference
 

@@ -9,6 +9,7 @@ import {
   FileValidationStatus,
   LABEL_PATTERN,
   LABEL_CONSTRAINTS,
+  PASSWORD_CONSTRAINTS,
   type ConfigResponse,
   type FileValidationStatusType
 } from '../src/index';
@@ -368,6 +369,26 @@ describe('Validation Constants - @shipstatic/types', () => {
 
       expect(LABEL_CONSTRAINTS.MAX_COUNT).toBeGreaterThanOrEqual(1);
       expect(LABEL_CONSTRAINTS.MAX_COUNT).toBeLessThanOrEqual(100);
+    });
+  });
+
+  describe('PASSWORD_CONSTRAINTS', () => {
+    it('should define min length', () => {
+      expect(PASSWORD_CONSTRAINTS.MIN_LENGTH).toBeGreaterThan(0);
+      expect(typeof PASSWORD_CONSTRAINTS.MIN_LENGTH).toBe('number');
+    });
+
+    it('should define max length', () => {
+      expect(PASSWORD_CONSTRAINTS.MAX_LENGTH).toBeGreaterThan(PASSWORD_CONSTRAINTS.MIN_LENGTH);
+      expect(typeof PASSWORD_CONSTRAINTS.MAX_LENGTH).toBe('number');
+    });
+
+    it('should have reasonable limits', () => {
+      expect(PASSWORD_CONSTRAINTS.MIN_LENGTH).toBeGreaterThanOrEqual(4);
+      expect(PASSWORD_CONSTRAINTS.MIN_LENGTH).toBeLessThanOrEqual(16);
+
+      expect(PASSWORD_CONSTRAINTS.MAX_LENGTH).toBeGreaterThanOrEqual(64);
+      expect(PASSWORD_CONSTRAINTS.MAX_LENGTH).toBeLessThanOrEqual(512);
     });
   });
 });

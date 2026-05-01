@@ -888,6 +888,17 @@ export interface DeploymentUploadOptions {
   labels?: string[];
   /** Client identifier (e.g., 'cli', 'sdk', 'web') */
   via?: string;
+  /**
+   * Optional password that gates public access to this deployment.
+   *
+   * Length: {@link PASSWORD_CONSTRAINTS.MIN_LENGTH} to
+   * {@link PASSWORD_CONSTRAINTS.MAX_LENGTH} characters. Plaintext on the wire;
+   * the API hashes it once (SHA-256) and stores the hex digest. The Router
+   * serves a lock page to visitors who don't present the matching cookie. If
+   * the deployment is linked to a custom domain, the same gate applies there
+   * too. Revocation is redeployment.
+   */
+  password?: string;
   /** @internal Trigger server-side build. Only available via /upload endpoint. */
   build?: boolean;
   /** @internal Trigger server-side prerender. Only available via /upload endpoint. */
@@ -1352,3 +1363,22 @@ export function deserializeLabels(labelsJson: string | null): string[] {
     return [];
   }
 }
+
+// =============================================================================
+// PASSWORD UTILITIES
+// =============================================================================
+
+/**
+ * Deployment password validation constraints, shared across UI, SDK, and API.
+ * Single source of truth for the length rule applied to the optional
+ * `DeploymentUploadOptions.password` field.
+ *
+ * Plaintext is hashed once server-side (SHA-256) and never persisted in its
+ * original form; see `cloudflare/shared/password.ts` for the protocol.
+ */
+export const PASSWORD_CONSTRAINTS = {
+  /** Minimum password length in characters */
+  MIN_LENGTH: 6,
+  /** Maximum password length in characters */
+  MAX_LENGTH: 128,
+} as const;
