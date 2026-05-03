@@ -33,8 +33,10 @@ export interface Deployment {
   readonly size: number;
   /** Current deployment status */
   status: DeploymentStatusType; // Mutable - can be updated
-  /** Whether deployment has configuration */
+  /** Whether deployment has a ship.json config */
   readonly config: boolean;
+  /** Whether deployment has a password set */
+  readonly password: boolean;
   /** Labels for categorization and filtering (lowercase, alphanumeric with separators). Always present, empty array when none. */
   labels: string[];
   /** The client/tool used to create this deployment (e.g., 'web', 'sdk', 'cli'), null if unknown */
@@ -1112,8 +1114,10 @@ export interface ActivityMeta {
   files?: number;
   /** Total size in bytes */
   size?: number;
-  /** Whether deployment has config */
+  /** Whether deployment has a ship.json config */
   hasConfig?: boolean;
+  /** Whether deployment has a password set */
+  hasPassword?: boolean;
 
   // Domain events
   /** Whether this was an update (vs create) */
