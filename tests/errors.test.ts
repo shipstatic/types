@@ -241,3 +241,50 @@ describe('ShipError.fromHttpResponse', () => {
     });
   });
 });
+
+describe('ShipError.fromFetchError', () => {
+  it('passes through an existing ShipError unchanged (preserves caller intent)', () => {
+    const original = ShipError.validation('Email required');
+    const result = ShipError.fromFetchError(original, 'Get account');
+    expect(result).toBe(original);
+  });
+
+  it('maps AbortError to ShipError.cancelled with operation prefix', () => {
+    const abort = new Error('The operation was aborted');
+    abort.name = 'AbortError';
+    const err = ShipError.fromFetchError(abort, 'Get account');
+    expect(err.type).toBe(ErrorType.Cancelled);
+    expect(err.message).toBe('Get account was cancelled');
+  });
+
+  it('maps fetch TypeError to ShipError.network with operation prefix and cause', () => {
+    const networkErr = new TypeError('fetch failed');
+    const err = ShipError.fromFetchError(networkErr, 'Ping');
+    expect(err.type).toBe(ErrorType.Network);
+    expect(err.message).toBe('Ping failed: fetch failed');
+    expect(err.isNetworkError()).toBe(true);
+    expect((err.details as { cause?: Error })?.cause).toBe(networkErr);
+  });
+
+  it('maps any other Error to ErrorType.Api with operation prefix (no HTTP status)', () => {
+    const generic = new Error('Something exploded');
+    const err = ShipError.fromFetchError(generic, 'List domains');
+    expect(err.type).toBe(ErrorType.Api);
+    expect(err.message).toBe('List domains failed: Something exploded');
+    // No HTTP status — fetch never reached the server
+    expect(err.status).toBeUndefined();
+  });
+
+  it('maps a non-Error throw (string, undefined) to ErrorType.Api with "Unknown error"', () => {
+    const err = ShipError.fromFetchError('weird thing', 'Verify domain');
+    expect(err.type).toBe(ErrorType.Api);
+    expect(err.message).toBe('Verify domain failed: Unknown error');
+    expect(err.status).toBeUndefined();
+  });
+
+  it('defaults operationName to "Request" when omitted', () => {
+    const generic = new Error('boom');
+    const err = ShipError.fromFetchError(generic);
+    expect(err.message).toBe('Request failed: boom');
+  });
+});

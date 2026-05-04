@@ -66,17 +66,67 @@ error.isType(errorType)
 // Wire format (producer side — API workers serialize errors with toResponse())
 error.toResponse() // → ErrorResponse JSON
 
-// Wire format (consumer side — HTTP clients reconstruct ShipError from a Response)
-await ShipError.fromHttpResponse(response, fallbackMessage?)
-// Trusts body.error when it's a known ErrorType (server's
-// ShipError.validation(...) round-trips back as ErrorType.Validation).
-// Falls back to status-derived (401→Authentication, 429→RateLimit, else→Api)
-// for non-API responses or malformed bodies. Body's message and details
-// are best-effort preserved.
+// HTTP error story (consumer side) — two symmetric helpers, one per failure mode:
+await ShipError.fromHttpResponse(response, fallbackMessage?)  // server returned non-OK
+ShipError.fromFetchError(cause, operationName?)                // fetch itself threw
 
 // Structural guard (handles module duplication in bundles)
 isShipError(error)
 ```
+
+### Error Flow
+
+Errors flow through the platform along a single, symmetric path. Every HTTP client (SDK, web console, future) uses the same two helpers; the API worker does the inverse. There is no other way to construct or hydrate a `ShipError` in HTTP context.
+
+```
+┌─ Producer (cloudflare/api worker) ────────────────────────────────────┐
+│  throw ShipError.validation('Email required')                          │
+│       │                                                                │
+│       ▼                                                                │
+│  app.onError(err) — global handler in api/src/index.ts                 │
+│       │                                                                │
+│       ▼                                                                │
+│  c.json(err.toResponse(), err.status ?? 500)                           │
+└────────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼  WIRE (JSON)
+                  { error: 'validation_failed',
+                    message: 'Email required',
+                    status: 400,
+                    details?: any }
+                                  │
+                                  ▼
+┌─ Consumer (npm/ship SDK or web/my) ───────────────────────────────────┐
+│                                                                        │
+│  Path 1 — server returned a non-OK response:                           │
+│    if (!response.ok)                                                   │
+│      throw await ShipError.fromHttpResponse(response, operationName)   │
+│      // trusts body.error if it's a server-producible ErrorType,       │
+│      // else status-derived (401→Authentication, 429→RateLimit,        │
+│      // anything else→Api). body.message and body.details preserved.   │
+│                                                                        │
+│  Path 2 — fetch itself failed (offline, abort, CORS):                  │
+│    catch (cause) {                                                     │
+│      throw ShipError.fromFetchError(cause, operationName)              │
+│      // ShipError pass-through · AbortError→Cancelled                  │
+│      // TypeError fetch→Network · other Error→Api · unknown→Api        │
+│    }                                                                   │
+│                                                                        │
+│  Either way, consumer code sees a typed ShipError:                     │
+│    if (error.isValidationError()) { ... }   // works for received errors│
+│    if (error.status === 429)      { ... }                              │
+│    if (error.isAuthError())       { ... }                              │
+│    if (error.isNetworkError())    { ... }                              │
+│                                                                        │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+**Conventions enforced by this design:**
+
+- **Wire-format type round-trips.** Server's `ShipError.validation(...)` reaches the client as `ErrorType.Validation`. `error.isValidationError()`, `isClientError()`, etc. work for received errors.
+- **Status drives type for non-API responses** (CDN errors, intermediaries with no body) — 401→Authentication, 429→RateLimit, else→Api.
+- **Client-only types stay client-only.** `Network` and `Cancelled` originate on the client (fetch failure, AbortSignal). Even if a misbehaving server claimed `error: "network_error"` in the body, `fromHttpResponse` ignores it — those types are filtered out of the wire-trust set.
+- **No HTTP error logic outside these two helpers.** SDK and web console are pure transport — `executeRequest` / `lib/api.ts` call the helpers directly; there are no private wrappers, no duplicated parsing, no drift surface.
 
 ### Resource Contracts
 
