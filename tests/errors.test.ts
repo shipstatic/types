@@ -1,6 +1,115 @@
 import { describe, it, expect } from 'vitest';
 import { ErrorType, ShipError, isShipError } from '../src/index';
 
+describe('ShipError construction', () => {
+  it('direct constructor sets type, message, status, details and is an Error/ShipError', () => {
+    const err = new ShipError(ErrorType.Business, 'Test message', 400, { hint: 'x' });
+    expect(err).toBeInstanceOf(Error);
+    expect(err).toBeInstanceOf(ShipError);
+    expect(err.name).toBe('ShipError');
+    expect(err.message).toBe('Test message');
+    expect(err.type).toBe(ErrorType.Business);
+    expect(err.status).toBe(400);
+    expect(err.details).toEqual({ hint: 'x' });
+  });
+});
+
+// Factory tests follow ErrorType enum order. One `it` per factory, asserting
+// type, message, status, and (where applicable) details. The principled
+// shape variations are documented in JSDoc on each factory.
+describe('ShipError factories', () => {
+  it('validation → type=Validation, status=400, preserves details', () => {
+    const err = ShipError.validation('Validation failed', { field: 'test' });
+    expect(err.type).toBe(ErrorType.Validation);
+    expect(err.message).toBe('Validation failed');
+    expect(err.status).toBe(400);
+    expect(err.details).toEqual({ field: 'test' });
+  });
+
+  it('notFound → type=NotFound, status=404, message composed from (resource, id?)', () => {
+    expect(ShipError.notFound('Domain').message).toBe('Domain not found');
+    const err = ShipError.notFound('Domain', 'foo.com');
+    expect(err.type).toBe(ErrorType.NotFound);
+    expect(err.message).toBe('Domain foo.com not found');
+    expect(err.status).toBe(404);
+  });
+
+  it('forbidden → type=Forbidden, status=403, preserves details', () => {
+    const err = ShipError.forbidden('Account terminated', { reason: 'plan_expired' });
+    expect(err.type).toBe(ErrorType.Forbidden);
+    expect(err.message).toBe('Account terminated');
+    expect(err.status).toBe(403);
+    expect(err.isClientError()).toBe(true);
+    expect((err.details as { reason?: string } | undefined)?.reason).toBe('plan_expired');
+  });
+
+  it('rateLimit → type=RateLimit, status=429, default message', () => {
+    expect(ShipError.rateLimit().message).toBe('Too many requests');
+    const err = ShipError.rateLimit('Slow down', { retryAfter: 60 });
+    expect(err.type).toBe(ErrorType.RateLimit);
+    expect(err.message).toBe('Slow down');
+    expect(err.status).toBe(429);
+    expect((err.details as { retryAfter?: number } | undefined)?.retryAfter).toBe(60);
+  });
+
+  it('authentication → type=Authentication, status=401, default message', () => {
+    expect(ShipError.authentication().message).toBe('Authentication required');
+    const err = ShipError.authentication('Token expired', { hint: 'reauth' });
+    expect(err.type).toBe(ErrorType.Authentication);
+    expect(err.message).toBe('Token expired');
+    expect(err.status).toBe(401);
+    expect(err.isAuthError()).toBe(true);
+  });
+
+  it('business → type=Business, status defaults to 400, custom status accepted', () => {
+    expect(ShipError.business('default').status).toBe(400);
+    const err = ShipError.business('Business rule violated', 422);
+    expect(err.type).toBe(ErrorType.Business);
+    expect(err.message).toBe('Business rule violated');
+    expect(err.status).toBe(422);
+  });
+
+  it('api → type=Api, status defaults to 500, custom status accepted', () => {
+    expect(ShipError.api('default').status).toBe(500);
+    const err = ShipError.api('API issue', 503);
+    expect(err.type).toBe(ErrorType.Api);
+    expect(err.message).toBe('API issue');
+    expect(err.status).toBe(503);
+  });
+
+  it('network → type=Network, no status, cause stored in details', () => {
+    const cause = new Error('Network down');
+    const err = ShipError.network('Connection failed', { cause });
+    expect(err.type).toBe(ErrorType.Network);
+    expect(err.message).toBe('Connection failed');
+    expect(err.status).toBeUndefined();
+    expect(err.isNetworkError()).toBe(true);
+    expect((err.details as { cause?: Error } | undefined)?.cause).toBe(cause);
+  });
+
+  it('cancelled → type=Cancelled with no status', () => {
+    const err = ShipError.cancelled('Operation was cancelled');
+    expect(err.type).toBe(ErrorType.Cancelled);
+    expect(err.message).toBe('Operation was cancelled');
+    expect(err.status).toBeUndefined();
+  });
+
+  it('file → type=File, no status, filePath stored in details', () => {
+    const err = ShipError.file('File not found', { filePath: '/path/to/file' });
+    expect(err.type).toBe(ErrorType.File);
+    expect(err.message).toBe('File not found');
+    expect(err.status).toBeUndefined();
+    expect((err.details as { filePath?: string } | undefined)?.filePath).toBe('/path/to/file');
+  });
+
+  it('config → type=Config with no status', () => {
+    const err = ShipError.config('Config is bad');
+    expect(err.type).toBe(ErrorType.Config);
+    expect(err.message).toBe('Config is bad');
+    expect(err.status).toBeUndefined();
+  });
+});
+
 /**
  * Build a `Response` carrying a JSON body and a given HTTP status.
  * Helper keeps individual tests focused on the assertion, not the plumbing.
@@ -11,6 +120,50 @@ function jsonResponse(body: unknown, status: number): Response {
     headers: { 'content-type': 'application/json' },
   });
 }
+
+describe('ShipError.toResponse()', () => {
+  describe('wire format serialization', () => {
+    it('serializes type, message, status, details to ErrorResponse shape', () => {
+      const original = ShipError.validation('Invalid input', { field: 'email' });
+      const response = original.toResponse();
+      expect(response.error).toBe(ErrorType.Validation);
+      expect(response.message).toBe('Invalid input');
+      expect(response.status).toBe(400);
+      expect(response.details).toEqual({ field: 'email' });
+    });
+  });
+
+  // The `internal:` telemetry pattern (see JSDoc on ShipError.authentication
+  // and the dedicated subsection in CLAUDE.md): server-side auth code attaches
+  // a granular tag like `{ internal: 'jwt_missing_subject' }` to record which
+  // strategy/check failed. toResponse() strips the entire details object on
+  // Authentication errors when this key is present, so the wire response is
+  // a clean "Authentication failed" with no leakage.
+  describe('internal: telemetry stripping (Authentication only)', () => {
+    it('strips details from Authentication errors when details.internal is set', () => {
+      const err = ShipError.authentication('Authentication failed', { internal: 'jwt_missing_subject' });
+      const wire = err.toResponse();
+      expect(wire.details).toBeUndefined();
+      expect(wire.message).toBe('Authentication failed');
+      expect(wire.error).toBe(ErrorType.Authentication);
+    });
+
+    it('preserves details on Authentication errors when details.internal is absent', () => {
+      const err = ShipError.authentication('Token expired', { hint: 'reauth' });
+      expect(err.toResponse().details).toEqual({ hint: 'reauth' });
+    });
+
+    it('does NOT strip details on non-Authentication errors even when details.internal is set', () => {
+      const err = ShipError.validation('bad input', { internal: 'should_not_strip' });
+      expect(err.toResponse().details).toEqual({ internal: 'should_not_strip' });
+    });
+
+    it('handles Authentication errors with no details at all', () => {
+      const err = ShipError.authentication('Authentication required');
+      expect(err.toResponse().details).toBeUndefined();
+    });
+  });
+});
 
 describe('ShipError.fromHttpResponse', () => {
   describe('error type derivation by status', () => {
@@ -337,46 +490,3 @@ describe('ShipError.fromFetchError', () => {
   });
 });
 
-describe('ShipError.forbidden', () => {
-  it('produces a Forbidden error with status 403', () => {
-    const err = ShipError.forbidden('Account terminated');
-    expect(err.type).toBe(ErrorType.Forbidden);
-    expect(err.status).toBe(403);
-    expect(err.message).toBe('Account terminated');
-    expect(err.isClientError()).toBe(true);
-  });
-
-  it('preserves details when provided', () => {
-    const err = ShipError.forbidden('No access', { reason: 'plan_expired' });
-    const details = err.details as { reason?: string } | undefined;
-    expect(details?.reason).toBe('plan_expired');
-  });
-});
-
-describe('ShipError.toResponse() — internal: stripping for auth errors', () => {
-  it('strips details from Authentication errors when details.internal is set', () => {
-    // Server-side telemetry pattern: granular tag for logs/tests, opaque to clients.
-    const err = ShipError.authentication('Authentication failed', { internal: 'jwt_missing_subject' });
-    const wire = err.toResponse();
-    expect(wire.details).toBeUndefined();
-    expect(wire.message).toBe('Authentication failed');
-    expect(wire.error).toBe(ErrorType.Authentication);
-  });
-
-  it('preserves details on Authentication errors when details.internal is absent', () => {
-    const err = ShipError.authentication('Token expired', { hint: 'reauth' });
-    expect(err.toResponse().details).toEqual({ hint: 'reauth' });
-  });
-
-  it('does NOT strip details on non-Authentication errors even when details.internal is set', () => {
-    // Strip is targeted at the auth telemetry convention only — `internal`
-    // on other types round-trips like any other detail key.
-    const err = ShipError.validation('bad input', { internal: 'should_not_strip' });
-    expect(err.toResponse().details).toEqual({ internal: 'should_not_strip' });
-  });
-
-  it('preserves details on Authentication errors with no details at all', () => {
-    const err = ShipError.authentication('Authentication required');
-    expect(err.toResponse().details).toBeUndefined();
-  });
-});
