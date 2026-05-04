@@ -64,8 +64,13 @@ error.isClientError()      // Business | Config | File | Validation
 error.isNetworkError() / isAuthError() / isValidationError() / isFileError() / isConfigError()
 error.isType(errorType)
 
-// Wire format
-error.toResponse()  /  ShipError.fromResponse(response)
+// Wire format (producer side — API workers serialize errors with toResponse())
+error.toResponse() // → ErrorResponse JSON
+
+// Wire format (consumer side — HTTP clients reconstruct ShipError from a Response)
+await ShipError.fromHttpResponse(response, fallbackMessage?)
+// Status drives the error type (401→Authentication, 429→RateLimit, else→Api).
+// Body's message/error/details are best-effort preserved.
 
 // Structural guard (handles module duplication in bundles)
 isShipError(error)
