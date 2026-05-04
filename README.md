@@ -62,7 +62,7 @@ import {
 
 ```typescript
 import type {
-  ConfigResponse,
+  PlatformLimits,        // plan-based caps from /config (file size, file count, total size)
   BillingStatus,
   CheckoutSession,
   ActivityListResponse,
@@ -80,8 +80,6 @@ import type {
   DomainResource,
   AccountResource,
   TokenResource,
-  BillingResource,
-  KeysResource,
 } from '@shipstatic/types';
 ```
 
@@ -138,8 +136,8 @@ import {
 ```typescript
 import {
   DEFAULT_API,
-  API_KEY_PREFIX,
-  DEPLOY_TOKEN_PREFIX,
+  API_KEY,         // { PREFIX, HEX_LENGTH, TOTAL_LENGTH, HINT_LENGTH }
+  DEPLOY_TOKEN,    // { PREFIX, HEX_LENGTH, TOTAL_LENGTH }
   DEPLOYMENT_CONFIG_FILENAME,
 } from '@shipstatic/types';
 ```

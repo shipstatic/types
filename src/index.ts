@@ -341,39 +341,48 @@ export interface AccountOverrides {
 // =============================================================================
 
 /**
- * All possible error types in the ShipStatic platform
- * Names are developer-friendly while wire format stays consistent
+ * All possible error types in the ShipStatic platform.
+ *
+ * Developer-friendly key names map to stable wire-format string values.
+ * Both the value and the type are exported under the same name so callers
+ * can use `ErrorType.Validation` (value comparison) and `: ErrorType` (type
+ * annotation) without ceremony — matching the pattern other status objects
+ * (`DeploymentStatus`, `DomainStatus`, `AccountPlan`, `AuthMethod`) follow.
  */
-export enum ErrorType {
+export const ErrorType = {
   /** Validation failed (400) */
-  Validation = "validation_failed",
+  Validation: 'validation_failed',
   /** Resource not found (404) */
-  NotFound = "not_found",
+  NotFound: 'not_found',
   /** Rate limit exceeded (429) */
-  RateLimit = "rate_limit_exceeded",
+  RateLimit: 'rate_limit_exceeded',
   /** Authentication required (401) */
-  Authentication = "authentication_failed",
+  Authentication: 'authentication_failed',
   /** Business logic error (400) */
-  Business = "business_logic_error",
-  /** API server error (500) - renamed from Internal for clarity */
-  Api = "internal_server_error",
+  Business: 'business_logic_error',
+  /** API server error (500) */
+  Api: 'internal_server_error',
   /** Network/connection error */
-  Network = "network_error",
+  Network: 'network_error',
   /** Operation was cancelled */
-  Cancelled = "operation_cancelled",
+  Cancelled: 'operation_cancelled',
   /** File operation error */
-  File = "file_error",
+  File: 'file_error',
   /** Configuration error */
-  Config = "config_error"
-}
+  Config: 'config_error',
+} as const;
+
+export type ErrorType = typeof ErrorType[keyof typeof ErrorType];
 
 /**
- * Categorizes error types for better type checking
+ * Categorizes error types for the `isClientError` / `isNetworkError` /
+ * `isAuthError` helpers. Each `Set` is typed against the wider `ErrorType`
+ * union so `.has(error.type)` accepts any value from the union.
  */
 const ERROR_CATEGORIES = {
-  client: new Set([ErrorType.Business, ErrorType.Config, ErrorType.File, ErrorType.Validation]),
-  network: new Set([ErrorType.Network]),
-  auth: new Set([ErrorType.Authentication]),
+  client: new Set<ErrorType>([ErrorType.Business, ErrorType.Config, ErrorType.File, ErrorType.Validation]),
+  network: new Set<ErrorType>([ErrorType.Network]),
+  auth: new Set<ErrorType>([ErrorType.Authentication]),
 } as const;
 
 /**
@@ -536,12 +545,22 @@ export function isShipError(error: unknown): error is ShipError {
 // =============================================================================
 
 /**
- * Dynamic platform configuration returned by the /config endpoint.
- * Contains plan-based limits that vary by account.
+ * Plan-based platform limits returned by the `/config` endpoint.
+ *
+ * The SDK fetches these once on first API call to drive client-side
+ * file-size / file-count / total-size validation that mirrors what the API
+ * would enforce server-side. Limits vary by account plan.
+ *
+ * Distinct from `ResolvedConfig` (which carries the *client's* credentials
+ * and API URL after defaulting); this one carries the *platform's* posted
+ * caps for the current account.
  */
-export interface ConfigResponse {
+export interface PlatformLimits {
+  /** Maximum size in bytes for a single file. */
   maxFileSize: number;
+  /** Maximum number of files in a single deployment. */
   maxFilesCount: number;
+  /** Maximum total size in bytes across all files in a deployment. */
   maxTotalSize: number;
 }
 
@@ -667,16 +686,33 @@ export interface PingResponse {
   timestamp?: number;
 }
 
-// API Key Configuration
-export const API_KEY_PREFIX = 'ship-';
-export const API_KEY_HEX_LENGTH = 64;
-export const API_KEY_TOTAL_LENGTH = API_KEY_PREFIX.length + API_KEY_HEX_LENGTH; // 69
-export const API_KEY_HINT_LENGTH = 4;
+/**
+ * Shape constants for API keys (`ship-{64 hex chars}`).
+ * Single source of truth used by validation utilities and auth middleware.
+ */
+export const API_KEY = {
+  /** Prefix that identifies an API key. */
+  PREFIX: 'ship-',
+  /** Number of hex characters following the prefix. */
+  HEX_LENGTH: 64,
+  /** Total length of an API key including prefix (`PREFIX.length + HEX_LENGTH = 69`). */
+  TOTAL_LENGTH: 69,
+  /** Number of trailing characters used to display a redacted hint (e.g. last 4). */
+  HINT_LENGTH: 4,
+} as const;
 
-// Deploy Token Configuration
-export const DEPLOY_TOKEN_PREFIX = 'token-';
-export const DEPLOY_TOKEN_HEX_LENGTH = 64;
-export const DEPLOY_TOKEN_TOTAL_LENGTH = DEPLOY_TOKEN_PREFIX.length + DEPLOY_TOKEN_HEX_LENGTH; // 70
+/**
+ * Shape constants for deploy tokens (`token-{64 hex chars}`).
+ * Single source of truth used by validation utilities and auth middleware.
+ */
+export const DEPLOY_TOKEN = {
+  /** Prefix that identifies a deploy token. */
+  PREFIX: 'token-',
+  /** Number of hex characters following the prefix. */
+  HEX_LENGTH: 64,
+  /** Total length of a deploy token including prefix (`PREFIX.length + HEX_LENGTH = 70`). */
+  TOTAL_LENGTH: 70,
+} as const;
 
 // Authentication Method Constants
 export const AuthMethod = {
@@ -703,17 +739,17 @@ export const SPA_DEFAULT_CONFIG = { rewrites: [{ source: '/(.*)', destination: '
  * Validate API key format
  */
 export function validateApiKey(apiKey: string): void {
-  if (!apiKey.startsWith(API_KEY_PREFIX)) {
-    throw ShipError.validation(`API key must start with "${API_KEY_PREFIX}"`);
+  if (!apiKey.startsWith(API_KEY.PREFIX)) {
+    throw ShipError.validation(`API key must start with "${API_KEY.PREFIX}"`);
   }
 
-  if (apiKey.length !== API_KEY_TOTAL_LENGTH) {
-    throw ShipError.validation(`API key must be ${API_KEY_TOTAL_LENGTH} characters total (${API_KEY_PREFIX} + ${API_KEY_HEX_LENGTH} hex chars)`);
+  if (apiKey.length !== API_KEY.TOTAL_LENGTH) {
+    throw ShipError.validation(`API key must be ${API_KEY.TOTAL_LENGTH} characters total (${API_KEY.PREFIX} + ${API_KEY.HEX_LENGTH} hex chars)`);
   }
 
-  const hexPart = apiKey.slice(API_KEY_PREFIX.length);
+  const hexPart = apiKey.slice(API_KEY.PREFIX.length);
   if (!/^[a-f0-9]{64}$/i.test(hexPart)) {
-    throw ShipError.validation(`API key must contain ${API_KEY_HEX_LENGTH} hexadecimal characters after "${API_KEY_PREFIX}" prefix`);
+    throw ShipError.validation(`API key must contain ${API_KEY.HEX_LENGTH} hexadecimal characters after "${API_KEY.PREFIX}" prefix`);
   }
 }
 
@@ -721,17 +757,17 @@ export function validateApiKey(apiKey: string): void {
  * Validate deploy token format
  */
 export function validateDeployToken(deployToken: string): void {
-  if (!deployToken.startsWith(DEPLOY_TOKEN_PREFIX)) {
-    throw ShipError.validation(`Deploy token must start with "${DEPLOY_TOKEN_PREFIX}"`);
+  if (!deployToken.startsWith(DEPLOY_TOKEN.PREFIX)) {
+    throw ShipError.validation(`Deploy token must start with "${DEPLOY_TOKEN.PREFIX}"`);
   }
 
-  if (deployToken.length !== DEPLOY_TOKEN_TOTAL_LENGTH) {
-    throw ShipError.validation(`Deploy token must be ${DEPLOY_TOKEN_TOTAL_LENGTH} characters total (${DEPLOY_TOKEN_PREFIX} + ${DEPLOY_TOKEN_HEX_LENGTH} hex chars)`);
+  if (deployToken.length !== DEPLOY_TOKEN.TOTAL_LENGTH) {
+    throw ShipError.validation(`Deploy token must be ${DEPLOY_TOKEN.TOTAL_LENGTH} characters total (${DEPLOY_TOKEN.PREFIX} + ${DEPLOY_TOKEN.HEX_LENGTH} hex chars)`);
   }
 
-  const hexPart = deployToken.slice(DEPLOY_TOKEN_PREFIX.length);
+  const hexPart = deployToken.slice(DEPLOY_TOKEN.PREFIX.length);
   if (!/^[a-f0-9]{64}$/i.test(hexPart)) {
-    throw ShipError.validation(`Deploy token must contain ${DEPLOY_TOKEN_HEX_LENGTH} hexadecimal characters after "${DEPLOY_TOKEN_PREFIX}" prefix`);
+    throw ShipError.validation(`Deploy token must contain ${DEPLOY_TOKEN.HEX_LENGTH} hexadecimal characters after "${DEPLOY_TOKEN.PREFIX}" prefix`);
   }
 }
 
@@ -886,28 +922,16 @@ export const DEFAULT_API = 'https://api.shipstatic.com';
 // =============================================================================
 
 /**
- * Browser-specific deploy input — an array of `File` objects (typically from
- * `<input type="file">` or drag-and-drop). The Browser SDK rejects any other
- * shape at runtime.
- */
-export type BrowserDeployInput = File[];
-
-/**
- * Node-specific deploy input — file or directory path(s) on disk. A single
- * path or an array of paths; directories are walked recursively. The Node
- * SDK rejects any other shape at runtime.
- */
-export type NodeDeployInput = string | string[];
-
-/**
- * Universal deploy input — the union of every platform's accepted shape.
+ * Universal deploy input — the union of every shape the SDK accepts.
  *
- * Prefer the platform-specific aliases (`BrowserDeployInput` /
- * `NodeDeployInput`) when writing platform-specific code; `DeployInput` is
- * the right type only for code that genuinely needs to accept either. Each
- * platform's SDK validates at runtime and throws on the wrong shape.
+ * - **Browser**: `File[]` (typically from `<input type="file">` or drag-and-drop)
+ * - **Node**: `string | string[]` (file or directory path(s) on disk; directories are walked)
+ *
+ * Each platform's SDK narrows its `deploy()` signature to the relevant shape
+ * and rejects anything else at runtime. Use the structural types directly
+ * (`File[]`, `string | string[]`) when writing platform-specific code.
  */
-export type DeployInput = BrowserDeployInput | NodeDeployInput;
+export type DeployInput = File[] | string | string[];
 
 /**
  * Options for deployment creation at the API contract level.
@@ -1008,34 +1032,6 @@ export interface BillingStatus {
 export interface CheckoutSession {
   /** URL to redirect user to Creem checkout page */
   url: string;
-}
-
-/**
- * Billing resource interface - the contract all implementations must follow
- *
- * IMPOSSIBLE SIMPLICITY: No sync() method needed!
- * Webhooks are the single source of truth. Frontend just polls status().
- */
-export interface BillingResource {
-  /**
-   * Create a checkout session
-   * @returns Checkout session with URL to redirect user
-   */
-  checkout: () => Promise<CheckoutSession>;
-
-  /**
-   * Get current billing status
-   * @returns Billing status and usage information
-   */
-  status: () => Promise<BillingStatus>;
-}
-
-
-/**
- * Keys resource interface - the contract all implementations must follow
- */
-export interface KeysResource {
-  create: () => Promise<{ apiKey: string }>;
 }
 
 // =============================================================================
