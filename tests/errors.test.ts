@@ -22,6 +22,14 @@ describe('ShipError.fromHttpResponse', () => {
       expect(err.status).toBe(401);
     });
 
+    it('maps 403 → ErrorType.Forbidden', async () => {
+      const err = await ShipError.fromHttpResponse(
+        jsonResponse({ message: 'no' }, 403),
+      );
+      expect(err.type).toBe(ErrorType.Forbidden);
+      expect(err.status).toBe(403);
+    });
+
     it('maps 429 → ErrorType.RateLimit', async () => {
       const err = await ShipError.fromHttpResponse(
         jsonResponse({ message: 'slow down' }, 429),
@@ -135,6 +143,46 @@ describe('ShipError.fromHttpResponse', () => {
       );
       // Falls back to status-derived: 401 → Authentication
       expect(err.type).toBe(ErrorType.Authentication);
+    });
+
+    it('does NOT trust body.error when it claims a client-only type (File)', async () => {
+      // File errors originate on the SDK during local file processing — never
+      // produced server-side. A misbehaving body claim is ignored.
+      const err = await ShipError.fromHttpResponse(
+        jsonResponse(
+          { error: ErrorType.File, message: 'misbehaving server', status: 500 },
+          500,
+        ),
+      );
+      expect(err.type).toBe(ErrorType.Api);
+    });
+
+    it('does NOT trust body.error when it claims a client-only type (Config)', async () => {
+      const err = await ShipError.fromHttpResponse(
+        jsonResponse(
+          { error: ErrorType.Config, message: 'misbehaving server', status: 400 },
+          400,
+        ),
+      );
+      expect(err.type).toBe(ErrorType.Api);
+    });
+
+    it('preserves Forbidden type when body.error is "forbidden" (status 403)', async () => {
+      const err = await ShipError.fromHttpResponse(
+        jsonResponse(
+          { error: ErrorType.Forbidden, message: 'Account terminated', status: 403 },
+          403,
+        ),
+      );
+      expect(err.type).toBe(ErrorType.Forbidden);
+      expect(err.status).toBe(403);
+      expect(err.isClientError()).toBe(true);
+    });
+
+    it('maps status 403 to Forbidden when body has no error type', async () => {
+      const err = await ShipError.fromHttpResponse(jsonResponse({}, 403));
+      expect(err.type).toBe(ErrorType.Forbidden);
+      expect(err.status).toBe(403);
     });
   });
 

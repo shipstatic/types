@@ -350,29 +350,44 @@ export interface AccountOverrides {
  * (`DeploymentStatus`, `DomainStatus`, `AccountPlan`, `AuthMethod`) follow.
  */
 export const ErrorType = {
-  /** Validation failed (400) */
+  /** Validation failed (400). Input shape is wrong. */
   Validation: 'validation_failed',
-  /** Resource not found (404) */
+  /** Resource not found (404). */
   NotFound: 'not_found',
-  /** Rate limit exceeded (429) */
+  /** Authenticated but not allowed (403). User lacks permission for this action. */
+  Forbidden: 'forbidden',
+  /** Rate limit exceeded (429). */
   RateLimit: 'rate_limit_exceeded',
-  /** Authentication required (401) */
+  /** Authentication required or failed (401). Missing/invalid credentials. */
   Authentication: 'authentication_failed',
-  /** Business logic error (400) */
+  /** Business rule violation. Catch-all for 4xx state-rule errors that aren't more specific. */
   Business: 'business_logic_error',
-  /** API server error (500) */
+  /** API server error (500). Generic server-side fault. */
   Api: 'internal_server_error',
   /** Network/connection error. Client-side only — set by HTTP clients on fetch failure; never produced server-side. */
   Network: 'network_error',
   /** Operation was cancelled. Client-side only — set on `AbortSignal` abort; never produced server-side. */
   Cancelled: 'operation_cancelled',
-  /** File operation error */
+  /** File operation error. Client-side only — set by SDK during local file processing; never produced server-side. */
   File: 'file_error',
-  /** Configuration error */
+  /** Configuration error. Client-side only — set by SDK during config parsing/validation; never produced server-side. */
   Config: 'config_error',
 } as const;
 
 export type ErrorType = typeof ErrorType[keyof typeof ErrorType];
+
+/**
+ * Error types that originate exclusively on the client (HTTP clients, SDK
+ * file processing, local config parsing). These never appear on the wire
+ * from the server, so `fromHttpResponse` will not trust them even if a
+ * misbehaving server claims one in `body.error`.
+ */
+const CLIENT_ONLY_ERROR_TYPES = new Set<string>([
+  ErrorType.Network,
+  ErrorType.Cancelled,
+  ErrorType.File,
+  ErrorType.Config,
+]);
 
 /**
  * Categorizes error types for the `isClientError` / `isNetworkError` /
@@ -380,25 +395,20 @@ export type ErrorType = typeof ErrorType[keyof typeof ErrorType];
  * union so `.has(error.type)` accepts any value from the union.
  */
 const ERROR_CATEGORIES = {
-  client: new Set<ErrorType>([ErrorType.Business, ErrorType.Config, ErrorType.File, ErrorType.Validation]),
+  client: new Set<ErrorType>([ErrorType.Business, ErrorType.Config, ErrorType.File, ErrorType.Forbidden, ErrorType.Validation]),
   network: new Set<ErrorType>([ErrorType.Network]),
   auth: new Set<ErrorType>([ErrorType.Authentication]),
 } as const;
 
 /**
- * Lookup set of error types that legitimately appear on the wire — i.e.
- * server-thrown types. Used by `ShipError.fromHttpResponse` to validate the
- * body's `error` field before trusting it as the `ShipError.type`.
- *
- * Excludes `Network` and `Cancelled`, which are client-side-only by design:
- * they originate on the client (fetch failure, abort) and should never be
- * reconstructed from a server response, even if a misbehaving server were
- * to send them. A defensive omission, not a theoretical concern.
+ * Error types the server can legitimately produce on the wire. Used by
+ * `ShipError.fromHttpResponse` to validate the body's `error` field before
+ * trusting it as `ShipError.type`. Derived by exclusion from
+ * `CLIENT_ONLY_ERROR_TYPES` so adding a new server-producible type to
+ * `ErrorType` is automatically picked up.
  */
 const SERVER_PRODUCIBLE_ERROR_TYPES = new Set<string>(
-  Object.values(ErrorType).filter(
-    t => t !== ErrorType.Network && t !== ErrorType.Cancelled,
-  ),
+  Object.values(ErrorType).filter(t => !CLIENT_ONLY_ERROR_TYPES.has(t)),
 );
 
 /**
@@ -411,8 +421,8 @@ export interface ErrorResponse {
   message: string;
   /** HTTP status code (API contexts) */
   status?: number;
-  /** Optional additional error details */
-  details?: any;
+  /** Optional additional error details. Untyped by design — narrow at the read site. */
+  details?: unknown;
 }
 
 /**
@@ -423,7 +433,7 @@ export class ShipError extends Error {
     public readonly type: ErrorType,
     message: string,
     public readonly status?: number,
-    public readonly details?: any
+    public readonly details?: unknown,
   ) {
     super(message);
     this.name = 'ShipError';
@@ -431,8 +441,11 @@ export class ShipError extends Error {
 
   /** Convert to wire format */
   toResponse(): ErrorResponse {
-    // For security, exclude internal details from authentication errors in API responses
-    const details = this.type === ErrorType.Authentication && this.details?.internal
+    // Strip authentication details when they carry an `internal` telemetry
+    // tag (see `ShipError.authentication` JSDoc) — these are server-side
+    // diagnostics like 'jwt_missing_subject' that must not leak to clients.
+    const authDetails = this.details as { internal?: unknown } | undefined;
+    const details = this.type === ErrorType.Authentication && authDetails?.internal
       ? undefined
       : this.details;
 
@@ -451,11 +464,14 @@ export class ShipError extends Error {
    * resolution: `body.message` → `body.error` → `"<operationName> failed with
    * status <N>"`.
    *
-   * Type resolution: trusts `body.error` when it's a known `ErrorType`
-   * (preserves the wire's intent — server's `ShipError.validation(...)`
-   * round-trips back to `ErrorType.Validation` on the client). Falls back to
-   * status-derived (401 → Authentication, 429 → RateLimit, else → Api) for
-   * non-API responses (CDN errors, intermediaries) or malformed bodies.
+   * Type resolution: trusts `body.error` when it's a known server-producible
+   * `ErrorType` (preserves the wire's intent — server's
+   * `ShipError.validation(...)` round-trips back to `ErrorType.Validation`
+   * on the client). Falls back to status-derived (401 → Authentication,
+   * 403 → Forbidden, 429 → RateLimit, else → Api) for non-API responses
+   * (CDN errors, intermediaries) or malformed bodies. Client-only types
+   * (`Network`, `Cancelled`, `File`, `Config`) are filtered out of the
+   * trusted set — a misbehaving server claiming one of those is ignored.
    *
    * `operationName` (e.g. `"Get account"`) is used to compose the fallback
    * message. Defaults to `"Request"`. Same convention as `fromFetchError`.
@@ -496,6 +512,7 @@ export class ShipError extends Error {
 
     const type = bodyType ?? (
       response.status === 401 ? ErrorType.Authentication :
+      response.status === 403 ? ErrorType.Forbidden :
       response.status === 429 ? ErrorType.RateLimit :
       ErrorType.Api
     );
@@ -539,8 +556,12 @@ export class ShipError extends Error {
     return new ShipError(ErrorType.Api, `${op} failed: Unknown error`);
   }
 
-  // Factory methods for common errors
-  static validation(message: string, details?: any): ShipError {
+  // Factory methods. Uniform shape `(message, details?)` with two principled
+  // exceptions: `notFound` composes its message from (resource, id?), and
+  // `business` / `api` accept an optional status because they're the
+  // multi-status fallbacks.
+
+  static validation(message: string, details?: unknown): ShipError {
     return new ShipError(ErrorType.Validation, message, 400, details);
   }
 
@@ -549,11 +570,28 @@ export class ShipError extends Error {
     return new ShipError(ErrorType.NotFound, message, 404);
   }
 
+  static forbidden(message: string, details?: unknown): ShipError {
+    return new ShipError(ErrorType.Forbidden, message, 403, details);
+  }
+
   static rateLimit(message: string = "Too many requests"): ShipError {
     return new ShipError(ErrorType.RateLimit, message, 429);
   }
 
-  static authentication(message: string = "Authentication required", details?: any): ShipError {
+  /**
+   * Construct an Authentication (401) error.
+   *
+   * **Telemetry pattern — `details: { internal: '<tag>' }`.** When the
+   * server creates an auth error with an `internal` key in `details`
+   * (e.g. `{ internal: 'jwt_missing_subject' }`), `toResponse()` strips the
+   * entire `details` object before serialization. This keeps the wire
+   * response a clean "Authentication failed" while preserving granular
+   * server-side telemetry (which strategy/check failed) for logs and tests.
+   *
+   * Use this pattern in API auth code; do not put client-visible info under
+   * `internal`. Other `details` keys round-trip normally.
+   */
+  static authentication(message: string = "Authentication required", details?: unknown): ShipError {
     return new ShipError(ErrorType.Authentication, message, 401, details);
   }
 
@@ -561,7 +599,7 @@ export class ShipError extends Error {
     return new ShipError(ErrorType.Business, message, status);
   }
 
-  static network(message: string, details?: any): ShipError {
+  static network(message: string, details?: unknown): ShipError {
     return new ShipError(ErrorType.Network, message, undefined, details);
   }
 
@@ -569,11 +607,11 @@ export class ShipError extends Error {
     return new ShipError(ErrorType.Cancelled, message);
   }
 
-  static file(message: string, details?: any): ShipError {
+  static file(message: string, details?: unknown): ShipError {
     return new ShipError(ErrorType.File, message, undefined, details);
   }
 
-  static config(message: string, details?: any): ShipError {
+  static config(message: string, details?: unknown): ShipError {
     return new ShipError(ErrorType.Config, message, undefined, details);
   }
 
