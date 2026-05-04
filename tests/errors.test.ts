@@ -110,6 +110,32 @@ describe('ShipError.fromHttpResponse', () => {
       expect(err.type).toBe(ErrorType.Business);
       expect(err.status).toBe(500);
     });
+
+    it('does NOT trust body.error when it claims a client-only type (Network)', async () => {
+      // Network errors originate on the client (fetch failure). A server
+      // sending `error: "network_error"` is misbehaving — we ignore body.error
+      // and fall back to status-derived to avoid mistyping a server problem
+      // as an offline situation in the UI.
+      const err = await ShipError.fromHttpResponse(
+        jsonResponse(
+          { error: ErrorType.Network, message: 'misbehaving server', status: 500 },
+          500,
+        ),
+      );
+      expect(err.type).toBe(ErrorType.Api);
+      expect(err.isNetworkError()).toBe(false);
+    });
+
+    it('does NOT trust body.error when it claims a client-only type (Cancelled)', async () => {
+      const err = await ShipError.fromHttpResponse(
+        jsonResponse(
+          { error: ErrorType.Cancelled, message: 'misbehaving server', status: 401 },
+          401,
+        ),
+      );
+      // Falls back to status-derived: 401 → Authentication
+      expect(err.type).toBe(ErrorType.Authentication);
+    });
   });
 
   describe('message resolution', () => {
