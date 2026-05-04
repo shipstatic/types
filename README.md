@@ -43,7 +43,8 @@ if (isShipError(error)) {
 }
 
 if (error.isClientError()) { /* Business | Config | File | Validation */ }
-if (error.isAuthError()) { /* handle auth */ }
+if (error.isAuthError())   { /* handle auth */ }
+if (error.type === ErrorType.Validation) { /* specific-type checks */ }
 ```
 
 **HTTP client integration.** Both producer and consumer sides of the wire have first-class helpers, so every HTTP client across the platform reconstructs the same `ShipError` shape:
@@ -53,6 +54,8 @@ if (error.isAuthError()) { /* handle auth */ }
 return c.json(error.toResponse(), error.status ?? 500);
 
 // Consumer side — two symmetric helpers cover both HTTP error modes:
+
+// Both helpers take an optional operationName for context-aware fallback messages.
 
 // 1. Server returned a non-OK response
 if (!response.ok) {
