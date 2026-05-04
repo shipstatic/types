@@ -52,13 +52,23 @@ if (error.isAuthError()) { /* handle auth */ }
 // Producer side (API workers): serialize a ShipError to JSON
 return c.json(error.toResponse(), error.status ?? 500);
 
-// Consumer side (SDK, web app): rehydrate from any error Response
+// Consumer side — two symmetric helpers cover both HTTP error modes:
+
+// 1. Server returned a non-OK response
 if (!response.ok) {
-  throw await ShipError.fromHttpResponse(response, 'Get account failed');
+  throw await ShipError.fromHttpResponse(response, 'Get account');
 }
+
+// 2. fetch itself threw (offline, abort, CORS, ...)
+try { response = await fetch(url); }
+catch (cause) { throw ShipError.fromFetchError(cause, 'Get account'); }
 ```
 
-`fromHttpResponse` trusts the body's `error` field when it's a known `ErrorType` — so a server's `ShipError.validation(...)` round-trips back to `ErrorType.Validation` on the client. For non-API responses (CDN errors, intermediaries) or malformed bodies it falls back to status-derived (401 → `Authentication`, 429 → `RateLimit`, else → `Api`). Body's `message` and `details` are preserved best-effort. The optional second arg is a fallback message used when the body has nothing usable.
+`fromHttpResponse` trusts the body's `error` field when it's a known server-producible `ErrorType` — so a server's `ShipError.validation(...)` round-trips back to `ErrorType.Validation` on the client. For non-API responses (CDN errors, intermediaries) or malformed bodies it falls back to status-derived (401 → `Authentication`, 429 → `RateLimit`, else → `Api`). Body's `message` and `details` are preserved best-effort.
+
+`fromFetchError` routes by the thrown cause: an existing `ShipError` is returned unchanged, `AbortError` becomes `Cancelled`, a fetch `TypeError` becomes `Network`, anything else becomes `Api` (with no HTTP status — the request never reached the server).
+
+Both helpers accept an optional operation-name string for contextual messages (`"Get account was cancelled"`, `"Get account failed: ..."`).
 
 ### Status Constants
 

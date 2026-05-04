@@ -500,6 +500,42 @@ export class ShipError extends Error {
     return new ShipError(type, message, response.status, details);
   }
 
+  /**
+   * Construct a `ShipError` from an error caught around a `fetch()` call.
+   *
+   * The mirror of `fromHttpResponse` for the *other* side of the HTTP error
+   * story — the network layer failing (offline, CORS, abort) rather than the
+   * server returning a non-OK response.
+   *
+   * Routing:
+   * - Already a `ShipError` → returned as-is (caller's intent preserved)
+   * - `AbortError` → `ShipError.cancelled(...)`
+   * - `TypeError` whose message mentions "fetch" → `ShipError.network(...)`
+   * - Any other `Error` → `ShipError(Api, ...)` (no HTTP status — fetch never reached the server)
+   * - Anything else (string, undefined, etc.) → `ShipError(Api, ...)`
+   *
+   * The optional `operationName` is composed into the message for context:
+   * `"Get account was cancelled"`, `"Get account failed: ..."`. Defaults to
+   * `"Request"` when omitted.
+   */
+  static fromFetchError(cause: unknown, operationName?: string): ShipError {
+    if (isShipError(cause)) return cause;
+
+    const op = operationName || 'Request';
+
+    if (cause instanceof Error) {
+      if (cause.name === 'AbortError') {
+        return ShipError.cancelled(`${op} was cancelled`);
+      }
+      if (cause instanceof TypeError && cause.message.includes('fetch')) {
+        return ShipError.network(`${op} failed: ${cause.message}`, cause);
+      }
+      return new ShipError(ErrorType.Api, `${op} failed: ${cause.message}`);
+    }
+
+    return new ShipError(ErrorType.Api, `${op} failed: Unknown error`);
+  }
+
   // Factory methods for common errors
   static validation(message: string, details?: any): ShipError {
     return new ShipError(ErrorType.Validation, message, 400, details);
