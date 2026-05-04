@@ -14,20 +14,20 @@ Single file: `src/index.ts`, organized into named sections in this order:
 
 | Section | Purpose |
 |---------|---------|
-| Core Entities | Deployment, Domain, Token, Account — status consts, interfaces, list responses |
-| Error System | `ErrorType` enum, `ShipError` class, `isShipError` guard |
-| Config Types | `ConfigResponse` (plan-based limits from /config endpoint) |
+| Core Entities | Deployment, Domain (+ `DomainSetResult`), Token, Account — status consts, interfaces, list responses |
+| Error System | `ErrorType` (`as const` + type), `ShipError` class, `isShipError` guard |
+| Platform Limits | `PlatformLimits` (plan-based caps from the `/config` endpoint — file size, file count, total size) |
 | Extension Blocklist | `BLOCKED_EXTENSIONS`, `isBlockedExtension()` |
 | Common Responses | `PingResponse` |
-| Platform Constants | Auth prefixes/lengths, `AuthMethod`, `DEPLOYMENT_CONFIG_FILENAME` |
+| Platform Constants | `API_KEY` / `DEPLOY_TOKEN` (namespaced shape constants), `AuthMethod`, `DEPLOYMENT_CONFIG_FILENAME` |
 | Validation Utilities | `validateApiKey`, `validateDeployToken`, `validateApiUrl`, `isDeployment` |
 | SPA Check Types | `SPACheckRequest`, `SPACheckResponse` |
 | Static File | `StaticFile` (cross-environment file representation) |
-| Platform Configuration | `ResolvedConfig` |
+| Resolved Client Config | `ResolvedConfig` (the *client's* credentials + API URL after defaulting; distinct from `PlatformLimits` above) |
 | Progress Tracking | `ProgressInfo` |
 | URL Constant | `DEFAULT_API` |
-| Resource Contracts | `DeployInput` (+ platform-specific `BrowserDeployInput` / `NodeDeployInput` aliases), `DeploymentUploadOptions`, `*Resource` interfaces |
-| Billing Types | `BillingStatus`, `CheckoutSession`, `BillingResource`, `KeysResource` |
+| Resource Contracts | `DeployInput`, `DeploymentUploadOptions`, `*Resource` interfaces |
+| Billing Types | `BillingStatus`, `CheckoutSession` |
 | Activity Types | `ActivityEvent`, `UserVisibleActivityEvent`, `Activity`, `ActivityMeta` |
 | File Upload Types | `FileValidationStatus`, `ValidationIssue`, `ValidatableFile`, `FileValidationResult`, `UploadedFile` |
 | Domain Utilities | `isPlatformDomain`, `isCustomDomain`, `extractSubdomain`, `generate*Url` |
@@ -79,19 +79,29 @@ Interfaces define the **minimal contract** — SDK implementations may add runti
 DeploymentResource : upload, list, get, set, remove
 DomainResource     : set, list, get, remove, verify, validate, dns, records, share
 TokenResource      : create, list, remove
-BillingResource    : checkout, status
-KeysResource       : create
 AccountResource    : get
 ```
 
+`upload`'s wide input is `DeployInput` (`File[] | string | string[]`). Each platform's SDK narrows its `Ship.deploy()` shortcut to the relevant subset (`File[]` in Browser, `string | string[]` in Node) and runtime-validates the resource-layer call. There is no `BillingResource` or `KeysResource` in the shared contract — the `web/my` app talks to billing endpoints directly via its API client.
+
 ### Status Constants Pattern
 
+`as const` object + derived union type. Two naming variants depending on whether the entity name already ends in something like "Type":
+
 ```typescript
+// Standard: value object + `*Type` union (most status objects)
 export const FooStatus = { PENDING: 'pending', ACTIVE: 'active' } as const;
 export type FooStatusType = typeof FooStatus[keyof typeof FooStatus];
+
+// Shared name: when the entity name already ends in "Type", reuse the same
+// identifier for both value and union (TypeScript allows it)
+export const ErrorType = { Validation: 'validation_failed', ... } as const;
+export type ErrorType = typeof ErrorType[keyof typeof ErrorType];
 ```
 
-Used by: `DeploymentStatus`, `DomainStatus`, `AccountPlan`, `FileValidationStatus`, `AuthMethod`.
+Used by:
+- Standard variant: `DeploymentStatus`, `DomainStatus`, `AccountPlan`, `FileValidationStatus`, `AuthMethod`
+- Shared-name variant: `ErrorType` (would be `ErrorTypeType` under the standard variant — clearly worse)
 
 ### Readonly vs Mutable
 

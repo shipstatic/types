@@ -10,7 +10,7 @@ import {
   LABEL_PATTERN,
   LABEL_CONSTRAINTS,
   PASSWORD_CONSTRAINTS,
-  type ConfigResponse,
+  type PlatformLimits,
   type FileValidationStatusType
 } from '../src/index';
 
@@ -250,9 +250,9 @@ describe('Validation Constants - @shipstatic/types', () => {
     });
   });
 
-  describe('ConfigResponse', () => {
+  describe('PlatformLimits', () => {
     it('should have correct shape with 3 fields', () => {
-      const config: ConfigResponse = {
+      const config: PlatformLimits = {
         maxFileSize: 20 * 1024 * 1024,
         maxFilesCount: 500,
         maxTotalSize: 50 * 1024 * 1024,
@@ -264,7 +264,7 @@ describe('Validation Constants - @shipstatic/types', () => {
     });
 
     it('should only contain numeric limit fields', () => {
-      const config: ConfigResponse = {
+      const config: PlatformLimits = {
         maxFileSize: 20 * 1024 * 1024,
         maxFilesCount: 500,
         maxTotalSize: 50 * 1024 * 1024,
