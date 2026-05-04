@@ -448,8 +448,8 @@ export class ShipError extends Error {
    * Construct a `ShipError` from an HTTP error response.
    *
    * Best-effort body parse for `{ message, error?, details? }`. Message
-   * resolution: `body.message` → `body.error` → `fallbackMessage` →
-   * `Request failed with status N`.
+   * resolution: `body.message` → `body.error` → `"<operationName> failed with
+   * status <N>"`.
    *
    * Type resolution: trusts `body.error` when it's a known `ErrorType`
    * (preserves the wire's intent — server's `ShipError.validation(...)`
@@ -457,12 +457,15 @@ export class ShipError extends Error {
    * status-derived (401 → Authentication, 429 → RateLimit, else → Api) for
    * non-API responses (CDN errors, intermediaries) or malformed bodies.
    *
+   * `operationName` (e.g. `"Get account"`) is used to compose the fallback
+   * message. Defaults to `"Request"`. Same convention as `fromFetchError`.
+   *
    * Async because it reads the response body. Returns rather than throws so
    * callers can compose; most will `throw await ShipError.fromHttpResponse(...)`.
    */
   static async fromHttpResponse(
     response: Response,
-    fallbackMessage?: string,
+    operationName?: string,
   ): Promise<ShipError> {
     let message: string | undefined;
     let details: unknown;
@@ -486,10 +489,10 @@ export class ShipError extends Error {
         if (text) message = text;
       }
     } catch {
-      // Body unreadable; fall through to fallback.
+      // Body unreadable; fall through to operationName-derived message.
     }
 
-    message = message || fallbackMessage || `Request failed with status ${response.status}`;
+    message = message || `${operationName || 'Request'} failed with status ${response.status}`;
 
     const type = bodyType ?? (
       response.status === 401 ? ErrorType.Authentication :
@@ -528,7 +531,7 @@ export class ShipError extends Error {
         return ShipError.cancelled(`${op} was cancelled`);
       }
       if (cause instanceof TypeError && cause.message.includes('fetch')) {
-        return ShipError.network(`${op} failed: ${cause.message}`, cause);
+        return ShipError.network(`${op} failed: ${cause.message}`, { cause });
       }
       return new ShipError(ErrorType.Api, `${op} failed: ${cause.message}`);
     }
@@ -558,16 +561,16 @@ export class ShipError extends Error {
     return new ShipError(ErrorType.Business, message, status);
   }
 
-  static network(message: string, cause?: Error): ShipError {
-    return new ShipError(ErrorType.Network, message, undefined, { cause });
+  static network(message: string, details?: any): ShipError {
+    return new ShipError(ErrorType.Network, message, undefined, details);
   }
 
   static cancelled(message: string): ShipError {
     return new ShipError(ErrorType.Cancelled, message);
   }
 
-  static file(message: string, filePath?: string): ShipError {
-    return new ShipError(ErrorType.File, message, undefined, { filePath });
+  static file(message: string, details?: any): ShipError {
+    return new ShipError(ErrorType.File, message, undefined, details);
   }
 
   static config(message: string, details?: any): ShipError {
@@ -578,12 +581,8 @@ export class ShipError extends Error {
     return new ShipError(ErrorType.Api, message, status);
   }
 
-  // Helper getter for accessing file path from details
-  get filePath(): string | undefined {
-    return this.details?.filePath;
-  }
-
-  // Helper methods for error type checking using categorization
+  // Semantic-category type guards. For specific-type checks, use
+  // `error.type === ErrorType.X` directly or the generic `isType(t)`.
   isClientError(): boolean {
     return ERROR_CATEGORIES.client.has(this.type);
   }
@@ -596,19 +595,6 @@ export class ShipError extends Error {
     return ERROR_CATEGORIES.auth.has(this.type);
   }
 
-  isValidationError(): boolean {
-    return this.type === ErrorType.Validation;
-  }
-
-  isFileError(): boolean {
-    return this.type === ErrorType.File;
-  }
-
-  isConfigError(): boolean {
-    return this.type === ErrorType.Config;
-  }
-
-  // Generic type checker
   isType(errorType: ErrorType): boolean {
     return this.type === errorType;
   }

@@ -46,29 +46,34 @@ pnpm test --run # Runtime tests: validation constants, blocked extensions, label
 ### ShipError
 
 ```typescript
-// Factory methods
+// Factory methods — uniform shape: (message, details?). Two exceptions:
+// `notFound` composes its own message from (resource, id?), and `business`/`api`
+// take an optional status because they're the multi-status fallbacks.
 ShipError.validation(message, details?)
 ShipError.notFound(resource, id?)
 ShipError.authentication(message?, details?)
 ShipError.rateLimit(message?)
 ShipError.business(message, status?)       // status defaults to 400
-ShipError.network(message, cause?)
+ShipError.network(message, details?)       // pass `{ cause }` for the underlying Error
 ShipError.cancelled(message)
-ShipError.file(message, filePath?)
+ShipError.file(message, details?)          // pass `{ filePath }` for the path
 ShipError.config(message, details?)
 ShipError.api(message, status?)            // status defaults to 500
 
-// Type checks
+// Type checks — semantic categories cover the UX-relevant decisions.
+// For specific-type checks, use `error.type === ErrorType.X` or `isType(t)`.
 error.isClientError()      // Business | Config | File | Validation
-error.isNetworkError() / isAuthError() / isValidationError() / isFileError() / isConfigError()
+error.isNetworkError()
+error.isAuthError()
 error.isType(errorType)
 
 // Wire format (producer side — API workers serialize errors with toResponse())
 error.toResponse() // → ErrorResponse JSON
 
-// HTTP error story (consumer side) — two symmetric helpers, one per failure mode:
-await ShipError.fromHttpResponse(response, fallbackMessage?)  // server returned non-OK
-ShipError.fromFetchError(cause, operationName?)                // fetch itself threw
+// HTTP error story (consumer side) — two symmetric helpers, one per failure mode.
+// Both take `operationName` for context-aware fallback messages.
+await ShipError.fromHttpResponse(response, operationName?)  // server returned non-OK
+ShipError.fromFetchError(cause, operationName?)              // fetch itself threw
 
 // Structural guard (handles module duplication in bundles)
 isShipError(error)
@@ -113,17 +118,17 @@ Errors flow through the platform along a single, symmetric path. Every HTTP clie
 │    }                                                                   │
 │                                                                        │
 │  Either way, consumer code sees a typed ShipError:                     │
-│    if (error.isValidationError()) { ... }   // works for received errors│
-│    if (error.status === 429)      { ... }                              │
-│    if (error.isAuthError())       { ... }                              │
-│    if (error.isNetworkError())    { ... }                              │
+│    if (error.type === ErrorType.Validation) { ... } // works for received │
+│    if (error.status === 429)         { ... }                            │
+│    if (error.isAuthError())          { ... }                            │
+│    if (error.isNetworkError())       { ... }                            │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Conventions enforced by this design:**
 
-- **Wire-format type round-trips.** Server's `ShipError.validation(...)` reaches the client as `ErrorType.Validation`. `error.isValidationError()`, `isClientError()`, etc. work for received errors.
+- **Wire-format type round-trips.** Server's `ShipError.validation(...)` reaches the client as `ErrorType.Validation`. Type guards (`isClientError()`, etc.) and direct comparisons (`error.type === ErrorType.Validation`) both work for received errors.
 - **Status drives type for non-API responses** (CDN errors, intermediaries with no body) — 401→Authentication, 429→RateLimit, else→Api.
 - **Client-only types stay client-only.** `Network` and `Cancelled` originate on the client (fetch failure, AbortSignal). Even if a misbehaving server claimed `error: "network_error"` in the body, `fromHttpResponse` ignores it — those types are filtered out of the wire-trust set.
 - **No HTTP error logic outside these two helpers.** SDK and web console are pure transport — `executeRequest` / `lib/api.ts` call the helpers directly; there are no private wrappers, no duplicated parsing, no drift surface.

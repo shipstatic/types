@@ -70,7 +70,7 @@ describe('ShipError.fromHttpResponse', () => {
         ),
       );
       expect(err.type).toBe(ErrorType.Validation);
-      expect(err.isValidationError()).toBe(true);
+      expect(err.isClientError()).toBe(true);
     });
 
     it('preserves NotFound type when body.error is "not_found" (status 404)', async () => {
@@ -156,15 +156,15 @@ describe('ShipError.fromHttpResponse', () => {
       expect(err.message).toBe('machine_readable');
     });
 
-    it('falls back to fallbackMessage when body has neither', async () => {
+    it('composes operationName-derived fallback when body has nothing', async () => {
       const err = await ShipError.fromHttpResponse(
         jsonResponse({}, 500),
-        'Get account failed',
+        'Get account',
       );
-      expect(err.message).toBe('Get account failed');
+      expect(err.message).toBe('Get account failed with status 500');
     });
 
-    it('falls back to status-derived message when body and fallback are absent', async () => {
+    it('defaults operationName to "Request" when omitted', async () => {
       const err = await ShipError.fromHttpResponse(jsonResponse({}, 503));
       expect(err.message).toBe('Request failed with status 503');
     });
@@ -178,19 +178,19 @@ describe('ShipError.fromHttpResponse', () => {
       expect(err.message).toBe('Internal Server Error');
     });
 
-    it('falls back to status-derived message when body is empty (no content-type)', async () => {
+    it('composes operationName-derived fallback when body is empty (no content-type)', async () => {
       const res = new Response(null, { status: 500 });
-      const err = await ShipError.fromHttpResponse(res);
-      expect(err.message).toBe('Request failed with status 500');
+      const err = await ShipError.fromHttpResponse(res, 'Ping');
+      expect(err.message).toBe('Ping failed with status 500');
     });
 
-    it('tolerates malformed JSON body and falls through to fallback', async () => {
+    it('tolerates malformed JSON body and composes operationName-derived fallback', async () => {
       const res = new Response('{ not valid json', {
         status: 500,
         headers: { 'content-type': 'application/json' },
       });
-      const err = await ShipError.fromHttpResponse(res, 'Ping failed');
-      expect(err.message).toBe('Ping failed');
+      const err = await ShipError.fromHttpResponse(res, 'Ping');
+      expect(err.message).toBe('Ping failed with status 500');
     });
 
     it('ignores non-string message field', async () => {
