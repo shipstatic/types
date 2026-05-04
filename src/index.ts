@@ -113,6 +113,21 @@ export interface Domain {
 }
 
 /**
+ * Return shape of `domains.set()` — `Domain` plus an SDK-derived flag indicating
+ * whether the underlying `PUT /domains/:name` created the record (HTTP 201) or
+ * updated an existing one (HTTP 200).
+ *
+ * `isCreate` is not part of the wire format — the API returns a plain `Domain`
+ * body. The SDK derives the flag from the HTTP status code so callers (notably
+ * the CLI) can format different output for the create vs repoint paths without
+ * a second round-trip.
+ */
+export interface DomainSetResult extends Domain {
+  /** `true` when this call created a new domain; `false` when it updated an existing one. */
+  isCreate: boolean;
+}
+
+/**
  * Response for listing domains
  */
 export interface DomainListResponse {
@@ -822,24 +837,21 @@ export interface StaticFile {
 // =============================================================================
 
 /**
- * Standard platform configuration format used by all clients
- */
-export interface PlatformConfig {
-  apiUrl?: string;
-  deployToken?: string;
-  apiKey?: string;
-}
-
-/**
- * Resolved configuration with required apiUrl.
- * This is the normalized config after merging options, env, and config files.
+ * Resolved client configuration with `apiUrl` defaulted.
+ *
+ * Produced by the SDK after layering its credential sources (constructor
+ * options on top of `SHIP_*` env vars in Node; constructor options only in
+ * Browser) and applying the `DEFAULT_API` fallback. File-based sources
+ * (`.shiprc`, `package.json` `"ship"` key) are the CLI's responsibility and
+ * are merged in *before* construction — by the time a `ResolvedConfig`
+ * exists, every source has already collapsed into the constructor argument.
  */
 export interface ResolvedConfig {
-  /** API URL (always present after resolution, defaults to DEFAULT_API) */
+  /** API URL — always present after resolution, defaults to `DEFAULT_API`. */
   apiUrl: string;
-  /** API key for authenticated deployments */
+  /** API key for authenticated deployments. */
   apiKey?: string;
-  /** Deploy token for single-use deployments */
+  /** Deploy token for single-use deployments. */
   deployToken?: string;
 }
 
@@ -874,12 +886,28 @@ export const DEFAULT_API = 'https://api.shipstatic.com';
 // =============================================================================
 
 /**
- * Deploy input type - environment-specific
- *
- * Browser: File[] - array of File objects
- * Node.js: string | string[] - file/directory paths
+ * Browser-specific deploy input — an array of `File` objects (typically from
+ * `<input type="file">` or drag-and-drop). The Browser SDK rejects any other
+ * shape at runtime.
  */
-export type DeployInput = File[] | string | string[];
+export type BrowserDeployInput = File[];
+
+/**
+ * Node-specific deploy input — file or directory path(s) on disk. A single
+ * path or an array of paths; directories are walked recursively. The Node
+ * SDK rejects any other shape at runtime.
+ */
+export type NodeDeployInput = string | string[];
+
+/**
+ * Universal deploy input — the union of every platform's accepted shape.
+ *
+ * Prefer the platform-specific aliases (`BrowserDeployInput` /
+ * `NodeDeployInput`) when writing platform-specific code; `DeployInput` is
+ * the right type only for code that genuinely needs to accept either. Each
+ * platform's SDK validates at runtime and throws on the wrong shape.
+ */
+export type DeployInput = BrowserDeployInput | NodeDeployInput;
 
 /**
  * Options for deployment creation at the API contract level.
@@ -923,7 +951,7 @@ export interface DeploymentResource {
  * Domain resource interface - the contract all implementations must follow
  */
 export interface DomainResource {
-  set: (name: string, options?: { deployment?: string; labels?: string[] }) => Promise<Domain>;
+  set: (name: string, options?: { deployment?: string; labels?: string[] }) => Promise<DomainSetResult>;
   list: () => Promise<DomainListResponse>;
   get: (name: string) => Promise<Domain>;
   remove: (name: string) => Promise<void>;

@@ -23,10 +23,10 @@ Single file: `src/index.ts`, organized into named sections in this order:
 | Validation Utilities | `validateApiKey`, `validateDeployToken`, `validateApiUrl`, `isDeployment` |
 | SPA Check Types | `SPACheckRequest`, `SPACheckResponse` |
 | Static File | `StaticFile` (cross-environment file representation) |
-| Platform Configuration | `PlatformConfig`, `ResolvedConfig` |
+| Platform Configuration | `ResolvedConfig` |
 | Progress Tracking | `ProgressInfo` |
 | URL Constant | `DEFAULT_API` |
-| Resource Contracts | `DeployInput`, `DeploymentUploadOptions`, `*Resource` interfaces |
+| Resource Contracts | `DeployInput` (+ platform-specific `BrowserDeployInput` / `NodeDeployInput` aliases), `DeploymentUploadOptions`, `*Resource` interfaces |
 | Billing Types | `BillingStatus`, `CheckoutSession`, `BillingResource`, `KeysResource` |
 | Activity Types | `ActivityEvent`, `UserVisibleActivityEvent`, `Activity`, `ActivityMeta` |
 | File Upload Types | `FileValidationStatus`, `ValidationIssue`, `ValidatableFile`, `FileValidationResult`, `UploadedFile` |

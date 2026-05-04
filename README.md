@@ -21,7 +21,7 @@ npm install @shipstatic/types
 ```typescript
 import type {
   Deployment, DeploymentListResponse,
-  Domain, DomainListResponse, DnsRecord, DomainDnsResponse, DomainRecordsResponse, DomainValidateResponse,
+  Domain, DomainSetResult, DomainListResponse, DnsRecord, DomainDnsResponse, DomainRecordsResponse, DomainValidateResponse,
   Token, TokenListItem, TokenListResponse, TokenCreateResponse,
   Account, AccountUsage, AccountOverrides,
   StaticFile
