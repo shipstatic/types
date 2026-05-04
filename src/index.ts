@@ -362,9 +362,9 @@ export const ErrorType = {
   Business: 'business_logic_error',
   /** API server error (500) */
   Api: 'internal_server_error',
-  /** Network/connection error */
+  /** Network/connection error. Client-side only — set by HTTP clients on fetch failure; never produced server-side. */
   Network: 'network_error',
-  /** Operation was cancelled */
+  /** Operation was cancelled. Client-side only — set on `AbortSignal` abort; never produced server-side. */
   Cancelled: 'operation_cancelled',
   /** File operation error */
   File: 'file_error',
@@ -386,12 +386,20 @@ const ERROR_CATEGORIES = {
 } as const;
 
 /**
- * Lookup set of known wire-format error type strings. Used by
- * `ShipError.fromHttpResponse` to validate the body's `error` field before
- * trusting it as an `ErrorType`. Defensive against malformed/unknown values
- * that could otherwise leak into the typed `ShipError.type` field.
+ * Lookup set of error types that legitimately appear on the wire — i.e.
+ * server-thrown types. Used by `ShipError.fromHttpResponse` to validate the
+ * body's `error` field before trusting it as the `ShipError.type`.
+ *
+ * Excludes `Network` and `Cancelled`, which are client-side-only by design:
+ * they originate on the client (fetch failure, abort) and should never be
+ * reconstructed from a server response, even if a misbehaving server were
+ * to send them. A defensive omission, not a theoretical concern.
  */
-const KNOWN_ERROR_TYPES = new Set<string>(Object.values(ErrorType));
+const SERVER_PRODUCIBLE_ERROR_TYPES = new Set<string>(
+  Object.values(ErrorType).filter(
+    t => t !== ErrorType.Network && t !== ErrorType.Cancelled,
+  ),
+);
 
 /**
  * Standard error response format used everywhere
@@ -469,7 +477,7 @@ export class ShipError extends Error {
           if (typeof obj.message === 'string') message = obj.message;
           else if (typeof obj.error === 'string') message = obj.error;
           details = obj.details;
-          if (typeof obj.error === 'string' && KNOWN_ERROR_TYPES.has(obj.error)) {
+          if (typeof obj.error === 'string' && SERVER_PRODUCIBLE_ERROR_TYPES.has(obj.error)) {
             bodyType = obj.error as ErrorType;
           }
         }
