@@ -62,7 +62,7 @@ import {
 
 ```typescript
 import type {
-  PlatformLimits,        // plan-based caps from /config (file size, file count, total size)
+  PlatformLimits,        // plan-based caps from /limits (file size, file count, total size)
   BillingStatus,
   CheckoutSession,
   ActivityListResponse,
