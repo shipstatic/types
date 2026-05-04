@@ -46,20 +46,21 @@ pnpm test --run # Runtime tests: validation constants, blocked extensions, label
 ### ShipError
 
 ```typescript
-// Factory methods — uniform shape: (message, details?). Two exceptions:
-// `notFound` composes its own message from (resource, id?), and `business`/`api`
-// take an optional status because they're the multi-status fallbacks.
+// Factory methods — every one accepts an optional `details?: unknown` as the
+// last param. Single exception: `notFound` composes its message from
+// `(resource, id?)` and doesn't take details. The two multi-status fallbacks
+// (`business`, `api`) accept an optional status before details.
 ShipError.validation(message, details?)
 ShipError.notFound(resource, id?)
 ShipError.forbidden(message, details?)
 ShipError.authentication(message?, details?)  // see "internal: telemetry" pattern below
-ShipError.rateLimit(message?)
-ShipError.business(message, status?)       // status defaults to 400
-ShipError.network(message, details?)       // pass `{ cause }` for the underlying Error
-ShipError.cancelled(message)
-ShipError.file(message, details?)          // pass `{ filePath }` for the path
+ShipError.rateLimit(message?, details?)
+ShipError.business(message, status?, details?)  // status defaults to 400
+ShipError.network(message, details?)            // pass `{ cause }` for the underlying Error
+ShipError.cancelled(message, details?)
+ShipError.file(message, details?)               // pass `{ filePath }` for the path
 ShipError.config(message, details?)
-ShipError.api(message, status?)            // status defaults to 500
+ShipError.api(message, status?, details?)       // status defaults to 500
 
 // Type checks — semantic categories cover the UX-relevant decisions.
 // For specific-type checks, use `error.type === ErrorType.X` or `isType(t)`.

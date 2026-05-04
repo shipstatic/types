@@ -574,8 +574,8 @@ export class ShipError extends Error {
     return new ShipError(ErrorType.Forbidden, message, 403, details);
   }
 
-  static rateLimit(message: string = "Too many requests"): ShipError {
-    return new ShipError(ErrorType.RateLimit, message, 429);
+  static rateLimit(message: string = "Too many requests", details?: unknown): ShipError {
+    return new ShipError(ErrorType.RateLimit, message, 429, details);
   }
 
   /**
@@ -595,16 +595,16 @@ export class ShipError extends Error {
     return new ShipError(ErrorType.Authentication, message, 401, details);
   }
 
-  static business(message: string, status: number = 400): ShipError {
-    return new ShipError(ErrorType.Business, message, status);
+  static business(message: string, status: number = 400, details?: unknown): ShipError {
+    return new ShipError(ErrorType.Business, message, status, details);
   }
 
   static network(message: string, details?: unknown): ShipError {
     return new ShipError(ErrorType.Network, message, undefined, details);
   }
 
-  static cancelled(message: string): ShipError {
-    return new ShipError(ErrorType.Cancelled, message);
+  static cancelled(message: string, details?: unknown): ShipError {
+    return new ShipError(ErrorType.Cancelled, message, undefined, details);
   }
 
   static file(message: string, details?: unknown): ShipError {
@@ -615,8 +615,8 @@ export class ShipError extends Error {
     return new ShipError(ErrorType.Config, message, undefined, details);
   }
 
-  static api(message: string, status: number = 500): ShipError {
-    return new ShipError(ErrorType.Api, message, status);
+  static api(message: string, status: number = 500, details?: unknown): ShipError {
+    return new ShipError(ErrorType.Api, message, status, details);
   }
 
   // Semantic-category type guards. For specific-type checks, use

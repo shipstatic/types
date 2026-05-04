@@ -336,3 +336,47 @@ describe('ShipError.fromFetchError', () => {
     expect(err.message).toBe('Request failed: boom');
   });
 });
+
+describe('ShipError.forbidden', () => {
+  it('produces a Forbidden error with status 403', () => {
+    const err = ShipError.forbidden('Account terminated');
+    expect(err.type).toBe(ErrorType.Forbidden);
+    expect(err.status).toBe(403);
+    expect(err.message).toBe('Account terminated');
+    expect(err.isClientError()).toBe(true);
+  });
+
+  it('preserves details when provided', () => {
+    const err = ShipError.forbidden('No access', { reason: 'plan_expired' });
+    const details = err.details as { reason?: string } | undefined;
+    expect(details?.reason).toBe('plan_expired');
+  });
+});
+
+describe('ShipError.toResponse() — internal: stripping for auth errors', () => {
+  it('strips details from Authentication errors when details.internal is set', () => {
+    // Server-side telemetry pattern: granular tag for logs/tests, opaque to clients.
+    const err = ShipError.authentication('Authentication failed', { internal: 'jwt_missing_subject' });
+    const wire = err.toResponse();
+    expect(wire.details).toBeUndefined();
+    expect(wire.message).toBe('Authentication failed');
+    expect(wire.error).toBe(ErrorType.Authentication);
+  });
+
+  it('preserves details on Authentication errors when details.internal is absent', () => {
+    const err = ShipError.authentication('Token expired', { hint: 'reauth' });
+    expect(err.toResponse().details).toEqual({ hint: 'reauth' });
+  });
+
+  it('does NOT strip details on non-Authentication errors even when details.internal is set', () => {
+    // Strip is targeted at the auth telemetry convention only — `internal`
+    // on other types round-trips like any other detail key.
+    const err = ShipError.validation('bad input', { internal: 'should_not_strip' });
+    expect(err.toResponse().details).toEqual({ internal: 'should_not_strip' });
+  });
+
+  it('preserves details on Authentication errors with no details at all', () => {
+    const err = ShipError.authentication('Authentication required');
+    expect(err.toResponse().details).toBeUndefined();
+  });
+});
