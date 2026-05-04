@@ -119,7 +119,7 @@ Errors flow through the platform along a single, symmetric path. Every HTTP clie
                   { error: 'validation_failed',
                     message: 'Email required',
                     status: 400,
-                    details?: any }
+                    details?: unknown }
                                   │
                                   ▼
 ┌─ Consumer (npm/ship SDK or web/my) ───────────────────────────────────┐
@@ -128,8 +128,9 @@ Errors flow through the platform along a single, symmetric path. Every HTTP clie
 │    if (!response.ok)                                                   │
 │      throw await ShipError.fromHttpResponse(response, operationName)   │
 │      // trusts body.error if it's a server-producible ErrorType,       │
-│      // else status-derived (401→Authentication, 429→RateLimit,        │
-│      // anything else→Api). body.message and body.details preserved.   │
+│      // else status-derived (401→Authentication, 403→Forbidden,        │
+│      // 429→RateLimit, else→Api). body.message and body.details        │
+│      // preserved.                                                     │
 │                                                                        │
 │  Path 2 — fetch itself failed (offline, abort, CORS):                  │
 │    catch (cause) {                                                     │
@@ -150,8 +151,8 @@ Errors flow through the platform along a single, symmetric path. Every HTTP clie
 **Conventions enforced by this design:**
 
 - **Wire-format type round-trips.** Server's `ShipError.validation(...)` reaches the client as `ErrorType.Validation`. Type guards (`isClientError()`, etc.) and direct comparisons (`error.type === ErrorType.Validation`) both work for received errors.
-- **Status drives type for non-API responses** (CDN errors, intermediaries with no body) — 401→Authentication, 429→RateLimit, else→Api.
-- **Client-only types stay client-only.** `Network` and `Cancelled` originate on the client (fetch failure, AbortSignal). Even if a misbehaving server claimed `error: "network_error"` in the body, `fromHttpResponse` ignores it — those types are filtered out of the wire-trust set.
+- **Status drives type for non-API responses** (CDN errors, intermediaries with no body) — 401→Authentication, 403→Forbidden, 429→RateLimit, else→Api.
+- **Client-only types stay client-only.** `Network`, `Cancelled`, `File`, and `Config` originate on the client (fetch failure, AbortSignal, SDK file processing, SDK config parsing). Even if a misbehaving server claimed one of these in `body.error`, `fromHttpResponse` ignores it — they're filtered out of the wire-trust set via `CLIENT_ONLY_ERROR_TYPES`.
 - **No HTTP error logic outside these two helpers.** SDK and web console are pure transport — `executeRequest` / `lib/api.ts` call the helpers directly; there are no private wrappers, no duplicated parsing, no drift surface.
 
 ### Resource Contracts
