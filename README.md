@@ -58,7 +58,7 @@ if (!response.ok) {
 }
 ```
 
-`fromHttpResponse` derives the error type from HTTP status (401 → `Authentication`, 429 → `RateLimit`, else → `Api`), preserving the body's `message`, `error`, and `details` best-effort. The optional second arg is a fallback message used when the body has nothing usable.
+`fromHttpResponse` trusts the body's `error` field when it's a known `ErrorType` — so a server's `ShipError.validation(...)` round-trips back to `ErrorType.Validation` on the client. For non-API responses (CDN errors, intermediaries) or malformed bodies it falls back to status-derived (401 → `Authentication`, 429 → `RateLimit`, else → `Api`). Body's `message` and `details` are preserved best-effort. The optional second arg is a fallback message used when the body has nothing usable.
 
 ### Status Constants
 

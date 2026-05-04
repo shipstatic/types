@@ -59,6 +59,59 @@ describe('ShipError.fromHttpResponse', () => {
     });
   });
 
+  describe('body.error wire round-trip (trusts known ErrorType strings)', () => {
+    it('preserves Validation type when body.error is "validation_failed" (status 400)', async () => {
+      // Server-thrown ShipError.validation(...) round-trips back as Validation,
+      // not as the generic Api type that pure status-derivation would produce.
+      const err = await ShipError.fromHttpResponse(
+        jsonResponse(
+          { error: ErrorType.Validation, message: 'Email required', status: 400 },
+          400,
+        ),
+      );
+      expect(err.type).toBe(ErrorType.Validation);
+      expect(err.isValidationError()).toBe(true);
+    });
+
+    it('preserves NotFound type when body.error is "not_found" (status 404)', async () => {
+      const err = await ShipError.fromHttpResponse(
+        jsonResponse(
+          { error: ErrorType.NotFound, message: 'Domain foo.com not found', status: 404 },
+          404,
+        ),
+      );
+      expect(err.type).toBe(ErrorType.NotFound);
+    });
+
+    it('falls back to status-derived type when body.error is unknown', async () => {
+      const err = await ShipError.fromHttpResponse(
+        jsonResponse({ error: 'totally_made_up_type', message: 'nope' }, 401),
+      );
+      expect(err.type).toBe(ErrorType.Authentication);
+    });
+
+    it('falls back to status-derived type when body.error is missing', async () => {
+      const err = await ShipError.fromHttpResponse(
+        jsonResponse({ message: 'nope' }, 429),
+      );
+      expect(err.type).toBe(ErrorType.RateLimit);
+    });
+
+    it('trusts body.error even when it disagrees with status (wire is authoritative)', async () => {
+      // A 500 carrying a Business error body — server's intent wins. This
+      // edge case shouldn't happen in practice (API serializes status from
+      // ShipError.status), but if it does, the wire is the source of truth.
+      const err = await ShipError.fromHttpResponse(
+        jsonResponse(
+          { error: ErrorType.Business, message: 'Plan limit', status: 500 },
+          500,
+        ),
+      );
+      expect(err.type).toBe(ErrorType.Business);
+      expect(err.status).toBe(500);
+    });
+  });
+
   describe('message resolution', () => {
     it('prefers body.message over body.error', async () => {
       const err = await ShipError.fromHttpResponse(
