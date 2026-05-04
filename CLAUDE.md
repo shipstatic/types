@@ -51,7 +51,8 @@ pnpm test --run # Runtime tests: validation constants, blocked extensions, label
 // take an optional status because they're the multi-status fallbacks.
 ShipError.validation(message, details?)
 ShipError.notFound(resource, id?)
-ShipError.authentication(message?, details?)
+ShipError.forbidden(message, details?)
+ShipError.authentication(message?, details?)  // see "internal: telemetry" pattern below
 ShipError.rateLimit(message?)
 ShipError.business(message, status?)       // status defaults to 400
 ShipError.network(message, details?)       // pass `{ cause }` for the underlying Error
@@ -77,6 +78,25 @@ ShipError.fromFetchError(cause, operationName?)              // fetch itself thr
 
 // Structural guard (handles module duplication in bundles)
 isShipError(error)
+```
+
+### `internal:` telemetry pattern (Authentication errors)
+
+Server-side auth code attaches an `internal` tag to `details` to record *which* auth check failed without leaking that information to clients:
+
+```typescript
+// In API auth code — granular reason for logs/tests, opaque to clients.
+throw ShipError.authentication('Authentication failed', { internal: 'jwt_missing_subject' });
+```
+
+`toResponse()` strips the entire `details` object when `details.internal` is truthy on an Authentication error. So the wire response is the clean `{ error: 'authentication_failed', message: 'Authentication failed', status: 401 }` — no leakage of which strategy or which check failed — while the server keeps the granular `internal` tag in process for telemetry, log lines, and assertions in tests.
+
+**Use this pattern in API auth code; do not put client-visible info under `internal`.** Other `details` keys round-trip normally (the strip is targeted at this convention only).
+
+`details` is typed `unknown` everywhere — narrow at the read site:
+
+```typescript
+const internal = (error.details as { internal?: string } | undefined)?.internal;
 ```
 
 ### Error Flow

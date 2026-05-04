@@ -35,6 +35,7 @@ import { ShipError, ErrorType, isShipError } from '@shipstatic/types';
 
 throw ShipError.validation('File too large');
 throw ShipError.notFound('Deployment', id);
+throw ShipError.forbidden('Account terminated');
 throw ShipError.authentication();
 throw ShipError.business('Plan limit reached');
 
