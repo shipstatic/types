@@ -386,6 +386,14 @@ const ERROR_CATEGORIES = {
 } as const;
 
 /**
+ * Lookup set of known wire-format error type strings. Used by
+ * `ShipError.fromHttpResponse` to validate the body's `error` field before
+ * trusting it as an `ErrorType`. Defensive against malformed/unknown values
+ * that could otherwise leak into the typed `ShipError.type` field.
+ */
+const KNOWN_ERROR_TYPES = new Set<string>(Object.values(ErrorType));
+
+/**
  * Standard error response format used everywhere
  */
 export interface ErrorResponse {
@@ -433,10 +441,13 @@ export class ShipError extends Error {
    *
    * Best-effort body parse for `{ message, error?, details? }`. Message
    * resolution: `body.message` → `body.error` → `fallbackMessage` →
-   * `Request failed with status N`. Status drives the error type — same
-   * convention used by the SDK and web console — so `error.status === 429`
-   * always lines up with `ErrorType.RateLimit`, etc., regardless of what the
-   * body's `error` field claims.
+   * `Request failed with status N`.
+   *
+   * Type resolution: trusts `body.error` when it's a known `ErrorType`
+   * (preserves the wire's intent — server's `ShipError.validation(...)`
+   * round-trips back to `ErrorType.Validation` on the client). Falls back to
+   * status-derived (401 → Authentication, 429 → RateLimit, else → Api) for
+   * non-API responses (CDN errors, intermediaries) or malformed bodies.
    *
    * Async because it reads the response body. Returns rather than throws so
    * callers can compose; most will `throw await ShipError.fromHttpResponse(...)`.
@@ -447,6 +458,7 @@ export class ShipError extends Error {
   ): Promise<ShipError> {
     let message: string | undefined;
     let details: unknown;
+    let bodyType: ErrorType | undefined;
 
     try {
       const contentType = response.headers.get('content-type');
@@ -457,6 +469,9 @@ export class ShipError extends Error {
           if (typeof obj.message === 'string') message = obj.message;
           else if (typeof obj.error === 'string') message = obj.error;
           details = obj.details;
+          if (typeof obj.error === 'string' && KNOWN_ERROR_TYPES.has(obj.error)) {
+            bodyType = obj.error as ErrorType;
+          }
         }
       } else {
         const text = await response.text();
@@ -468,10 +483,11 @@ export class ShipError extends Error {
 
     message = message || fallbackMessage || `Request failed with status ${response.status}`;
 
-    const type =
+    const type = bodyType ?? (
       response.status === 401 ? ErrorType.Authentication :
       response.status === 429 ? ErrorType.RateLimit :
-      ErrorType.Api;
+      ErrorType.Api
+    );
 
     return new ShipError(type, message, response.status, details);
   }
@@ -515,14 +531,6 @@ export class ShipError extends Error {
   }
 
   static api(message: string, status: number = 500): ShipError {
-    return new ShipError(ErrorType.Api, message, status);
-  }
-
-  static database(message: string, status: number = 500): ShipError {
-    return new ShipError(ErrorType.Api, message, status);
-  }
-
-  static storage(message: string, status: number = 500): ShipError {
     return new ShipError(ErrorType.Api, message, status);
   }
 

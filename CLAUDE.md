@@ -57,7 +57,6 @@ ShipError.cancelled(message)
 ShipError.file(message, filePath?)
 ShipError.config(message, details?)
 ShipError.api(message, status?)            // status defaults to 500
-ShipError.database / ShipError.storage     // aliases for api()
 
 // Type checks
 error.isClientError()      // Business | Config | File | Validation
@@ -69,8 +68,11 @@ error.toResponse() // → ErrorResponse JSON
 
 // Wire format (consumer side — HTTP clients reconstruct ShipError from a Response)
 await ShipError.fromHttpResponse(response, fallbackMessage?)
-// Status drives the error type (401→Authentication, 429→RateLimit, else→Api).
-// Body's message/error/details are best-effort preserved.
+// Trusts body.error when it's a known ErrorType (server's
+// ShipError.validation(...) round-trips back as ErrorType.Validation).
+// Falls back to status-derived (401→Authentication, 429→RateLimit, else→Api)
+// for non-API responses or malformed bodies. Body's message and details
+// are best-effort preserved.
 
 // Structural guard (handles module duplication in bundles)
 isShipError(error)
