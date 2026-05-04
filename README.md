@@ -46,6 +46,20 @@ if (error.isClientError()) { /* Business | Config | File | Validation */ }
 if (error.isAuthError()) { /* handle auth */ }
 ```
 
+**HTTP client integration.** Both producer and consumer sides of the wire have first-class helpers, so every HTTP client across the platform reconstructs the same `ShipError` shape:
+
+```typescript
+// Producer side (API workers): serialize a ShipError to JSON
+return c.json(error.toResponse(), error.status ?? 500);
+
+// Consumer side (SDK, web app): rehydrate from any error Response
+if (!response.ok) {
+  throw await ShipError.fromHttpResponse(response, 'Get account failed');
+}
+```
+
+`fromHttpResponse` derives the error type from HTTP status (401 → `Authentication`, 429 → `RateLimit`, else → `Api`), preserving the body's `message`, `error`, and `details` best-effort. The optional second arg is a fallback message used when the body has nothing usable.
+
 ### Status Constants
 
 ```typescript

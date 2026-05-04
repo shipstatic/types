@@ -428,9 +428,52 @@ export class ShipError extends Error {
     };
   }
 
-  /** Create from wire format */
-  static fromResponse(response: ErrorResponse): ShipError {
-    return new ShipError(response.error, response.message, response.status, response.details);
+  /**
+   * Construct a `ShipError` from an HTTP error response.
+   *
+   * Best-effort body parse for `{ message, error?, details? }`. Message
+   * resolution: `body.message` → `body.error` → `fallbackMessage` →
+   * `Request failed with status N`. Status drives the error type — same
+   * convention used by the SDK and web console — so `error.status === 429`
+   * always lines up with `ErrorType.RateLimit`, etc., regardless of what the
+   * body's `error` field claims.
+   *
+   * Async because it reads the response body. Returns rather than throws so
+   * callers can compose; most will `throw await ShipError.fromHttpResponse(...)`.
+   */
+  static async fromHttpResponse(
+    response: Response,
+    fallbackMessage?: string,
+  ): Promise<ShipError> {
+    let message: string | undefined;
+    let details: unknown;
+
+    try {
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('application/json')) {
+        const json: unknown = await response.json();
+        if (json && typeof json === 'object') {
+          const obj = json as Record<string, unknown>;
+          if (typeof obj.message === 'string') message = obj.message;
+          else if (typeof obj.error === 'string') message = obj.error;
+          details = obj.details;
+        }
+      } else {
+        const text = await response.text();
+        if (text) message = text;
+      }
+    } catch {
+      // Body unreadable; fall through to fallback.
+    }
+
+    message = message || fallbackMessage || `Request failed with status ${response.status}`;
+
+    const type =
+      response.status === 401 ? ErrorType.Authentication :
+      response.status === 429 ? ErrorType.RateLimit :
+      ErrorType.Api;
+
+    return new ShipError(type, message, response.status, details);
   }
 
   // Factory methods for common errors
