@@ -159,6 +159,15 @@ import {
 } from '@shipstatic/types';
 ```
 
+### Password Utilities
+
+```typescript
+import {
+  PASSWORD_CONSTRAINTS,   // { MIN_LENGTH: 6, MAX_LENGTH: 128 }
+  validatePassword,       // (value: unknown) => string | undefined
+} from '@shipstatic/types';
+```
+
 ### Constants
 
 ```typescript

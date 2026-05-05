@@ -1525,3 +1525,32 @@ export const PASSWORD_CONSTRAINTS = {
   /** Maximum password length in characters */
   MAX_LENGTH: 128,
 } as const;
+
+/**
+ * Validate an optional deployment password and return it normalized.
+ *
+ * Absent (`undefined` / `null`) → returns `undefined`; an unprotected
+ * deployment is a valid choice. Present → must be a string within
+ * `PASSWORD_CONSTRAINTS` length bounds. Whitespace is preserved verbatim —
+ * significant. Throws `ShipError.validation` on breach.
+ *
+ * Single source of truth shared by SDK (client-side validation, return
+ * ignored) and API (server-side enforcement, return threaded into config).
+ * Length is part of the wire-format contract; strength rules, if added later,
+ * stay server-side. See `CLAUDE.md` "Validation: format vs policy".
+ */
+export function validatePassword(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'string') {
+    throw ShipError.validation('Password must be a string');
+  }
+  if (
+    value.length < PASSWORD_CONSTRAINTS.MIN_LENGTH ||
+    value.length > PASSWORD_CONSTRAINTS.MAX_LENGTH
+  ) {
+    throw ShipError.validation(
+      `Password must be between ${PASSWORD_CONSTRAINTS.MIN_LENGTH} and ${PASSWORD_CONSTRAINTS.MAX_LENGTH} characters`,
+    );
+  }
+  return value;
+}
