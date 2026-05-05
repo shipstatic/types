@@ -417,16 +417,42 @@ describe('Validation Constants - @shipstatic/types', () => {
       expect(() => validatePassword(tooLong)).toThrow(/between/);
     });
 
-    it('returns the value unchanged at the boundaries', () => {
+    it('returns the value unchanged at the boundaries (no whitespace)', () => {
       const min = 'a'.repeat(PASSWORD_CONSTRAINTS.MIN_LENGTH);
       const max = 'a'.repeat(PASSWORD_CONSTRAINTS.MAX_LENGTH);
       expect(validatePassword(min)).toBe(min);
       expect(validatePassword(max)).toBe(max);
     });
 
-    it('preserves whitespace verbatim — significant', () => {
-      const sixSpaces = ' '.repeat(PASSWORD_CONSTRAINTS.MIN_LENGTH);
-      expect(validatePassword(sixSpaces)).toBe(sixSpaces);
+    it('trims leading and trailing whitespace before validating', () => {
+      // Tabs, spaces, and newlines all count as whitespace per String#trim.
+      expect(validatePassword('  hunter22  ')).toBe('hunter22');
+      expect(validatePassword('\thunter22\n')).toBe('hunter22');
+      expect(validatePassword('\n\r\thunter22 \t\r\n')).toBe('hunter22');
+    });
+
+    it('preserves whitespace inside the password — significant', () => {
+      // Internal whitespace is part of the password and counts toward length.
+      expect(validatePassword('my passphrase')).toBe('my passphrase');
+      expect(validatePassword('  my passphrase  ')).toBe('my passphrase');
+    });
+
+    it('rejects whitespace-only strings (trim → empty → too short)', () => {
+      expect(() => validatePassword('      ')).toThrow(/between/);
+      expect(() => validatePassword('\t\t\t\t\t\t')).toThrow(/between/);
+    });
+
+    it('runs length validation against the trimmed value', () => {
+      // Padded so the wire length is in-range, but the trimmed form is too
+      // short. Intent is what matters — protect against paste accidents that
+      // would otherwise create a 2-char password masquerading as 12.
+      expect(() => validatePassword('     pw     ')).toThrow(/between/);
+      // Same shape on the other side — trimmed form one over the cap.
+      const overByOne = ' ' + 'a'.repeat(PASSWORD_CONSTRAINTS.MAX_LENGTH + 1) + ' ';
+      expect(() => validatePassword(overByOne)).toThrow(/between/);
+      // And the inverse — padded value, trimmed form lands exactly at the cap.
+      const paddedAtMax = '   ' + 'a'.repeat(PASSWORD_CONSTRAINTS.MAX_LENGTH) + '   ';
+      expect(validatePassword(paddedAtMax)).toBe('a'.repeat(PASSWORD_CONSTRAINTS.MAX_LENGTH));
     });
   });
 });

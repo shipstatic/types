@@ -1065,7 +1065,8 @@ export interface DeploymentUploadOptions {
    * Optional password that protects this deployment.
    *
    * Length: {@link PASSWORD_CONSTRAINTS.MIN_LENGTH} to
-   * {@link PASSWORD_CONSTRAINTS.MAX_LENGTH} characters; whitespace is
+   * {@link PASSWORD_CONSTRAINTS.MAX_LENGTH} characters. Leading and trailing
+   * whitespace is trimmed before validation; internal whitespace is
    * significant. Visitors are prompted to enter the password before they can
    * view the deployment — including on any custom domains pointing at it.
    * To remove protection, redeploy without a password.
@@ -1529,10 +1530,18 @@ export const PASSWORD_CONSTRAINTS = {
 /**
  * Validate an optional deployment password and return it normalized.
  *
- * Absent (`undefined` / `null`) → returns `undefined`; an unprotected
- * deployment is a valid choice. Present → must be a string within
- * `PASSWORD_CONSTRAINTS` length bounds. Whitespace is preserved verbatim —
- * significant. Throws `ShipError.validation` on breach.
+ * Absent (`undefined` / `null`) → returns `undefined`. Present → trim
+ * leading/trailing whitespace, then validate against `PASSWORD_CONSTRAINTS`
+ * length bounds (internal whitespace is significant and counts toward
+ * length). Throws `ShipError.validation` on breach; returns the trimmed
+ * value.
+ *
+ * The trim is canonical: at upload, the API hashes the trimmed value; at
+ * unlock, the router trims submissions before hashing. Submission and storage
+ * agree byte-for-byte. Length validation runs on the trimmed value because
+ * that's the user's actual intent — and it disarms a class of invisible
+ * foot-guns (trailing newlines from copy/paste, mobile auto-spacing,
+ * password-manager artifacts).
  *
  * Single source of truth shared by SDK (client-side validation, return
  * ignored) and API (server-side enforcement, return threaded into config).
@@ -1544,13 +1553,14 @@ export function validatePassword(value: unknown): string | undefined {
   if (typeof value !== 'string') {
     throw ShipError.validation('Password must be a string');
   }
+  const trimmed = value.trim();
   if (
-    value.length < PASSWORD_CONSTRAINTS.MIN_LENGTH ||
-    value.length > PASSWORD_CONSTRAINTS.MAX_LENGTH
+    trimmed.length < PASSWORD_CONSTRAINTS.MIN_LENGTH ||
+    trimmed.length > PASSWORD_CONSTRAINTS.MAX_LENGTH
   ) {
     throw ShipError.validation(
       `Password must be between ${PASSWORD_CONSTRAINTS.MIN_LENGTH} and ${PASSWORD_CONSTRAINTS.MAX_LENGTH} characters`,
     );
   }
-  return value;
+  return trimmed;
 }
