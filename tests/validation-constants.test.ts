@@ -10,6 +10,7 @@ import {
   LABEL_PATTERN,
   LABEL_CONSTRAINTS,
   PASSWORD_CONSTRAINTS,
+  validatePassword,
   type PlatformLimits,
   type FileValidationStatusType
 } from '../src/index';
@@ -389,6 +390,43 @@ describe('Validation Constants - @shipstatic/types', () => {
 
       expect(PASSWORD_CONSTRAINTS.MAX_LENGTH).toBeGreaterThanOrEqual(64);
       expect(PASSWORD_CONSTRAINTS.MAX_LENGTH).toBeLessThanOrEqual(512);
+    });
+  });
+
+  describe('validatePassword()', () => {
+    it('returns undefined for absent values (undefined / null)', () => {
+      expect(validatePassword(undefined)).toBeUndefined();
+      expect(validatePassword(null)).toBeUndefined();
+    });
+
+    it('rejects non-string types', () => {
+      expect(() => validatePassword(123)).toThrow(/string/);
+      expect(() => validatePassword(true)).toThrow(/string/);
+      expect(() => validatePassword({})).toThrow(/string/);
+      expect(() => validatePassword([])).toThrow(/string/);
+    });
+
+    it('rejects strings shorter than the minimum length', () => {
+      const tooShort = 'a'.repeat(PASSWORD_CONSTRAINTS.MIN_LENGTH - 1);
+      expect(() => validatePassword(tooShort)).toThrow(/between/);
+      expect(() => validatePassword('')).toThrow(/between/);
+    });
+
+    it('rejects strings longer than the maximum length', () => {
+      const tooLong = 'a'.repeat(PASSWORD_CONSTRAINTS.MAX_LENGTH + 1);
+      expect(() => validatePassword(tooLong)).toThrow(/between/);
+    });
+
+    it('returns the value unchanged at the boundaries', () => {
+      const min = 'a'.repeat(PASSWORD_CONSTRAINTS.MIN_LENGTH);
+      const max = 'a'.repeat(PASSWORD_CONSTRAINTS.MAX_LENGTH);
+      expect(validatePassword(min)).toBe(min);
+      expect(validatePassword(max)).toBe(max);
+    });
+
+    it('preserves whitespace verbatim — significant', () => {
+      const sixSpaces = ' '.repeat(PASSWORD_CONSTRAINTS.MIN_LENGTH);
+      expect(validatePassword(sixSpaces)).toBe(sixSpaces);
     });
   });
 });

@@ -32,7 +32,7 @@ Single file: `src/index.ts`, organized into named sections in this order:
 | File Upload Types | `FileValidationStatus`, `ValidationIssue`, `ValidatableFile`, `FileValidationResult`, `UploadedFile` |
 | Domain Utilities | `isPlatformDomain`, `isCustomDomain`, `extractSubdomain`, `generate*Url` |
 | Label Utilities | `LABEL_CONSTRAINTS`, `LABEL_PATTERN`, `serializeLabels`, `deserializeLabels` |
-| Password Utilities | `PASSWORD_CONSTRAINTS` |
+| Password Utilities | `PASSWORD_CONSTRAINTS`, `validatePassword` |
 
 ## Quick Reference
 
@@ -209,6 +209,24 @@ Use `readonly` for stable fields (`id`, `created`, `url`). Leave mutable fields 
 4. Run `pnpm build` to validate
 
 **New error types:** Add to `ErrorType` enum + a static factory on `ShipError`.
+
+### Validation: format vs policy
+
+Validators in this package enforce **wire-format rules** — the rules that define what a value *is*, not what's *allowed*. Format rules belong here because every consumer (SDK, API, web app, integrations) needs to agree on them or the wire breaks.
+
+Examples that belong here:
+
+- `validateApiKey` — `ship-` prefix + 64 hex chars; the format defines the type.
+- `validateDeployToken` — same shape, different prefix.
+- `validatePassword` — length 6–128 is the wire-format envelope an API endpoint accepts.
+
+Examples that do **not** belong here (keep in the API):
+
+- Password strength rules (no breach lists, complexity heuristics) — security policy, evolves on the server.
+- Plan-based caps (file size, file count) — already correctly delivered via `/limits`, not hard-coded.
+- Domain availability, account state, billing rules — server-only state.
+
+Rule of thumb: if a client could compute the answer offline from the input alone *and* the API would always reject the same input the same way, it's format → ship the validator here. Otherwise it's policy → keep it server-side.
 
 ## Design Principles
 
