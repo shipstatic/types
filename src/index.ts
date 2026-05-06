@@ -45,7 +45,7 @@ export interface Deployment {
   readonly created: number;
   /** Unix timestamp (seconds) when deployment expires, null if never */
   expires: number | null; // Mutable - can be updated
-  /** Screenshot URL for this deployment (e.g., 'https://screenshots.shipstatic.com/happy-cat-abc1234/a3f2c1b4d5e6f789') */
+  /** Full URL to the deployment screenshot (e.g., 'https://screenshots.shipstatic.com/happy-cat-abc1234/a3f2c1b4d5e6f789') */
   readonly screenshot: string;
 }
 
