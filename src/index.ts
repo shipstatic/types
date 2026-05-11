@@ -216,7 +216,7 @@ export interface Token {
   readonly account: string;
   /** SHA256 hash of the raw credential (auth lookups only, never exposed to users) */
   readonly hash: string;
-  /** IP address locking for security, null if not locked */
+  /** IP-lock. Non-null = single-use (claimable only from this IP, once); null = multi-use. */
   readonly ip: string | null;
   /** Labels for categorization and filtering (lowercase, alphanumeric with separators). Always present, empty array when none. */
   labels: string[];
@@ -224,7 +224,7 @@ export interface Token {
   readonly created: number;
   /** Unix timestamp (seconds) when token expires, null for never */
   readonly expires: number | null;
-  /** Unix timestamp (seconds) when token was last used, null if never used */
+  /** Consumption timestamp. Single-use: gates re-use (set once). Multi-use: refreshed on every claim. Null = never claimed. */
   readonly used: number | null;
 }
 
@@ -241,7 +241,7 @@ export interface TokenListItem {
   readonly created: number;
   /** Unix timestamp (seconds) when token expires, null for never */
   readonly expires: number | null;
-  /** Unix timestamp (seconds) when token was last used, null if never used */
+  /** Consumption timestamp. Single-use: gates re-use (set once). Multi-use: refreshed on every claim. Null = never claimed. */
   readonly used: number | null;
 }
 
@@ -1008,7 +1008,7 @@ export interface ResolvedConfig {
   apiUrl: string;
   /** API key for authenticated deployments. */
   apiKey?: string;
-  /** Deploy token for single-use deployments. */
+  /** Deploy token used as the request credential (`token-{64-hex}`). */
   deployToken?: string;
 }
 
