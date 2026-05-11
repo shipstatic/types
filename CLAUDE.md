@@ -6,7 +6,7 @@ Claude Code instructions for the **Types** package.
 
 **@shipstatic/types** is the single source of truth for all shared TypeScript types, constants, and utilities across the ShipStatic platform. If a type is used by more than one package, it belongs here.
 
-**Maturity:** Release candidate — changes should be deliberate.
+**Maturity:** Stable; semver applies — breaking changes require a major version bump.
 
 ## Architecture
 
