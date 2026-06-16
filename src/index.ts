@@ -1178,6 +1178,7 @@ export type ActivityEvent =
   | 'deployment.update'
   | 'deployment.delete'
   | 'deployment.claim'
+  | 'deployment.flagged' // Internal: HTML content matched a detection rule (not user-visible)
   // Domain events
   | 'domain.create'
   | 'domain.update'
