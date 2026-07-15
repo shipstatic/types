@@ -445,7 +445,7 @@ export class ShipError extends Error {
   toResponse(): ErrorResponse {
     // Strip authentication details when they carry an `internal` telemetry
     // tag (see `ShipError.authentication` JSDoc) — these are server-side
-    // diagnostics like 'jwt_missing_subject' that must not leak to clients.
+    // diagnostics like 'session_invalid' that must not leak to clients.
     const authDetails = this.details as { internal?: unknown } | undefined;
     const details = this.type === ErrorType.Authentication && authDetails?.internal
       ? undefined
@@ -585,7 +585,7 @@ export class ShipError extends Error {
    *
    * **Telemetry pattern — `details: { internal: '<tag>' }`.** When the
    * server creates an auth error with an `internal` key in `details`
-   * (e.g. `{ internal: 'jwt_missing_subject' }`), `toResponse()` strips the
+   * (e.g. `{ internal: 'session_invalid' }`), `toResponse()` strips the
    * entire `details` object before serialization. This keeps the wire
    * response a clean "Authentication failed" while preserving granular
    * server-side telemetry (which strategy/check failed) for logs and tests.
@@ -837,7 +837,7 @@ export const DEPLOY_TOKEN = {
 
 // Authentication Method Constants
 export const AuthMethod = {
-  JWT: 'jwt',
+  SESSION: 'session',
   API_KEY: 'apiKey',
   TOKEN: 'token',
   WEBHOOK: 'webhook',
