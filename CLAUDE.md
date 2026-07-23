@@ -102,6 +102,9 @@ const internal = (error.details as { internal?: string } | undefined)?.internal;
 
 ### Error Flow
 
+**The message authoring law.** The wire `message` is displayed verbatim on every surface — web console alerts, CLI stderr, SDK consumers. Producers therefore author messages for end users at the throw site (plain sentences; machine data like timestamps, bucket names, or ids goes in `details`, never in prose). Surfaces may add context-actionable guidance in their own vocabulary (the CLI mentions its flags) or presentation chrome (toast titles), and may compose copy where no wire exists (network failures, timeouts) — but they never re-word a wire message. Clients branch on `error` type / `status`, never on message strings, which is what keeps message improvements free.
+
+
 Errors flow through the platform along a single, symmetric path. Every HTTP client (SDK, web console, future) uses the same two helpers; the API worker does the inverse. There is no other way to construct or hydrate a `ShipError` in HTTP context.
 
 ```

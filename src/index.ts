@@ -840,11 +840,33 @@ export const AuthMethod = {
   SESSION: 'session',
   API_KEY: 'apiKey',
   TOKEN: 'token',
+  OAUTH: 'oauth',
   WEBHOOK: 'webhook',
   SYSTEM: 'system'
 } as const;
 
 export type AuthMethodType = typeof AuthMethod[keyof typeof AuthMethod];
+
+/**
+ * OAuth scope vocabulary for delegated third-party access tokens.
+ * Single source of truth used by the authorization server (advertised in
+ * `scopes_supported`), the API's scope-enforcement middleware, and consent UI
+ * copy. The standard `offline_access` scope (refresh tokens) is not platform
+ * vocabulary and is deliberately absent — the middleware never checks it.
+ *
+ * Deliberately absent by design: any `tokens:*` scope, `account:write`, or
+ * admin scope — a delegated app must never mint credentials, delete the
+ * account, or act as admin.
+ */
+export const OAuthScope = {
+  ACCOUNT_READ: 'account:read',
+  DEPLOYMENTS_READ: 'deployments:read',
+  DEPLOYMENTS_WRITE: 'deployments:write',
+  DOMAINS_READ: 'domains:read',
+  DOMAINS_WRITE: 'domains:write',
+} as const;
+
+export type OAuthScopeType = typeof OAuthScope[keyof typeof OAuthScope];
 
 // Deployment Configuration
 export const DEPLOYMENT_CONFIG_FILENAME = 'ship.json';
