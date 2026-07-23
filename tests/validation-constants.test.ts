@@ -11,8 +11,11 @@ import {
   LABEL_CONSTRAINTS,
   PASSWORD_CONSTRAINTS,
   validatePassword,
+  AuthMethod,
+  OAuthScope,
   type PlatformLimits,
-  type FileValidationStatusType
+  type FileValidationStatusType,
+  type OAuthScopeType
 } from '../src/index';
 
 describe('Validation Constants - @shipstatic/types', () => {
@@ -292,6 +295,47 @@ describe('Validation Constants - @shipstatic/types', () => {
       const values = Object.values(FileValidationStatus);
       const uniqueValues = new Set(values);
       expect(uniqueValues.size).toBe(values.length);
+    });
+  });
+
+  describe('AuthMethod', () => {
+    it('should have all credential populations', () => {
+      expect(AuthMethod.SESSION).toBe('session');
+      expect(AuthMethod.API_KEY).toBe('apiKey');
+      expect(AuthMethod.TOKEN).toBe('token');
+      expect(AuthMethod.OAUTH).toBe('oauth');
+      expect(AuthMethod.WEBHOOK).toBe('webhook');
+      expect(AuthMethod.SYSTEM).toBe('system');
+    });
+
+    it('should have no duplicate values', () => {
+      const values = Object.values(AuthMethod);
+      expect(new Set(values).size).toBe(values.length);
+    });
+  });
+
+  describe('OAuthScope', () => {
+    // Scope strings are a wire contract — OAuth clients hold grants recorded
+    // against these exact values. Changing one invalidates issued tokens.
+    it('should have the exact platform scope vocabulary', () => {
+      expect(OAuthScope.ACCOUNT_READ).toBe('account:read');
+      expect(OAuthScope.DEPLOYMENTS_READ).toBe('deployments:read');
+      expect(OAuthScope.DEPLOYMENTS_WRITE).toBe('deployments:write');
+      expect(OAuthScope.DOMAINS_READ).toBe('domains:read');
+      expect(OAuthScope.DOMAINS_WRITE).toBe('domains:write');
+      expect(Object.keys(OAuthScope)).toHaveLength(5);
+    });
+
+    it('should never contain credential-minting or admin scopes', () => {
+      const values = Object.values(OAuthScope) as string[];
+      for (const scope of values) {
+        expect(scope).not.toMatch(/token|key|admin|account:write/);
+      }
+    });
+
+    it('should be usable as a type', () => {
+      const scope: OAuthScopeType = OAuthScope.DEPLOYMENTS_WRITE;
+      expect(scope).toBe('deployments:write');
     });
   });
 
