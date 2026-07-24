@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { ErrorType, ShipError, isShipError } from '../src/index';
+import { describe, expect, it } from 'vitest';
+import { ErrorType, isShipError, ShipError } from '../src/index';
 
 describe('ShipError construction', () => {
   it('direct constructor sets type, message, status, details and is an Error/ShipError', () => {
@@ -141,7 +141,9 @@ describe('ShipError.toResponse()', () => {
   // a clean "Authentication failed" with no leakage.
   describe('internal: telemetry stripping (Authentication only)', () => {
     it('strips details from Authentication errors when details.internal is set', () => {
-      const err = ShipError.authentication('Authentication failed', { internal: 'jwt_missing_subject' });
+      const err = ShipError.authentication('Authentication failed', {
+        internal: 'jwt_missing_subject',
+      });
       const wire = err.toResponse();
       expect(wire.details).toBeUndefined();
       expect(wire.message).toBe('Authentication failed');
@@ -168,33 +170,25 @@ describe('ShipError.toResponse()', () => {
 describe('ShipError.fromHttpResponse', () => {
   describe('error type derivation by status', () => {
     it('maps 401 → ErrorType.Authentication', async () => {
-      const err = await ShipError.fromHttpResponse(
-        jsonResponse({ message: 'nope' }, 401),
-      );
+      const err = await ShipError.fromHttpResponse(jsonResponse({ message: 'nope' }, 401));
       expect(err.type).toBe(ErrorType.Authentication);
       expect(err.status).toBe(401);
     });
 
     it('maps 403 → ErrorType.Forbidden', async () => {
-      const err = await ShipError.fromHttpResponse(
-        jsonResponse({ message: 'no' }, 403),
-      );
+      const err = await ShipError.fromHttpResponse(jsonResponse({ message: 'no' }, 403));
       expect(err.type).toBe(ErrorType.Forbidden);
       expect(err.status).toBe(403);
     });
 
     it('maps 429 → ErrorType.RateLimit', async () => {
-      const err = await ShipError.fromHttpResponse(
-        jsonResponse({ message: 'slow down' }, 429),
-      );
+      const err = await ShipError.fromHttpResponse(jsonResponse({ message: 'slow down' }, 429));
       expect(err.type).toBe(ErrorType.RateLimit);
       expect(err.status).toBe(429);
     });
 
     it('maps 400 → ErrorType.Api (everything non-special)', async () => {
-      const err = await ShipError.fromHttpResponse(
-        jsonResponse({ message: 'bad input' }, 400),
-      );
+      const err = await ShipError.fromHttpResponse(jsonResponse({ message: 'bad input' }, 400));
       expect(err.type).toBe(ErrorType.Api);
       expect(err.status).toBe(400);
     });
@@ -206,9 +200,7 @@ describe('ShipError.fromHttpResponse', () => {
     });
 
     it('maps 500 → ErrorType.Api', async () => {
-      const err = await ShipError.fromHttpResponse(
-        jsonResponse({ message: 'server boom' }, 500),
-      );
+      const err = await ShipError.fromHttpResponse(jsonResponse({ message: 'server boom' }, 500));
       expect(err.type).toBe(ErrorType.Api);
       expect(err.status).toBe(500);
     });
@@ -225,10 +217,7 @@ describe('ShipError.fromHttpResponse', () => {
       // Server-thrown ShipError.validation(...) round-trips back as Validation,
       // not as the generic Api type that pure status-derivation would produce.
       const err = await ShipError.fromHttpResponse(
-        jsonResponse(
-          { error: ErrorType.Validation, message: 'Email required', status: 400 },
-          400,
-        ),
+        jsonResponse({ error: ErrorType.Validation, message: 'Email required', status: 400 }, 400),
       );
       expect(err.type).toBe(ErrorType.Validation);
       expect(err.isClientError()).toBe(true);
@@ -252,9 +241,7 @@ describe('ShipError.fromHttpResponse', () => {
     });
 
     it('falls back to status-derived type when body.error is missing', async () => {
-      const err = await ShipError.fromHttpResponse(
-        jsonResponse({ message: 'nope' }, 429),
-      );
+      const err = await ShipError.fromHttpResponse(jsonResponse({ message: 'nope' }, 429));
       expect(err.type).toBe(ErrorType.RateLimit);
     });
 
@@ -263,10 +250,7 @@ describe('ShipError.fromHttpResponse', () => {
       // edge case shouldn't happen in practice (API serializes status from
       // ShipError.status), but if it does, the wire is the source of truth.
       const err = await ShipError.fromHttpResponse(
-        jsonResponse(
-          { error: ErrorType.Business, message: 'Plan limit', status: 500 },
-          500,
-        ),
+        jsonResponse({ error: ErrorType.Business, message: 'Plan limit', status: 500 }, 500),
       );
       expect(err.type).toBe(ErrorType.Business);
       expect(err.status).toBe(500);
@@ -278,10 +262,7 @@ describe('ShipError.fromHttpResponse', () => {
       // and fall back to status-derived to avoid mistyping a server problem
       // as an offline situation in the UI.
       const err = await ShipError.fromHttpResponse(
-        jsonResponse(
-          { error: ErrorType.Network, message: 'misbehaving server', status: 500 },
-          500,
-        ),
+        jsonResponse({ error: ErrorType.Network, message: 'misbehaving server', status: 500 }, 500),
       );
       expect(err.type).toBe(ErrorType.Api);
       expect(err.isNetworkError()).toBe(false);
@@ -302,20 +283,14 @@ describe('ShipError.fromHttpResponse', () => {
       // File errors originate on the SDK during local file processing — never
       // produced server-side. A misbehaving body claim is ignored.
       const err = await ShipError.fromHttpResponse(
-        jsonResponse(
-          { error: ErrorType.File, message: 'misbehaving server', status: 500 },
-          500,
-        ),
+        jsonResponse({ error: ErrorType.File, message: 'misbehaving server', status: 500 }, 500),
       );
       expect(err.type).toBe(ErrorType.Api);
     });
 
     it('does NOT trust body.error when it claims a client-only type (Config)', async () => {
       const err = await ShipError.fromHttpResponse(
-        jsonResponse(
-          { error: ErrorType.Config, message: 'misbehaving server', status: 400 },
-          400,
-        ),
+        jsonResponse({ error: ErrorType.Config, message: 'misbehaving server', status: 400 }, 400),
       );
       expect(err.type).toBe(ErrorType.Api);
     });
@@ -342,10 +317,7 @@ describe('ShipError.fromHttpResponse', () => {
   describe('message resolution', () => {
     it('prefers body.message over body.error', async () => {
       const err = await ShipError.fromHttpResponse(
-        jsonResponse(
-          { message: 'human readable', error: 'machine_readable' },
-          400,
-        ),
+        jsonResponse({ message: 'human readable', error: 'machine_readable' }, 400),
       );
       expect(err.message).toBe('human readable');
     });
@@ -358,10 +330,7 @@ describe('ShipError.fromHttpResponse', () => {
     });
 
     it('composes operationName-derived fallback when body has nothing', async () => {
-      const err = await ShipError.fromHttpResponse(
-        jsonResponse({}, 500),
-        'Get account',
-      );
+      const err = await ShipError.fromHttpResponse(jsonResponse({}, 500), 'Get account');
       expect(err.message).toBe('Get account failed with status 500');
     });
 
@@ -418,9 +387,7 @@ describe('ShipError.fromHttpResponse', () => {
     });
 
     it('leaves details undefined when body has none', async () => {
-      const err = await ShipError.fromHttpResponse(
-        jsonResponse({ message: 'nope' }, 400),
-      );
+      const err = await ShipError.fromHttpResponse(jsonResponse({ message: 'nope' }, 400));
       expect(err.details).toBeUndefined();
     });
   });
@@ -489,4 +456,3 @@ describe('ShipError.fromFetchError', () => {
     expect(err.message).toBe('Request failed: boom');
   });
 });
-

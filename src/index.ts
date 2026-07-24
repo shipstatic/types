@@ -14,10 +14,10 @@ export const DeploymentStatus = {
   PENDING: 'pending',
   SUCCESS: 'success',
   FAILED: 'failed',
-  DELETING: 'deleting'
+  DELETING: 'deleting',
 } as const;
 
-export type DeploymentStatusType = typeof DeploymentStatus[keyof typeof DeploymentStatus];
+export type DeploymentStatusType = (typeof DeploymentStatus)[keyof typeof DeploymentStatus];
 
 /**
  * Core deployment object - used in both API responses and SDK
@@ -48,7 +48,6 @@ export interface Deployment {
   /** Full URL to the deployment screenshot (e.g., 'https://screenshots.shipstatic.com/happy-cat-abc1234/a3f2c1b4d5e6f789') */
   readonly screenshot: string;
 }
-
 
 /**
  * Response from deployment creation. Extends Deployment with one-time fields
@@ -87,10 +86,10 @@ export const DomainStatus = {
   PENDING: 'pending',
   PARTIAL: 'partial',
   SUCCESS: 'success',
-  PAUSED: 'paused'
+  PAUSED: 'paused',
 } as const;
 
-export type DomainStatusType = typeof DomainStatus[keyof typeof DomainStatus];
+export type DomainStatusType = (typeof DomainStatus)[keyof typeof DomainStatus];
 
 /**
  * Core domain object - used in both API responses and SDK
@@ -262,10 +261,10 @@ export const AccountPlan = {
   ENTERPRISE: 'enterprise',
   SUSPENDED: 'suspended',
   TERMINATING: 'terminating',
-  TERMINATED: 'terminated'
+  TERMINATED: 'terminated',
 } as const;
 
-export type AccountPlanType = typeof AccountPlan[keyof typeof AccountPlan];
+export type AccountPlanType = (typeof AccountPlan)[keyof typeof AccountPlan];
 
 /**
  * Account usage metrics — always available regardless of billing provider.
@@ -370,7 +369,7 @@ export const ErrorType = {
   Config: 'config_error',
 } as const;
 
-export type ErrorType = typeof ErrorType[keyof typeof ErrorType];
+export type ErrorType = (typeof ErrorType)[keyof typeof ErrorType];
 
 /**
  * Error types that originate exclusively on the client (HTTP clients, SDK
@@ -391,7 +390,13 @@ const CLIENT_ONLY_ERROR_TYPES = new Set<string>([
  * union so `.has(error.type)` accepts any value from the union.
  */
 const ERROR_CATEGORIES = {
-  client: new Set<ErrorType>([ErrorType.Business, ErrorType.Config, ErrorType.File, ErrorType.Forbidden, ErrorType.Validation]),
+  client: new Set<ErrorType>([
+    ErrorType.Business,
+    ErrorType.Config,
+    ErrorType.File,
+    ErrorType.Forbidden,
+    ErrorType.Validation,
+  ]),
   network: new Set<ErrorType>([ErrorType.Network]),
   auth: new Set<ErrorType>([ErrorType.Authentication]),
 } as const;
@@ -404,7 +409,7 @@ const ERROR_CATEGORIES = {
  * `ErrorType` is automatically picked up.
  */
 const SERVER_PRODUCIBLE_ERROR_TYPES = new Set<string>(
-  Object.values(ErrorType).filter(t => !CLIENT_ONLY_ERROR_TYPES.has(t)),
+  Object.values(ErrorType).filter((t) => !CLIENT_ONLY_ERROR_TYPES.has(t)),
 );
 
 /**
@@ -441,15 +446,14 @@ export class ShipError extends Error {
     // tag (see `ShipError.authentication` JSDoc) — these are server-side
     // diagnostics like 'session_invalid' that must not leak to clients.
     const authDetails = this.details as { internal?: unknown } | undefined;
-    const details = this.type === ErrorType.Authentication && authDetails?.internal
-      ? undefined
-      : this.details;
+    const details =
+      this.type === ErrorType.Authentication && authDetails?.internal ? undefined : this.details;
 
     return {
       error: this.type,
       message: this.message,
       status: this.status,
-      details
+      details,
     };
   }
 
@@ -475,10 +479,7 @@ export class ShipError extends Error {
    * Async because it reads the response body. Returns rather than throws so
    * callers can compose; most will `throw await ShipError.fromHttpResponse(...)`.
    */
-  static async fromHttpResponse(
-    response: Response,
-    operationName?: string,
-  ): Promise<ShipError> {
+  static async fromHttpResponse(response: Response, operationName?: string): Promise<ShipError> {
     let message: string | undefined;
     let details: unknown;
     let bodyType: ErrorType | undefined;
@@ -506,12 +507,15 @@ export class ShipError extends Error {
 
     message = message || `${operationName || 'Request'} failed with status ${response.status}`;
 
-    const type = bodyType ?? (
-      response.status === 401 ? ErrorType.Authentication :
-      response.status === 403 ? ErrorType.Forbidden :
-      response.status === 429 ? ErrorType.RateLimit :
-      ErrorType.Api
-    );
+    const type =
+      bodyType ??
+      (response.status === 401
+        ? ErrorType.Authentication
+        : response.status === 403
+          ? ErrorType.Forbidden
+          : response.status === 429
+            ? ErrorType.RateLimit
+            : ErrorType.Api);
 
     return new ShipError(type, message, response.status, details);
   }
@@ -570,7 +574,7 @@ export class ShipError extends Error {
     return new ShipError(ErrorType.Forbidden, message, 403, details);
   }
 
-  static rateLimit(message: string = "Too many requests", details?: unknown): ShipError {
+  static rateLimit(message: string = 'Too many requests', details?: unknown): ShipError {
     return new ShipError(ErrorType.RateLimit, message, 429, details);
   }
 
@@ -587,7 +591,7 @@ export class ShipError extends Error {
    * Use this pattern in API auth code; do not put client-visible info under
    * `internal`. Other `details` keys round-trip normally.
    */
-  static authentication(message: string = "Authentication required", details?: unknown): ShipError {
+  static authentication(message: string = 'Authentication required', details?: unknown): ShipError {
     return new ShipError(ErrorType.Authentication, message, 401, details);
   }
 
@@ -694,21 +698,47 @@ export interface PlatformLimits {
  */
 export const BLOCKED_EXTENSIONS: ReadonlySet<string> = new Set([
   // Executables
-  'exe', 'msi', 'dll', 'scr', 'bat', 'cmd', 'com', 'pif', 'app', 'deb', 'rpm',
+  'exe',
+  'msi',
+  'dll',
+  'scr',
+  'bat',
+  'cmd',
+  'com',
+  'pif',
+  'app',
+  'deb',
+  'rpm',
   // Installers
-  'pkg', 'mpkg',
+  'pkg',
+  'mpkg',
   // Disk images
-  'dmg', 'iso', 'img',
+  'dmg',
+  'iso',
+  'img',
   // Malware vectors
-  'cab', 'cpl', 'chm',
+  'cab',
+  'cpl',
+  'chm',
   // Dangerous scripts
-  'ps1', 'vbs', 'vbe', 'ws', 'wsf', 'wsc', 'wsh', 'reg',
+  'ps1',
+  'vbs',
+  'vbe',
+  'ws',
+  'wsf',
+  'wsc',
+  'wsh',
+  'reg',
   // Java
-  'jar', 'jnlp',
+  'jar',
+  'jnlp',
   // Mobile/browser packages
-  'apk', 'crx',
+  'apk',
+  'crx',
   // Shortcut/link
-  'lnk', 'inf', 'hta',
+  'lnk',
+  'inf',
+  'hta',
 ]);
 
 /**
@@ -745,6 +775,7 @@ export function isBlockedExtension(filename: string): boolean {
  *
  * Everything else is allowed — browser percent-encodes, Worker decodes, R2 matches.
  */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: blocking control characters is this regex's purpose
 export const UNSAFE_FILENAME_CHARS = /[\x00-\x1f\x7f#?%\\<>"]/;
 
 /**
@@ -783,7 +814,7 @@ export const UNBUILT_PROJECT_MARKERS: ReadonlySet<string> = new Set([
  */
 export function hasUnbuiltMarker(filePath: string): boolean {
   const segments = filePath.replace(/\\/g, '/').split('/').filter(Boolean);
-  return segments.some(s => UNBUILT_PROJECT_MARKERS.has(s));
+  return segments.some((s) => UNBUILT_PROJECT_MARKERS.has(s));
 }
 
 // =============================================================================
@@ -824,10 +855,10 @@ export const AuthMethod = {
   AGENT: 'agent',
   OAUTH: 'oauth',
   WEBHOOK: 'webhook',
-  SYSTEM: 'system'
+  SYSTEM: 'system',
 } as const;
 
-export type AuthMethodType = typeof AuthMethod[keyof typeof AuthMethod];
+export type AuthMethodType = (typeof AuthMethod)[keyof typeof AuthMethod];
 
 /**
  * Shape constants for API keys (`ship-{64 hex chars}`).
@@ -891,7 +922,7 @@ export const TokenKind = {
   OPAQUE: 'opaque',
 } as const;
 
-export type TokenKindType = typeof TokenKind[keyof typeof TokenKind];
+export type TokenKindType = (typeof TokenKind)[keyof typeof TokenKind];
 
 /**
  * Classify a client token by shape. The single dispatch used by both sides
@@ -924,7 +955,7 @@ export const OAuthScope = {
   DOMAINS_WRITE: 'domains:write',
 } as const;
 
-export type OAuthScopeType = typeof OAuthScope[keyof typeof OAuthScope];
+export type OAuthScopeType = (typeof OAuthScope)[keyof typeof OAuthScope];
 
 // =============================================================================
 // DEPLOYMENT CONFIGURATION CONSTANTS
@@ -933,7 +964,9 @@ export type OAuthScopeType = typeof OAuthScope[keyof typeof OAuthScope];
 export const DEPLOYMENT_CONFIG_FILENAME = 'ship.json';
 
 /** Default ship.json config for SPA routing. Single source of truth — used by both API and SDK. */
-export const SPA_DEFAULT_CONFIG = { rewrites: [{ source: '/(.*)', destination: '/index.html' }] } as const;
+export const SPA_DEFAULT_CONFIG = {
+  rewrites: [{ source: '/(.*)', destination: '/index.html' }],
+} as const;
 
 // =============================================================================
 // VALIDATION UTILITIES
@@ -947,19 +980,23 @@ export const SPA_DEFAULT_CONFIG = { rewrites: [{ source: '/(.*)', destination: '
 function validatePrefixedCredential(
   value: string,
   shape: { PREFIX: string; HEX_LENGTH: number; TOTAL_LENGTH: number },
-  label: string
+  label: string,
 ): void {
   if (!value.startsWith(shape.PREFIX)) {
     throw ShipError.validation(`${label} must start with "${shape.PREFIX}"`);
   }
 
   if (value.length !== shape.TOTAL_LENGTH) {
-    throw ShipError.validation(`${label} must be ${shape.TOTAL_LENGTH} characters total (${shape.PREFIX} + ${shape.HEX_LENGTH} hex chars)`);
+    throw ShipError.validation(
+      `${label} must be ${shape.TOTAL_LENGTH} characters total (${shape.PREFIX} + ${shape.HEX_LENGTH} hex chars)`,
+    );
   }
 
   const hexPart = value.slice(shape.PREFIX.length);
   if (!new RegExp(`^[a-f0-9]{${shape.HEX_LENGTH}}$`, 'i').test(hexPart)) {
-    throw ShipError.validation(`${label} must contain ${shape.HEX_LENGTH} hexadecimal characters after "${shape.PREFIX}" prefix`);
+    throw ShipError.validation(
+      `${label} must contain ${shape.HEX_LENGTH} hexadecimal characters after "${shape.PREFIX}" prefix`,
+    );
   }
 }
 
@@ -986,9 +1023,11 @@ export function validateDeployToken(deployToken: string): void {
 export function validateToken(token: string): void {
   switch (classifyToken(token)) {
     case TokenKind.API_KEY:
-      return validateApiKey(token);
+      validateApiKey(token);
+      return;
     case TokenKind.DEPLOY_TOKEN:
-      return validateDeployToken(token);
+      validateDeployToken(token);
+      return;
     case TokenKind.OPAQUE:
       if (!token) throw ShipError.validation('Token must be a non-empty string');
   }
@@ -1002,7 +1041,7 @@ export function validateToken(token: string): void {
 export function validateCaller(caller: string): void {
   if (!caller || caller.length > CALLER.MAX_LENGTH || !CALLER.PATTERN.test(caller)) {
     throw ShipError.validation(
-      `Caller must be 1-${CALLER.MAX_LENGTH} characters: letters, digits, dots, underscores, or hyphens`
+      `Caller must be 1-${CALLER.MAX_LENGTH} characters: letters, digits, dots, underscores, or hyphens`,
     );
   }
 }
@@ -1180,7 +1219,10 @@ export interface DeploymentUploadOptions {
  * Deployment resource interface - the contract all implementations must follow
  */
 export interface DeploymentResource {
-  upload: (input: DeployInput, options?: DeploymentUploadOptions) => Promise<DeploymentCreateResponse>;
+  upload: (
+    input: DeployInput,
+    options?: DeploymentUploadOptions,
+  ) => Promise<DeploymentCreateResponse>;
   list: () => Promise<DeploymentListResponse>;
   get: (id: string) => Promise<Deployment>;
   set: (id: string, options: { labels: string[] }) => Promise<Deployment>;
@@ -1191,7 +1233,10 @@ export interface DeploymentResource {
  * Domain resource interface - the contract all implementations must follow
  */
 export interface DomainResource {
-  set: (name: string, options?: { deployment?: string; labels?: string[] }) => Promise<DomainSetResult>;
+  set: (
+    name: string,
+    options?: { deployment?: string; labels?: string[] },
+  ) => Promise<DomainSetResult>;
   list: () => Promise<DomainListResponse>;
   get: (name: string) => Promise<Domain>;
   remove: (name: string) => Promise<void>;
@@ -1240,7 +1285,6 @@ export interface BillingStatus {
   /** Link to Creem customer portal for billing management, null if unavailable */
   portal: string | null;
 }
-
 
 /**
  * Checkout session response from POST /billing/checkout
@@ -1305,9 +1349,9 @@ export type ActivityEvent =
   | 'refund.created'
   | 'dispute.created'
   // Billing operational events (admin/debug only, not user-visible)
-  | 'billing.sync'    // Outbound: unit count pushed to payment provider
-  | 'billing.stale'   // Dropped: webhook predates last known state
-  | 'billing.race';   // Dropped: concurrent webhook already updated state
+  | 'billing.sync' // Outbound: unit count pushed to payment provider
+  | 'billing.stale' // Dropped: webhook predates last known state
+  | 'billing.race'; // Dropped: concurrent webhook already updated state
 
 /**
  * Activity events visible to users in the dashboard
@@ -1416,8 +1460,8 @@ export const FileValidationStatus = {
   READY: 'ready',
 } as const;
 
-export type FileValidationStatusType = typeof FileValidationStatus[keyof typeof FileValidationStatus];
-
+export type FileValidationStatusType =
+  (typeof FileValidationStatus)[keyof typeof FileValidationStatus];
 
 /**
  * A validation issue with a display-ready message
