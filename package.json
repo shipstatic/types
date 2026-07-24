@@ -15,8 +15,11 @@
     "build": "tsc",
     "clean": "rm -rf dist",
     "test": "vitest",
-    "prepare": "husky"
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "prepare": "git config core.hooksPath scripts/githooks"
   },
+  "packageManager": "pnpm@10.12.4",
   "files": [
     "dist",
     "src"
@@ -39,8 +42,8 @@
     "node": ">=20.0.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.5",
     "@types/node": "^24.10.9",
-    "husky": "^9.1.7",
     "typescript": "^5.9.3",
     "vitest": "^2.1.8"
   }
