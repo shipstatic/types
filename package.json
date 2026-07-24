@@ -17,7 +17,8 @@
     "test": "vitest",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "prepare": "git config core.hooksPath scripts/githooks"
+    "prepare": "git config core.hooksPath scripts/githooks",
+    "typecheck": "tsc --noEmit"
   },
   "packageManager": "pnpm@10.12.4",
   "files": [
