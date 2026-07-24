@@ -1,32 +1,44 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  BLOCKED_EXTENSIONS,
-  isBlockedExtension,
-  UNBUILT_PROJECT_MARKERS,
-  hasUnbuiltMarker,
-  UNSAFE_FILENAME_CHARS,
-  hasUnsafeChars,
-  FileValidationStatus,
-  LABEL_PATTERN,
-  LABEL_CONSTRAINTS,
-  PASSWORD_CONSTRAINTS,
-  validatePassword,
   AuthMethod,
-  OAuthScope,
-  TokenKind,
-  classifyToken,
-  validateToken,
+  BLOCKED_EXTENSIONS,
   CALLER,
-  validateCaller,
-  type PlatformLimits,
+  classifyToken,
+  FileValidationStatus,
   type FileValidationStatusType,
-  type OAuthScopeType
+  hasUnbuiltMarker,
+  hasUnsafeChars,
+  isBlockedExtension,
+  LABEL_CONSTRAINTS,
+  LABEL_PATTERN,
+  OAuthScope,
+  type OAuthScopeType,
+  PASSWORD_CONSTRAINTS,
+  type PlatformLimits,
+  TokenKind,
+  UNBUILT_PROJECT_MARKERS,
+  UNSAFE_FILENAME_CHARS,
+  validateCaller,
+  validatePassword,
+  validateToken,
 } from '../src/index';
 
 describe('Validation Constants - @shipstatic/types', () => {
   describe('BLOCKED_EXTENSIONS', () => {
     it('should block executable extensions', () => {
-      const executables = ['exe', 'msi', 'dll', 'scr', 'bat', 'cmd', 'com', 'pif', 'app', 'deb', 'rpm'];
+      const executables = [
+        'exe',
+        'msi',
+        'dll',
+        'scr',
+        'bat',
+        'cmd',
+        'com',
+        'pif',
+        'app',
+        'deb',
+        'rpm',
+      ];
       for (const ext of executables) {
         expect(BLOCKED_EXTENSIONS.has(ext)).toBe(true);
       }
@@ -71,7 +83,18 @@ describe('Validation Constants - @shipstatic/types', () => {
     });
 
     it('should NOT block web file extensions', () => {
-      const webExtensions = ['html', 'css', 'js', 'json', 'png', 'jpg', 'svg', 'woff2', 'pdf', 'wasm'];
+      const webExtensions = [
+        'html',
+        'css',
+        'js',
+        'json',
+        'png',
+        'jpg',
+        'svg',
+        'woff2',
+        'pdf',
+        'wasm',
+      ];
       for (const ext of webExtensions) {
         expect(BLOCKED_EXTENSIONS.has(ext)).toBe(false);
       }
@@ -347,8 +370,8 @@ describe('Validation Constants - @shipstatic/types', () => {
 
   describe('TokenKind & classifyToken()', () => {
     it('classifies by prefix — the shared wire dispatch', () => {
-      expect(classifyToken('ship-' + 'a'.repeat(64))).toBe(TokenKind.API_KEY);
-      expect(classifyToken('deploy-' + 'a'.repeat(64))).toBe(TokenKind.DEPLOY_TOKEN);
+      expect(classifyToken(`ship-${'a'.repeat(64)}`)).toBe(TokenKind.API_KEY);
+      expect(classifyToken(`deploy-${'a'.repeat(64)}`)).toBe(TokenKind.DEPLOY_TOKEN);
       expect(classifyToken('some-oauth-access-token')).toBe(TokenKind.OPAQUE);
       expect(classifyToken('')).toBe(TokenKind.OPAQUE);
     });
@@ -388,8 +411,8 @@ describe('Validation Constants - @shipstatic/types', () => {
     it('applies strict format rules to prefixed populations', () => {
       expect(() => validateToken('ship-tooshort')).toThrow(/characters total/);
       expect(() => validateToken('deploy-tooshort')).toThrow(/characters total/);
-      expect(validateToken('ship-' + 'a'.repeat(64))).toBeUndefined();
-      expect(validateToken('deploy-' + 'b'.repeat(64))).toBeUndefined();
+      expect(validateToken(`ship-${'a'.repeat(64)}`)).toBeUndefined();
+      expect(validateToken(`deploy-${'b'.repeat(64)}`)).toBeUndefined();
     });
 
     it('passes opaque tokens through when non-empty', () => {
@@ -410,20 +433,15 @@ describe('Validation Constants - @shipstatic/types', () => {
         'release.candidate',
       ];
 
-      valid.forEach(label => {
+      valid.forEach((label) => {
         expect(LABEL_PATTERN.test(label)).toBe(true);
       });
     });
 
     it('should reject invalid label formats', () => {
-      const invalidFormat = [
-        '-prod',
-        'prod-',
-        'pr od',
-        'PROD',
-      ];
+      const invalidFormat = ['-prod', 'prod-', 'pr od', 'PROD'];
 
-      invalidFormat.forEach(label => {
+      invalidFormat.forEach((label) => {
         expect(LABEL_PATTERN.test(label)).toBe(false);
       });
     });
@@ -434,7 +452,6 @@ describe('Validation Constants - @shipstatic/types', () => {
       expect(LABEL_PATTERN.test('abc')).toBe(true);
       expect(LABEL_PATTERN.test('a'.repeat(100))).toBe(true);
     });
-
 
     it('should handle separator variations', () => {
       expect(LABEL_PATTERN.test('my-label')).toBe(true);
@@ -551,10 +568,10 @@ describe('Validation Constants - @shipstatic/types', () => {
       // would otherwise create a 2-char password masquerading as 12.
       expect(() => validatePassword('     pw     ')).toThrow(/between/);
       // Same shape on the other side — trimmed form one over the cap.
-      const overByOne = ' ' + 'a'.repeat(PASSWORD_CONSTRAINTS.MAX_LENGTH + 1) + ' ';
+      const overByOne = ` ${'a'.repeat(PASSWORD_CONSTRAINTS.MAX_LENGTH + 1)} `;
       expect(() => validatePassword(overByOne)).toThrow(/between/);
       // And the inverse — padded value, trimmed form lands exactly at the cap.
-      const paddedAtMax = '   ' + 'a'.repeat(PASSWORD_CONSTRAINTS.MAX_LENGTH) + '   ';
+      const paddedAtMax = `   ${'a'.repeat(PASSWORD_CONSTRAINTS.MAX_LENGTH)}   `;
       expect(validatePassword(paddedAtMax)).toBe('a'.repeat(PASSWORD_CONSTRAINTS.MAX_LENGTH));
     });
   });
