@@ -9,7 +9,9 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignoreUnknown": true
+    "ignoreUnknown": true,
+    // SVGs are image assets, not markup to lint.
+    "includes": ["**", "!**/*.svg"]
   },
   "formatter": {
     "enabled": true,
@@ -27,11 +29,31 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "suspicious": {
         // Visible in editors and CI summaries without blocking the build.
         "noExplicitAny": "warn"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      // Tests may use `!`, `any`, ANSI-strip regexes, shared exported
+      // helpers, and terse iteration freely — they assert the invariants
+      // production code must prove.
+      "includes": ["**/tests/**", "**/*.test.ts", "**/*.test.tsx"],
+      "linter": {
+        "rules": {
+          "style": { "noNonNullAssertion": "off" },
+          "complexity": { "noBannedTypes": "off" },
+          "suspicious": {
+            "noExplicitAny": "off",
+            "noControlCharactersInRegex": "off",
+            "noExportsInTest": "off",
+            "useIterableCallbackReturn": "off"
+          }
+        }
+      }
+    }
+  ]
 }
