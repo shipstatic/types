@@ -207,30 +207,9 @@ export interface DomainValidateResponse {
 // =============================================================================
 
 /**
- * Deployment token for automated deployments
- */
-export interface Token {
-  /** 7-char management identifier */
-  readonly token: string;
-  /** The account this token belongs to */
-  readonly account: string;
-  /** SHA256 hash of the raw credential (auth lookups only, never exposed to users) */
-  readonly hash: string;
-  /** IP-lock. Non-null = single-use (claimable only from this IP, once); null = multi-use. */
-  readonly ip: string | null;
-  /** Labels for categorization and filtering (lowercase, alphanumeric with separators). Always present, empty array when none. */
-  labels: string[];
-  /** Unix timestamp (seconds) when token was created */
-  readonly created: number;
-  /** Unix timestamp (seconds) when token expires, null for never */
-  readonly expires: number | null;
-  /** Consumption timestamp. Single-use: gates re-use (set once). Multi-use: refreshed on every claim. Null = never claimed. */
-  readonly used: number | null;
-}
-
-/**
  * Token as returned by the list endpoint.
- * Shows 7-char management ID, omits account and hash.
+ * The secret is shown once at creation and never again — listings carry
+ * only the management identifier and lifecycle metadata.
  */
 export interface TokenListItem {
   /** 7-char management identifier (e.g., "a1b2c3d") */
@@ -241,7 +220,7 @@ export interface TokenListItem {
   readonly created: number;
   /** Unix timestamp (seconds) when token expires, null for never */
   readonly expires: number | null;
-  /** Consumption timestamp. Single-use: gates re-use (set once). Multi-use: refreshed on every claim. Null = never claimed. */
+  /** Unix timestamp (seconds) of the last request authenticated with this token, null if never used */
   readonly used: number | null;
 }
 
@@ -319,6 +298,21 @@ export interface Account {
   readonly hint: string | null;
   /** Grace period expiration (unix seconds), null if no grace period active */
   readonly grace: number | null;
+}
+
+/**
+ * Account as returned by `GET /account` — the entity plus how the request
+ * was authorized, so `whoami` can answer "what credential am I holding?".
+ * Request-scoped fields live on the response type, never on the entity
+ * (the `DeploymentCreateResponse` pattern).
+ */
+export interface AccountGetResponse extends Account {
+  /** How the request that produced this response was authorized. */
+  readonly authMethod: AuthMethodType;
+  /** Present (and true) only when the caller is an operator acting as themselves. */
+  readonly isAdmin?: true;
+  /** Present only during read-only admin impersonation: the operator's account id. */
+  readonly impersonatedBy?: string;
 }
 
 /**
@@ -666,15 +660,14 @@ export function isShipError(error: unknown): error is ShipError {
 // =============================================================================
 
 /**
- * Plan-based platform limits returned by the `/config` endpoint.
+ * Plan-based platform limits returned by the `/limits` endpoint.
  *
  * The SDK fetches these once on first API call to drive client-side
  * file-size / file-count / total-size validation that mirrors what the API
  * would enforce server-side. Limits vary by account plan.
  *
- * Distinct from `ResolvedConfig` (which carries the *client's* credentials
- * and API URL after defaulting); this one carries the *platform's* posted
- * caps for the current account.
+ * These are the *platform's* posted caps for the current account — server
+ * truth delivered at runtime, never hard-coded on the client.
  */
 export interface PlatformLimits {
   /** Maximum size in bytes for a single file. */
@@ -807,6 +800,35 @@ export interface PingResponse {
   timestamp?: number;
 }
 
+// =============================================================================
+// CREDENTIAL SHAPES
+// =============================================================================
+// The one address for credential vocabulary: how a request is authorized
+// (AuthMethod), the shapes that distinguish populations on the wire
+// (API_KEY, DEPLOY_TOKEN, CALLER), the single dispatch over them (TokenKind,
+// classifyToken), and the delegated-access scopes (OAuthScope).
+
+/**
+ * How a request (or recorded activity) was authorized.
+ *
+ * Client populations: `SESSION` (first-party cookie), `API_KEY` (`ship-`
+ * key), `TOKEN` (`deploy-` deploy token), `AGENT` (anonymous public deploy —
+ * no credential; the platform grants the public-account identity per
+ * request), `OAUTH` (delegated access token). Server populations: `WEBHOOK`
+ * (signed webhook processing), `SYSTEM` (scheduled/background jobs).
+ */
+export const AuthMethod = {
+  SESSION: 'session',
+  API_KEY: 'apiKey',
+  TOKEN: 'token',
+  AGENT: 'agent',
+  OAUTH: 'oauth',
+  WEBHOOK: 'webhook',
+  SYSTEM: 'system'
+} as const;
+
+export type AuthMethodType = typeof AuthMethod[keyof typeof AuthMethod];
+
 /**
  * Shape constants for API keys (`ship-{64 hex chars}`).
  * Single source of truth used by validation utilities and auth middleware.
@@ -823,29 +845,65 @@ export const API_KEY = {
 } as const;
 
 /**
- * Shape constants for deploy tokens (`token-{64 hex chars}`).
+ * Shape constants for deploy tokens (`deploy-{64 hex chars}`).
  * Single source of truth used by validation utilities and auth middleware.
  */
 export const DEPLOY_TOKEN = {
   /** Prefix that identifies a deploy token. */
-  PREFIX: 'token-',
+  PREFIX: 'deploy-',
   /** Number of hex characters following the prefix. */
   HEX_LENGTH: 64,
-  /** Total length of a deploy token including prefix (`PREFIX.length + HEX_LENGTH = 70`). */
-  TOTAL_LENGTH: 70,
+  /** Total length of a deploy token including prefix (`PREFIX.length + HEX_LENGTH = 71`). */
+  TOTAL_LENGTH: 71,
 } as const;
 
-// Authentication Method Constants
-export const AuthMethod = {
-  SESSION: 'session',
-  API_KEY: 'apiKey',
-  TOKEN: 'token',
-  OAUTH: 'oauth',
-  WEBHOOK: 'webhook',
-  SYSTEM: 'system'
+/**
+ * Shape constants for caller identifiers (the `X-Caller` instance-identity
+ * header — rate-limit bucketing for multi-tenant orchestrators). The API
+ * normalizes case and silently ignores malformed values (the header is
+ * unauthenticated); clients validate at the boundary via `validateCaller`,
+ * so a value the server would drop fails fast instead.
+ */
+export const CALLER = {
+  /** HTTP header name. */
+  HEADER: 'X-Caller',
+  /** Maximum identifier length. */
+  MAX_LENGTH: 128,
+  /** Allowed characters: alphanumeric, dot, underscore, hyphen. */
+  PATTERN: /^[a-zA-Z0-9._-]+$/,
 } as const;
 
-export type AuthMethodType = typeof AuthMethod[keyof typeof AuthMethod];
+/**
+ * Token populations distinguishable by shape. The platform carries every
+ * client token in one wire slot (`Authorization: Bearer <value>`) and
+ * classifies by value, never by a side channel — this is the classifier.
+ *
+ * `API_KEY` and `DEPLOY_TOKEN` *are* `AuthMethod.API_KEY` and
+ * `AuthMethod.TOKEN` — the equality is structural, so a classification flows
+ * straight into an auth method and the pair can never drift. `OPAQUE` is any
+ * other value — shape says nothing about it, so only a lookup can. Today the
+ * server refuses every opaque bearer; the OAuth access-token population
+ * resolves there when the authorization server ships.
+ */
+export const TokenKind = {
+  API_KEY: AuthMethod.API_KEY,
+  DEPLOY_TOKEN: AuthMethod.TOKEN,
+  OPAQUE: 'opaque',
+} as const;
+
+export type TokenKindType = typeof TokenKind[keyof typeof TokenKind];
+
+/**
+ * Classify a client token by shape. The single dispatch used by both sides
+ * of the wire: API auth middleware (which population is this credential?)
+ * and SDK validation (which format rules apply before sending?). Sharing it
+ * is what guarantees client and server can never disagree on dispatch.
+ */
+export function classifyToken(token: string): TokenKindType {
+  if (token.startsWith(API_KEY.PREFIX)) return TokenKind.API_KEY;
+  if (token.startsWith(DEPLOY_TOKEN.PREFIX)) return TokenKind.DEPLOY_TOKEN;
+  return TokenKind.OPAQUE;
+}
 
 /**
  * OAuth scope vocabulary for delegated third-party access tokens.
@@ -868,7 +926,10 @@ export const OAuthScope = {
 
 export type OAuthScopeType = typeof OAuthScope[keyof typeof OAuthScope];
 
-// Deployment Configuration
+// =============================================================================
+// DEPLOYMENT CONFIGURATION CONSTANTS
+// =============================================================================
+
 export const DEPLOYMENT_CONFIG_FILENAME = 'ship.json';
 
 /** Default ship.json config for SPA routing. Single source of truth — used by both API and SDK. */
@@ -879,38 +940,70 @@ export const SPA_DEFAULT_CONFIG = { rewrites: [{ source: '/(.*)', destination: '
 // =============================================================================
 
 /**
+ * Shared rule for prefixed credentials: `{PREFIX}{HEX_LENGTH hex chars}`.
+ * The regex derives from the shape constants, so the validators can never
+ * drift from the shapes `classifyToken` dispatches on.
+ */
+function validatePrefixedCredential(
+  value: string,
+  shape: { PREFIX: string; HEX_LENGTH: number; TOTAL_LENGTH: number },
+  label: string
+): void {
+  if (!value.startsWith(shape.PREFIX)) {
+    throw ShipError.validation(`${label} must start with "${shape.PREFIX}"`);
+  }
+
+  if (value.length !== shape.TOTAL_LENGTH) {
+    throw ShipError.validation(`${label} must be ${shape.TOTAL_LENGTH} characters total (${shape.PREFIX} + ${shape.HEX_LENGTH} hex chars)`);
+  }
+
+  const hexPart = value.slice(shape.PREFIX.length);
+  if (!new RegExp(`^[a-f0-9]{${shape.HEX_LENGTH}}$`, 'i').test(hexPart)) {
+    throw ShipError.validation(`${label} must contain ${shape.HEX_LENGTH} hexadecimal characters after "${shape.PREFIX}" prefix`);
+  }
+}
+
+/**
  * Validate API key format
  */
 export function validateApiKey(apiKey: string): void {
-  if (!apiKey.startsWith(API_KEY.PREFIX)) {
-    throw ShipError.validation(`API key must start with "${API_KEY.PREFIX}"`);
-  }
-
-  if (apiKey.length !== API_KEY.TOTAL_LENGTH) {
-    throw ShipError.validation(`API key must be ${API_KEY.TOTAL_LENGTH} characters total (${API_KEY.PREFIX} + ${API_KEY.HEX_LENGTH} hex chars)`);
-  }
-
-  const hexPart = apiKey.slice(API_KEY.PREFIX.length);
-  if (!/^[a-f0-9]{64}$/i.test(hexPart)) {
-    throw ShipError.validation(`API key must contain ${API_KEY.HEX_LENGTH} hexadecimal characters after "${API_KEY.PREFIX}" prefix`);
-  }
+  validatePrefixedCredential(apiKey, API_KEY, 'API key');
 }
 
 /**
  * Validate deploy token format
  */
 export function validateDeployToken(deployToken: string): void {
-  if (!deployToken.startsWith(DEPLOY_TOKEN.PREFIX)) {
-    throw ShipError.validation(`Deploy token must start with "${DEPLOY_TOKEN.PREFIX}"`);
-  }
+  validatePrefixedCredential(deployToken, DEPLOY_TOKEN, 'Deploy token');
+}
 
-  if (deployToken.length !== DEPLOY_TOKEN.TOTAL_LENGTH) {
-    throw ShipError.validation(`Deploy token must be ${DEPLOY_TOKEN.TOTAL_LENGTH} characters total (${DEPLOY_TOKEN.PREFIX} + ${DEPLOY_TOKEN.HEX_LENGTH} hex chars)`);
+/**
+ * Validate a client token of any population. Classifies by shape and applies
+ * the matching format rules: `ship-` keys and `deploy-` deploy tokens are
+ * validated strictly; opaque tokens (OAuth access tokens, future populations)
+ * only need to be non-empty — their validity is the server's to decide.
+ */
+export function validateToken(token: string): void {
+  switch (classifyToken(token)) {
+    case TokenKind.API_KEY:
+      return validateApiKey(token);
+    case TokenKind.DEPLOY_TOKEN:
+      return validateDeployToken(token);
+    case TokenKind.OPAQUE:
+      if (!token) throw ShipError.validation('Token must be a non-empty string');
   }
+}
 
-  const hexPart = deployToken.slice(DEPLOY_TOKEN.PREFIX.length);
-  if (!/^[a-f0-9]{64}$/i.test(hexPart)) {
-    throw ShipError.validation(`Deploy token must contain ${DEPLOY_TOKEN.HEX_LENGTH} hexadecimal characters after "${DEPLOY_TOKEN.PREFIX}" prefix`);
+/**
+ * Validate a caller identifier against the `CALLER` shape. The server
+ * silently ignores malformed values (the header is unauthenticated); clients
+ * call this at configuration time so the drop never silently happens.
+ */
+export function validateCaller(caller: string): void {
+  if (!caller || caller.length > CALLER.MAX_LENGTH || !CALLER.PATTERN.test(caller)) {
+    throw ShipError.validation(
+      `Caller must be 1-${CALLER.MAX_LENGTH} characters: letters, digits, dots, underscores, or hyphens`
+    );
   }
 }
 
@@ -1012,29 +1105,6 @@ export interface StaticFile {
 }
 
 // =============================================================================
-// PLATFORM CONFIGURATION
-// =============================================================================
-
-/**
- * Resolved client configuration with `apiUrl` defaulted.
- *
- * Produced by the SDK after layering its credential sources (constructor
- * options on top of `SHIP_*` env vars in Node; constructor options only in
- * Browser) and applying the `DEFAULT_API` fallback. File-based sources
- * (`.shiprc`, `package.json` `"ship"` key) are the CLI's responsibility and
- * are merged in *before* construction — by the time a `ResolvedConfig`
- * exists, every source has already collapsed into the constructor argument.
- */
-export interface ResolvedConfig {
-  /** API URL — always present after resolution, defaults to `DEFAULT_API`. */
-  apiUrl: string;
-  /** API key for authenticated deployments. */
-  apiKey?: string;
-  /** Deploy token used as the request credential (`token-{64-hex}`). */
-  deployToken?: string;
-}
-
-// =============================================================================
 // PROGRESS TRACKING
 // =============================================================================
 
@@ -1102,6 +1172,8 @@ export interface DeploymentUploadOptions {
   prerender?: boolean;
   /** @internal Trigger server-side SPA detection. Only available via /upload endpoint. */
   spa?: boolean;
+  /** @internal reCAPTCHA proof for the anonymous human deploy channel. Only available via /upload endpoint. */
+  captcha?: string;
 }
 
 /**
@@ -1134,7 +1206,7 @@ export interface DomainResource {
  * Account resource interface - the contract all implementations must follow
  */
 export interface AccountResource {
-  get: () => Promise<Account>;
+  get: () => Promise<AccountGetResponse>;
 }
 
 /**
