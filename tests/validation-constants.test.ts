@@ -13,6 +13,11 @@ import {
   validatePassword,
   AuthMethod,
   OAuthScope,
+  TokenKind,
+  classifyToken,
+  validateToken,
+  CALLER,
+  validateCaller,
   type PlatformLimits,
   type FileValidationStatusType,
   type OAuthScopeType
@@ -303,6 +308,7 @@ describe('Validation Constants - @shipstatic/types', () => {
       expect(AuthMethod.SESSION).toBe('session');
       expect(AuthMethod.API_KEY).toBe('apiKey');
       expect(AuthMethod.TOKEN).toBe('token');
+      expect(AuthMethod.AGENT).toBe('agent');
       expect(AuthMethod.OAUTH).toBe('oauth');
       expect(AuthMethod.WEBHOOK).toBe('webhook');
       expect(AuthMethod.SYSTEM).toBe('system');
@@ -336,6 +342,59 @@ describe('Validation Constants - @shipstatic/types', () => {
     it('should be usable as a type', () => {
       const scope: OAuthScopeType = OAuthScope.DEPLOYMENTS_WRITE;
       expect(scope).toBe('deployments:write');
+    });
+  });
+
+  describe('TokenKind & classifyToken()', () => {
+    it('classifies by prefix — the shared wire dispatch', () => {
+      expect(classifyToken('ship-' + 'a'.repeat(64))).toBe(TokenKind.API_KEY);
+      expect(classifyToken('deploy-' + 'a'.repeat(64))).toBe(TokenKind.DEPLOY_TOKEN);
+      expect(classifyToken('some-oauth-access-token')).toBe(TokenKind.OPAQUE);
+      expect(classifyToken('')).toBe(TokenKind.OPAQUE);
+    });
+
+    it('classifies by prefix alone — format validity is a separate concern', () => {
+      expect(classifyToken('ship-tooshort')).toBe(TokenKind.API_KEY);
+      expect(classifyToken('deploy-tooshort')).toBe(TokenKind.DEPLOY_TOKEN);
+    });
+
+    it('kinds are structurally the AuthMethod values — and both pin the wire literals', () => {
+      // The identity is structural (TokenKind derives from AuthMethod); these
+      // literals pin the WIRE values, which a rename of either would break.
+      expect(TokenKind.API_KEY).toBe(AuthMethod.API_KEY);
+      expect(TokenKind.DEPLOY_TOKEN).toBe(AuthMethod.TOKEN);
+      expect(TokenKind.API_KEY).toBe('apiKey');
+      expect(TokenKind.DEPLOY_TOKEN).toBe('token');
+      expect(TokenKind.OPAQUE).toBe('opaque');
+    });
+  });
+
+  describe('CALLER & validateCaller()', () => {
+    it('accepts identifiers within the shape', () => {
+      expect(validateCaller('my-orchestrator')).toBeUndefined();
+      expect(validateCaller('user_42.session')).toBeUndefined();
+      expect(validateCaller('a'.repeat(CALLER.MAX_LENGTH))).toBeUndefined();
+    });
+
+    it('rejects empty, oversized, and out-of-charset identifiers', () => {
+      expect(() => validateCaller('')).toThrow(/Caller/);
+      expect(() => validateCaller('a'.repeat(CALLER.MAX_LENGTH + 1))).toThrow(/Caller/);
+      expect(() => validateCaller('has space')).toThrow(/Caller/);
+      expect(() => validateCaller('new\nline')).toThrow(/Caller/);
+    });
+  });
+
+  describe('validateToken()', () => {
+    it('applies strict format rules to prefixed populations', () => {
+      expect(() => validateToken('ship-tooshort')).toThrow(/characters total/);
+      expect(() => validateToken('deploy-tooshort')).toThrow(/characters total/);
+      expect(validateToken('ship-' + 'a'.repeat(64))).toBeUndefined();
+      expect(validateToken('deploy-' + 'b'.repeat(64))).toBeUndefined();
+    });
+
+    it('passes opaque tokens through when non-empty', () => {
+      expect(validateToken('oauth-access-token-value')).toBeUndefined();
+      expect(() => validateToken('')).toThrow(/non-empty/);
     });
   });
 
