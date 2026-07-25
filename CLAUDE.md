@@ -21,7 +21,7 @@ Single file: `src/index.ts`, organized into named sections in this order:
 | Platform Limits | `PlatformLimits` (plan-based caps from the `/limits` endpoint — file size, file count, total size) |
 | Extension Blocklist | `BLOCKED_EXTENSIONS`, `isBlockedExtension()` |
 | Common Responses | `PingResponse` |
-| Credential Shapes | The one address for credential vocabulary: `AuthMethod`, `API_KEY` / `DEPLOY_TOKEN` / `CALLER` (namespaced shape constants), `TokenKind` (structurally derived from `AuthMethod`) + `classifyToken` (the single token dispatch, both sides of the wire), `OAuthScope` |
+| Credential Shapes | The one address for credential vocabulary: `AUTH_BASE_PATH` (the identity mount — API server and web auth client read the same path), `AuthMethod`, `API_KEY` / `DEPLOY_TOKEN` / `CALLER` (namespaced shape constants), `TokenKind` (structurally derived from `AuthMethod`) + `classifyToken` (the single token dispatch, both sides of the wire), `OAuthScope` |
 | Deployment Config Constants | `DEPLOYMENT_CONFIG_FILENAME`, `SPA_DEFAULT_CONFIG` |
 | Validation Utilities | `validateToken` (classify, then apply the population's format rules via one shared prefixed-credential helper), `validateApiKey`, `validateDeployToken`, `validateCaller`, `validateApiUrl`, `isDeployment` |
 | SPA Check Types | `SPACheckRequest`, `SPACheckResponse` |
