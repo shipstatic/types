@@ -295,6 +295,8 @@ export interface Account {
   readonly activated: number | null;
   /** Last 4 characters of the API key for identification, null when no key generated */
   readonly hint: string | null;
+  /** Unix timestamp (seconds) of the API key's last use, null when never used or no key generated */
+  readonly used: number | null;
   /** Grace period expiration (unix seconds), null if no grace period active */
   readonly grace: number | null;
 }
