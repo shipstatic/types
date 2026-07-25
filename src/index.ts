@@ -834,10 +834,20 @@ export interface PingResponse {
 // =============================================================================
 // CREDENTIAL SHAPES
 // =============================================================================
-// The one address for credential vocabulary: how a request is authorized
-// (AuthMethod), the shapes that distinguish populations on the wire
-// (API_KEY, DEPLOY_TOKEN, CALLER), the single dispatch over them (TokenKind,
-// classifyToken), and the delegated-access scopes (OAuthScope).
+// The one address for credential vocabulary: where human identity lives
+// (AUTH_BASE_PATH), how a request is authorized (AuthMethod), the shapes
+// that distinguish populations on the wire (API_KEY, DEPLOY_TOKEN, CALLER),
+// the single dispatch over them (TokenKind, classifyToken), and the
+// delegated-access scopes (OAuthScope).
+
+/**
+ * Where human identity is mounted on the API host. The API mounts Better
+ * Auth at this path (sign-in, sign-out, session reads, admin impersonation)
+ * and the web console's auth client posts to it — shared here so the two
+ * halves of the auth pair agree by construction, the same way both sides
+ * already share the credential prefixes below.
+ */
+export const AUTH_BASE_PATH = '/auth';
 
 /**
  * How a request (or recorded activity) was authorized.

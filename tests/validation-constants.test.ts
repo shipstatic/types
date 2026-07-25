@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AUTH_BASE_PATH,
   AuthMethod,
   BLOCKED_EXTENSIONS,
   CALLER,
@@ -323,6 +324,15 @@ describe('Validation Constants - @shipstatic/types', () => {
       const values = Object.values(FileValidationStatus);
       const uniqueValues = new Set(values);
       expect(uniqueValues.size).toBe(values.length);
+    });
+  });
+
+  describe('AUTH_BASE_PATH', () => {
+    // The identity mount is a wire contract — the API mounts Better Auth
+    // here and the web console's auth client posts here. Changing it is a
+    // coordinated breaking change across the auth pair.
+    it('should be the /auth mount both halves agree on', () => {
+      expect(AUTH_BASE_PATH).toBe('/auth');
     });
   });
 
