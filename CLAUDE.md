@@ -213,6 +213,13 @@ Use `readonly` for stable fields (`id`, `created`, `url`). Leave mutable fields 
 3. Follow existing entity pattern: status const → entity interface → list response → resource contract
 4. Run `pnpm build` to validate
 
+**New fields on existing response entities are optional** (`readonly x?: T`),
+by the additive-evolution law: published SDK versions return the entity
+without the field, and a required field would make every additive API change
+a lockstep SDK release. `Account.used` is the precedent. A field may become
+required at the entity's next natural break (major bump) once every
+published consumer carries it.
+
 **New error types:** Add to `ErrorType` enum + a static factory on `ShipError`.
 
 ### Validation: format vs policy
