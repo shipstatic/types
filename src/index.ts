@@ -1342,6 +1342,7 @@ export type ActivityEvent =
   // Token events
   | 'token.create'
   | 'token.consume'
+  | 'token.delete'
   // Admin events (not user-visible)
   | 'admin.account.plan.update'
   | 'admin.account.ref.update'
@@ -1388,7 +1389,8 @@ export type UserVisibleActivityEvent =
   | 'domain.delete'
   | 'domain.verify'
   | 'token.create'
-  | 'token.consume';
+  | 'token.consume'
+  | 'token.delete';
 
 /**
  * Activity record returned from the API
