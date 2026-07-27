@@ -16,17 +16,18 @@ Single file: `src/index.ts`, organized into named sections in this order:
 
 | Section | Purpose |
 |---------|---------|
-| Core Entities | Deployment, Domain (+ `DomainSetResult`), `TokenListItem`, Account (+ `AccountGetResponse` — request-scoped `authMethod` lives on the response, not the entity) — status consts, interfaces, list responses |
+| Core Entities | Deployment, Domain (+ `DomainSetResult`), `TokenListItem`, Account (+ `AccountGetResponse` — request-scoped `authMethod` lives on the response, not the entity; `AccountUsage`, `AccountOverrides`) — status consts, interfaces, list responses (+ `ListOptions`), DNS/domain response shapes (`DnsRecord`, `DnsProvider`, `DomainDnsResponse`, `DomainRecordsResponse`, `DomainValidateResponse`) |
 | Error System | `ErrorType` (`as const` + type), `ShipError` class, `isShipError` guard |
 | Platform Limits | `PlatformLimits` (plan-based caps from the `/limits` endpoint — file size, file count, total size) |
 | Extension Blocklist | `BLOCKED_EXTENSIONS`, `isBlockedExtension()` |
-| Common Responses | `PingResponse` |
+| Filename Character Validation | `UNSAFE_FILENAME_CHARS`, `hasUnsafeChars()` |
+| Unbuilt Project Markers | `UNBUILT_PROJECT_MARKERS`, `hasUnbuiltMarker()` |
+| Common Responses | `PingResponse` (`timestamp` in unix seconds) |
 | Credential Shapes | The one address for credential vocabulary: `AUTH_BASE_PATH` (the identity mount — API server and web auth client read the same path), `AuthMethod`, `API_KEY` / `DEPLOY_TOKEN` / `CALLER` (namespaced shape constants), `TokenKind` (structurally derived from `AuthMethod`) + `classifyToken` (the single token dispatch, both sides of the wire), `OAuthScope` |
 | Deployment Config Constants | `DEPLOYMENT_CONFIG_FILENAME`, `SPA_DEFAULT_CONFIG` |
 | Validation Utilities | `validateToken` (classify, then apply the population's format rules via one shared prefixed-credential helper), `validateApiKey`, `validateDeployToken`, `validateCaller`, `validateApiUrl`, `isDeployment` |
 | SPA Check Types | `SPACheckRequest`, `SPACheckResponse` |
 | Static File | `StaticFile` (cross-environment file representation) |
-| Progress Tracking | `ProgressInfo` |
 | URL Constant | `DEFAULT_API` |
 | Resource Contracts | `DeployInput`, `DeploymentUploadOptions`, `*Resource` interfaces |
 | Billing Types | `BillingStatus`, `CheckoutSession` |
@@ -189,7 +190,7 @@ export type ErrorType = typeof ErrorType[keyof typeof ErrorType];
 ```
 
 Used by:
-- Standard variant: `DeploymentStatus`, `DomainStatus`, `AccountPlan`, `FileValidationStatus`, `AuthMethod`
+- Standard variant: `DeploymentStatus`, `DomainStatus`, `AccountPlan`, `FileValidationStatus`, `AuthMethod`, `TokenKind`
 - Shared-name variant: `ErrorType` (would be `ErrorTypeType` under the standard variant — clearly worse)
 
 ### Readonly vs Mutable
@@ -201,9 +202,9 @@ Use `readonly` for stable fields (`id`, `created`, `url`). Leave mutable fields 
 | Package | Uses |
 |---------|------|
 | `@shipstatic/ship` | All types, ShipError, validation utilities |
-| `@shipstatic/drop` | `FileValidationStatus`, `ValidatableFile`, `hasUnbuiltMarker` |
+| `@shipstatic/drop` | `FileValidationStatus`, `ValidatableFile`, `hasUnbuiltMarker`, `isShipError` |
 | `cloudflare/api` | All entity types, ShipError, constants |
-| `cloudflare/consumer` | ShipError, entity types |
+| `cloudflare/consumer` | `AccountPlanType`, `DeploymentStatus` directly (ShipError arrives via `cloudflare/shared`) |
 | `web/my` | Entity types, response types |
 
 ## Adding New Types

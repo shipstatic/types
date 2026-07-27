@@ -853,7 +853,7 @@ export function hasUnbuiltMarker(filePath: string): boolean {
 export interface PingResponse {
   /** Always true if service is healthy */
   success: boolean;
-  /** Optional timestamp */
+  /** Server time in unix seconds — the one wire unit for timestamps. */
   timestamp?: number;
 }
 
@@ -1180,25 +1180,6 @@ export interface StaticFile {
 }
 
 // =============================================================================
-// PROGRESS TRACKING
-// =============================================================================
-
-/**
- * Progress information for deploy/upload operations.
- * Provides consistent percentage-based progress with byte-level details.
- */
-export interface ProgressInfo {
-  /** Progress percentage (0-100) */
-  percent: number;
-  /** Number of bytes loaded so far */
-  loaded: number;
-  /** Total number of bytes to load. May be 0 if unknown initially */
-  total: number;
-  /** Current file being processed (optional) */
-  file?: string;
-}
-
-// =============================================================================
 // PLATFORM CONSTANTS
 // =============================================================================
 
@@ -1447,6 +1428,12 @@ export interface Activity {
 /**
  * Parsed activity metadata.
  * Different events populate different fields.
+ *
+ * Naming convention: meta booleans are event-scoped predicates and carry
+ * their prefix (`isUpdate`, `wasVerified`, `hasConfig`, `hasPassword`),
+ * while entity booleans are bare nouns (`Deployment.config`,
+ * `Deployment.password`). Two vocabularies, each internally consistent —
+ * deliberate, not drift.
  */
 export interface ActivityMeta {
   // Deployment events
