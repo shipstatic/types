@@ -212,6 +212,62 @@ describe('ShipError.fromHttpResponse', () => {
     });
   });
 
+  describe('Retry-After header lifting', () => {
+    const withRetryAfter = (body: unknown, status: number, retryAfter: string): Response =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json', 'retry-after': retryAfter },
+      });
+
+    it('lifts a seconds-form Retry-After into details', async () => {
+      const err = await ShipError.fromHttpResponse(
+        withRetryAfter(
+          { error: 'rate_limit_exceeded', message: 'slow down', status: 429 },
+          429,
+          '60',
+        ),
+      );
+      expect(err.type).toBe(ErrorType.RateLimit);
+      expect((err.details as { retryAfter?: number }).retryAfter).toBe(60);
+    });
+
+    it('parses an HTTP-date Retry-After into seconds', async () => {
+      const inThirty = new Date(Date.now() + 30_000).toUTCString();
+      const err = await ShipError.fromHttpResponse(withRetryAfter({}, 503, inThirty));
+      const retryAfter = (err.details as { retryAfter?: number }).retryAfter;
+      expect(retryAfter).toBeGreaterThanOrEqual(28);
+      expect(retryAfter).toBeLessThanOrEqual(31);
+    });
+
+    it('preserves body details and merges beside them', async () => {
+      const err = await ShipError.fromHttpResponse(
+        withRetryAfter(
+          { message: 'slow down', details: { resetAt: '2026-01-01T00:00:00Z' } },
+          429,
+          '60',
+        ),
+      );
+      expect(err.details).toEqual({ resetAt: '2026-01-01T00:00:00Z', retryAfter: 60 });
+    });
+
+    it('never overwrites a body-carried retryAfter', async () => {
+      const err = await ShipError.fromHttpResponse(
+        withRetryAfter({ message: 'slow down', details: { retryAfter: 5 } }, 429, '60'),
+      );
+      expect((err.details as { retryAfter?: number }).retryAfter).toBe(5);
+    });
+
+    it('leaves details untouched when the header is absent', async () => {
+      const err = await ShipError.fromHttpResponse(jsonResponse({ message: 'slow down' }, 429));
+      expect(err.details).toBeUndefined();
+    });
+
+    it('ignores an unparseable header value', async () => {
+      const err = await ShipError.fromHttpResponse(withRetryAfter({}, 429, 'soonish'));
+      expect(err.details).toBeUndefined();
+    });
+  });
+
   describe('body.error wire round-trip (trusts known ErrorType strings)', () => {
     it('preserves Validation type when body.error is "validation_failed" (status 400)', async () => {
       // Server-thrown ShipError.validation(...) round-trips back as Validation,

@@ -512,6 +512,25 @@ export class ShipError extends Error {
       // Body unreadable; fall through to operationName-derived message.
     }
 
+    // Rate-limit (and 503) timing rides the `Retry-After` HEADER, which a
+    // body-only reader would drop. Lift it into `details` as seconds so
+    // consumers can back off from the typed error alone, without keeping the
+    // raw Response around. Body-carried fields are preserved and win.
+    const retryAfterHeader = response.headers.get('retry-after');
+    if (retryAfterHeader !== null) {
+      const value = retryAfterHeader.trim();
+      const seconds = /^\d+$/.test(value)
+        ? Number(value)
+        : Math.ceil((Date.parse(value) - Date.now()) / 1000);
+      if (Number.isFinite(seconds) && seconds >= 0) {
+        const existing =
+          details && typeof details === 'object' ? (details as Record<string, unknown>) : {};
+        if (existing.retryAfter === undefined) {
+          details = { ...existing, retryAfter: seconds };
+        }
+      }
+    }
+
     message = message || `${operationName || 'Request'} failed with status ${response.status}`;
 
     const type =
@@ -1233,14 +1252,31 @@ export interface DeploymentUploadOptions {
 }
 
 /**
- * Deployment resource interface - the contract all implementations must follow
+ * Pagination options for the paginated list endpoints (`GET /deployments`,
+ * `GET /domains`). The response's `cursor` feeds the next request; a `null`
+ * cursor on the response means the last page. Omitting both returns the
+ * server's default first page.
  */
-export interface DeploymentResource {
-  upload: (
-    input: DeployInput,
-    options?: DeploymentUploadOptions,
-  ) => Promise<DeploymentCreateResponse>;
-  list: () => Promise<DeploymentListResponse>;
+export interface ListOptions {
+  /** Maximum number of items to return in one page. */
+  limit?: number;
+  /** Opaque cursor from the previous page's response. */
+  cursor?: string;
+}
+
+/**
+ * Deployment resource interface - the contract all implementations must follow.
+ *
+ * The interface defines the minimal wire contract; SDK implementations may
+ * extend the upload options with runtime concerns (timeout, signal, progress
+ * callbacks) by parameterizing: `DeploymentResource<MyUploadOptions>`. The
+ * default keeps plain `DeploymentResource` valid for wire-only consumers.
+ */
+export interface DeploymentResource<
+  UploadOptions extends DeploymentUploadOptions = DeploymentUploadOptions,
+> {
+  upload: (input: DeployInput, options?: UploadOptions) => Promise<DeploymentCreateResponse>;
+  list: (options?: ListOptions) => Promise<DeploymentListResponse>;
   get: (id: string) => Promise<Deployment>;
   set: (id: string, options: { labels: string[] }) => Promise<Deployment>;
   remove: (id: string) => Promise<void>;
@@ -1254,7 +1290,7 @@ export interface DomainResource {
     name: string,
     options?: { deployment?: string; labels?: string[] },
   ) => Promise<DomainSetResult>;
-  list: () => Promise<DomainListResponse>;
+  list: (options?: ListOptions) => Promise<DomainListResponse>;
   get: (name: string) => Promise<Domain>;
   remove: (name: string) => Promise<void>;
   verify: (name: string) => Promise<{ message: string }>;
