@@ -20,9 +20,10 @@ npm install @shipstatic/types
 
 ```typescript
 import type {
+  ListResponse,
   Deployment, DeploymentListResponse,
   Domain, DomainSetResult, DomainListResponse, DnsRecord, DomainDnsResponse, DomainRecordsResponse, DomainValidateResponse,
-  Token, TokenListItem, TokenListResponse, TokenCreateResponse,
+  Token, TokenListResponse, TokenCreateResponse,
   Account, AccountUsage, AccountOverrides,
   StaticFile
 } from '@shipstatic/types';
@@ -82,7 +83,7 @@ import {
   DomainStatus,       // pending | partial | success | paused
   AccountPlan,        // free | standard | sponsored | enterprise | suspended | terminating | terminated
   FileValidationStatus, // pending | processing_error | excluded | validation_failed | ready
-  AuthMethod,         // jwt | apiKey | token | webhook | system
+  AuthMethod,         // session | apiKey | token | agent | oauth | webhook | system
 } from '@shipstatic/types';
 ```
 
@@ -132,7 +133,6 @@ import type {
   FileValidationResult,
   ValidationIssue,
   UploadedFile,
-  ProgressInfo,
 } from '@shipstatic/types';
 ```
 
