@@ -85,6 +85,32 @@ export interface DeploymentListResponse extends ListResponse {
   deployments: Deployment[];
 }
 
+/**
+ * Acknowledgement of `DELETE /deployments/:deployment` — and the shape every
+ * mutation with no entity left to return follows.
+ *
+ * **The law:** a mutation answers with the resource it affected. If the
+ * resource still exists, that means the entity itself (`Deployment`,
+ * `Domain`, …). Otherwise it means this: the resource noun carrying the
+ * item's canonical key, plus the resource's own state field — and ONLY when
+ * the resource survived in a transitional state, as an async deletion's does.
+ * Where the resource is simply gone, the key alone is the whole answer
+ * ({@link DomainDeleteResponse}, {@link TokenDeleteResponse}).
+ *
+ * Nothing else rides along. No prose (`message`), because an acknowledgement
+ * is data and each surface composes its own copy; and no constant
+ * (`changed: true`, `queued: true`, `success: true`), because a field whose
+ * value the type already fixes tells a caller nothing it did not know before
+ * it made the request. Sync versus accepted is the HTTP status code's job —
+ * 200 versus 202 — not a boolean's.
+ */
+export interface DeploymentDeleteResponse {
+  /** The deployment hostname that was marked for removal */
+  readonly deployment: string;
+  /** The state the deployment is in while background cleanup runs */
+  readonly status: DeploymentStatusType;
+}
+
 // =============================================================================
 // DOMAIN TYPES
 // =============================================================================
@@ -149,6 +175,27 @@ export interface DomainSetResult extends Domain {
 export interface DomainListResponse extends ListResponse {
   /** Array of domains */
   domains: Domain[];
+}
+
+/**
+ * Acknowledgement of `DELETE /domains/:domain`. The row is gone, so there is
+ * no state to state — the canonical domain name is the whole answer. See
+ * {@link DeploymentDeleteResponse} for the law.
+ */
+export interface DomainDeleteResponse {
+  /** The domain name that was removed, normalized */
+  readonly domain: string;
+}
+
+/**
+ * Acknowledgement of `POST /domains/:domain/verify` (202). The DNS check is
+ * queued, not performed — the accepted status code says so, and the domain's
+ * own status is unchanged until the check runs, which is why none is stated
+ * here. See {@link DeploymentDeleteResponse} for the law.
+ */
+export interface DomainVerifyResponse {
+  /** The domain whose DNS verification was queued, normalized */
+  readonly domain: string;
 }
 
 /**
@@ -255,6 +302,16 @@ export interface TokenCreateResponse extends Token {
   readonly secret: string;
 }
 
+/**
+ * Acknowledgement of `DELETE /tokens/:token`. The credential is revoked and
+ * its row is gone, so the management identifier is the whole answer. See
+ * {@link DeploymentDeleteResponse} for the law.
+ */
+export interface TokenDeleteResponse {
+  /** The 7-char management identifier that was revoked */
+  readonly token: string;
+}
+
 // =============================================================================
 // ACCOUNT TYPES
 // =============================================================================
@@ -351,6 +408,34 @@ export interface AccountGetResponse extends Account {
   readonly isAdmin?: true;
   /** Present only during read-only admin impersonation: the operator's account id. */
   readonly impersonatedBy?: string;
+}
+
+/**
+ * Acknowledgement of `DELETE /account` (202). Termination is asynchronous —
+ * a cleanup consumer finishes the job — so the account survives long enough
+ * to state the plan it is transitioning through. `plan` is the account's
+ * state field, the way `status` is a deployment's. See
+ * {@link DeploymentDeleteResponse} for the law.
+ */
+export interface AccountDeleteResponse {
+  /** The account that was marked for termination */
+  readonly account: string;
+  /** The plan the account is in while cleanup runs */
+  readonly plan: AccountPlanType;
+}
+
+/**
+ * Response from `PUT /account/key` — the account's single API key, minted in
+ * place of whatever was there before.
+ *
+ * There is no entity to return: only the key's last-4 `hint` is durable
+ * (`Account.hint`), and the plaintext exists exactly once, in this response.
+ * The raw credential is `secret` on every surface that mints one — the same
+ * field `TokenCreateResponse` carries — because one concept gets one name.
+ */
+export interface AccountKeyResponse {
+  /** The raw API key (shown once at mint, then never again) */
+  readonly secret: string;
 }
 
 /**
@@ -1386,7 +1471,7 @@ export interface DomainResource {
   list: (options?: ListOptions) => Promise<DomainListResponse>;
   get: (name: string) => Promise<Domain>;
   remove: (name: string) => Promise<void>;
-  verify: (name: string) => Promise<{ message: string }>;
+  verify: (name: string) => Promise<DomainVerifyResponse>;
   validate: (name: string) => Promise<DomainValidateResponse>;
   dns: (name: string) => Promise<DomainDnsResponse>;
   records: (name: string) => Promise<DomainRecordsResponse>;
