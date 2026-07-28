@@ -66,8 +66,6 @@ export interface DeploymentListResponse {
   deployments: Deployment[];
   /** Cursor for pagination, null if no more pages */
   cursor: string | null;
-  /** Total number of deployments */
-  total: number;
 }
 
 // =============================================================================
@@ -136,8 +134,6 @@ export interface DomainListResponse {
   domains: Domain[];
   /** Cursor for pagination, null if no more pages */
   cursor: string | null;
-  /** Total number of domains */
-  total: number;
 }
 
 /**
@@ -231,8 +227,6 @@ export interface TokenListResponse {
   tokens: TokenListItem[];
   /** Cursor for pagination, null if no more pages */
   cursor: string | null;
-  /** Total number of tokens */
-  total: number;
 }
 
 /**
@@ -1305,10 +1299,20 @@ export interface DeploymentUploadOptions {
 }
 
 /**
- * Pagination options for the paginated list endpoints (`GET /deployments`,
- * `GET /domains`). The response's `cursor` feeds the next request; a `null`
- * cursor on the response means the last page. Omitting both returns the
- * server's default first page.
+ * Pagination options for every list endpoint. The response's `cursor` feeds
+ * the next request; a `null` cursor means the last page. Omitting both
+ * returns the server's default first page.
+ *
+ * A list answers `{ <collection>, cursor }` and nothing else — `cursor`
+ * carries the entire has-more signal, so no redundant boolean, and no
+ * `total`. **A count is an aggregate over a collection, not a property of a
+ * page:** including one makes every read pay for a full scan it did not ask
+ * for, which is precisely the cost keyset pagination exists to avoid.
+ *
+ * Counts therefore live on the summary resource that owns them —
+ * `GET /account` (`usage`) for a caller's own totals, `GET /admin/stats` for
+ * platform-wide ones. Ask for a count when you want a count; ask for a page
+ * when you want a page.
  */
 export interface ListOptions {
   /** Maximum number of items to return in one page. */
@@ -1554,8 +1558,6 @@ export interface ActivityListResponse {
   activities: Activity[];
   /** Cursor for pagination, null if no more pages */
   cursor: string | null;
-  /** Total number of activities */
-  total: number;
 }
 
 // =============================================================================

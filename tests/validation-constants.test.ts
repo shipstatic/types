@@ -598,8 +598,8 @@ describe('Validation Constants - @shipstatic/types', () => {
  * The list-contract fence.
  *
  * Every paginated collection must be reachable the same way from every
- * client: a `list` that accepts `ListOptions`, answering a response that
- * carries `cursor` and `total`. `TokenResource.list` shipped without the
+ * client: a `list` that accepts `ListOptions`, answering exactly
+ * `{ <collection>, cursor }`. `TokenResource.list` shipped without the
  * parameter while its response already paginated — an asymmetry that
  * compiled fine and only surfaced at the call site.
  *
@@ -612,18 +612,24 @@ describe('Validation Constants - @shipstatic/types', () => {
 describe('list contract coherence', () => {
   type TakesListOptions<T extends (...args: never[]) => unknown> =
     Parameters<T> extends [] ? false : true;
-  type Paginated<T> = T extends { cursor: string | null; total: number } ? true : false;
+  type Paginated<T> = T extends { cursor: string | null } ? true : false;
+  /** A page carries no aggregate — counts belong to a summary resource. */
+  type HasNoTotal<T> = T extends { total: unknown } ? false : true;
 
   // Each line fails to compile if that resource's `list` stops taking options.
   const _deployments: TakesListOptions<DeploymentResource['list']> = true;
   const _domains: TakesListOptions<DomainResource['list']> = true;
   const _tokens: TakesListOptions<TokenResource['list']> = true;
 
-  // …and if a list response stops carrying the cursor/total pair.
+  // …and if a list response stops carrying its cursor, or grows a total.
   const _deploymentList: Paginated<DeploymentListResponse> = true;
   const _domainList: Paginated<DomainListResponse> = true;
   const _tokenList: Paginated<TokenListResponse> = true;
   const _activityList: Paginated<ActivityListResponse> = true;
+  const _deploymentsPure: HasNoTotal<DeploymentListResponse> = true;
+  const _domainsPure: HasNoTotal<DomainListResponse> = true;
+  const _tokensPure: HasNoTotal<TokenListResponse> = true;
+  const _activitiesPure: HasNoTotal<ActivityListResponse> = true;
 
   it('holds at compile time', () => {
     expect([
@@ -634,6 +640,10 @@ describe('list contract coherence', () => {
       _domainList,
       _tokenList,
       _activityList,
-    ]).toEqual([true, true, true, true, true, true, true]);
+      _deploymentsPure,
+      _domainsPure,
+      _tokensPure,
+      _activitiesPure,
+    ]).toEqual(Array(11).fill(true));
   });
 });
