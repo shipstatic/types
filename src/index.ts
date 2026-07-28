@@ -71,9 +71,6 @@ export interface DeploymentCreateResponse extends Deployment {
  * beside every page read, which is precisely what keyset pagination exists
  * to avoid. Counts live on the resource that summarises the collection —
  * `GET /account`'s `usage` for one caller, `GET /admin/stats` platform-wide.
- *
- * The operator lists (`/admin/*`) answer this same shape behind the prefix;
- * their types live in `web/my`, not here — see `CLAUDE.md`, "Admin types".
  */
 export interface ListResponse {
   /** Opaque cursor from this page; `null` on the last page. */
@@ -222,13 +219,7 @@ export interface DomainValidateResponse {
 /**
  * Core deploy token object - used in both API responses and SDK.
  *
- * A single noun, like every other entity here: the platform's unit types are
- * `Deployment`, `Domain`, `Account`, `Activity` and this. It was once called
- * `TokenListItem`, named for the surface that returned it rather than for
- * what it is, which is exactly why {@link TokenCreateResponse} used to
- * restate its fields instead of extending it.
- *
- * The token itself is never here. The secret is shown once at creation
+ * The secret is never here: it is shown once at creation
  * ({@link TokenCreateResponse.secret}) and never again, so an entity read
  * carries only the management identifier and lifecycle metadata.
  */
