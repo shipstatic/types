@@ -1351,7 +1351,7 @@ export interface AccountResource {
  */
 export interface TokenResource {
   create: (options?: { ttl?: number; labels?: string[] }) => Promise<TokenCreateResponse>;
-  list: () => Promise<TokenListResponse>;
+  list: (options?: ListOptions) => Promise<TokenListResponse>;
   remove: (token: string) => Promise<void>;
 }
 
