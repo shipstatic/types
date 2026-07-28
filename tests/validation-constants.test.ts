@@ -632,7 +632,10 @@ describe('list contract coherence', () => {
   const _activitiesPure: HasNoTotal<ActivityListResponse> = true;
 
   it('holds at compile time', () => {
-    expect([
+    // The assertions above ARE the fence; they fail the typecheck, not this
+    // test. This body only keeps the bindings live so nothing prunes them —
+    // hence `every`, not a hand-counted length that a new collection breaks.
+    const assertions = [
       _deployments,
       _domains,
       _tokens,
@@ -644,6 +647,8 @@ describe('list contract coherence', () => {
       _domainsPure,
       _tokensPure,
       _activitiesPure,
-    ]).toEqual(Array(11).fill(true));
+    ];
+
+    expect(assertions.every((held) => held)).toBe(true);
   });
 });
