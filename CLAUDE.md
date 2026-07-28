@@ -69,7 +69,7 @@ ShipError.api(message, status?, details?)       // status defaults to 500
 
 // Type checks — semantic categories cover the UX-relevant decisions.
 // For specific-type checks, use `error.type === ErrorType.X` or `isType(t)`.
-error.isClientError()      // Business | Config | File | Validation
+error.isClientError()      // client-attributable: a client-fault TYPE, or any 4xx STATUS
 error.isNetworkError()
 error.isAuthError()
 error.isType(errorType)
@@ -160,6 +160,7 @@ Errors flow through the platform along a single, symmetric path. Every HTTP clie
 
 - **Wire-format type round-trips.** Server's `ShipError.validation(...)` reaches the client as `ErrorType.Validation`. Type guards (`isClientError()`, etc.) and direct comparisons (`error.type === ErrorType.Validation`) both work for received errors.
 - **Status drives type for non-API responses** (CDN errors, intermediaries with no body) — 401→Authentication, 403→Forbidden, 429→RateLimit, else→Api.
+- **Type and status are independent axes, and `isClientError()` reads both.** The line above is exactly why: a non-OK response whose body names no server-producible type is status-derived, so a CDN 404 or a misrouted request arrives as `Api` — a server-fault *type* carrying a client *status*. A type-only guard would report it as a platform failure and bury the server's message, so consumers would each have to re-add a status-range check beside every call. The guard owns that instead: client-fault type **or** 4xx status. The type set still carries the statusless local faults (`Config`, `File`), where there is no status to read.
 - **Client-only types stay client-only.** `Network`, `Cancelled`, `File`, and `Config` originate on the client (fetch failure, AbortSignal, SDK file processing, SDK config parsing). Even if a misbehaving server claimed one of these in `body.error`, `fromHttpResponse` ignores it — they're filtered out of the wire-trust set via `CLIENT_ONLY_ERROR_TYPES`.
 - **No HTTP error logic outside these two helpers.** SDK and web console are pure transport — `executeRequest` / `lib/api.ts` call the helpers directly; there are no private wrappers, no duplicated parsing, no drift surface.
 

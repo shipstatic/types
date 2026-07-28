@@ -400,10 +400,10 @@ const CLIENT_ONLY_ERROR_TYPES = new Set<string>([
  */
 const ERROR_CATEGORIES = {
   /**
-   * Every 4xx-class type — the caller's request or state is at fault, and
-   * the authored message is safe to surface verbatim. The set is exhaustive
-   * on purpose: a partial one forces consumers to add a status-range check
-   * beside every `isClientError()` call for the types it forgot.
+   * Client-attributable types. Exhaustive over the 4xx-carrying types, and
+   * it must include the statusless ones (`Config`, `File`) — those are
+   * raised locally by the SDK and have no status for `isClientError`'s
+   * second arm to read.
    */
   client: new Set<ErrorType>([
     ErrorType.Business,
@@ -655,10 +655,24 @@ export class ShipError extends Error {
     return new ShipError(ErrorType.Api, message, status, details);
   }
 
-  // Semantic-category type guards. For specific-type checks, use
+  // Semantic-category guards. For specific-type checks, use
   // `error.type === ErrorType.X` directly or the generic `isType(t)`.
+
+  /**
+   * The caller is at fault — by HTTP's own definition of a 4xx, or by a type
+   * that is client-attributable without ever having a status (`Config`,
+   * `File`, raised locally by the SDK).
+   *
+   * Both arms are load-bearing, because type and status are independent
+   * axes. `fromHttpResponse` trusts `body.error` only when it names a
+   * server-producible type; a non-OK response without one is status-derived,
+   * so a CDN 404 or any intermediary error arrives as `Api` — a server-fault
+   * *type* carrying a client *status*. Judging by type alone would report it
+   * as a platform failure and bury the server's own message.
+   */
   isClientError(): boolean {
-    return ERROR_CATEGORIES.client.has(this.type);
+    if (ERROR_CATEGORIES.client.has(this.type)) return true;
+    return this.status !== undefined && this.status >= 400 && this.status < 500;
   }
 
   isNetworkError(): boolean {

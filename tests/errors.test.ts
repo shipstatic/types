@@ -112,17 +112,14 @@ describe('ShipError factories', () => {
 
 describe('semantic categories', () => {
   /**
-   * The partition law: every 4xx-class error is either the auth category or
-   * the client category — never neither. Consumers branch on the categories
-   * alone (auth → re-credential, client → show the wire message, else →
-   * generic server fault), so a 4xx type in neither set would be reported to
-   * users as a server error.
-   *
-   * Asserted over the factories rather than a hand-listed set, so a new 4xx
-   * type fails here until it is categorised.
+   * The classification law consumers depend on: an error is auth, network,
+   * client, or a server fault — and only the last renders as a generic
+   * "something broke on our side". Anything client-attributable must be
+   * recognised as such, or the platform takes the blame for a caller's
+   * mistake and buries the server's own message.
    */
-  it('categorises every 4xx-class error as auth or client', () => {
-    const fourXX = [
+  it('classifies every client-attributable factory, by type or by status', () => {
+    const clientAttributable = [
       ShipError.validation('v'),
       ShipError.notFound('Resource'),
       ShipError.forbidden('f'),
@@ -133,26 +130,42 @@ describe('semantic categories', () => {
       ShipError.file('f'),
     ];
 
-    for (const err of fourXX) {
+    for (const err of clientAttributable) {
       expect(
         err.isAuthError() || err.isClientError(),
-        `${err.type} belongs to neither category`,
+        `${err.type} would render as a server fault`,
       ).toBe(true);
     }
   });
 
-  it('keeps notFound and rateLimit inside the client category', () => {
-    // Both are 4xx carrying user-facing wire messages. Excluding them forced
-    // consumers to pair isClientError() with their own status-range check.
+  it('recognises a 4xx even when the type is the status-derived fallback', () => {
+    // `fromHttpResponse` trusts `body.error` only when it names a
+    // server-producible type. A non-OK response without one — a CDN 404, an
+    // intermediary, a misrouted request — arrives as `Api` at a 4xx status,
+    // a server-fault TYPE carrying a client STATUS.
+    expect(new ShipError(ErrorType.Api, 'Domain not found', 404).isClientError()).toBe(true);
+    expect(new ShipError(ErrorType.Api, 'Already exists', 409).isClientError()).toBe(true);
+  });
+
+  it('keeps notFound and rateLimit client-attributable by type', () => {
     expect(ShipError.notFound('Deployment', 'abc').isClientError()).toBe(true);
     expect(ShipError.rateLimit().isClientError()).toBe(true);
   });
 
-  it('leaves server faults in no category, so they render generically', () => {
-    const api = ShipError.api('boom');
-    expect(api.isClientError()).toBe(false);
-    expect(api.isAuthError()).toBe(false);
-    expect(api.isNetworkError()).toBe(false);
+  it('classifies statusless local faults by type, since there is no status to read', () => {
+    // Raised by the SDK before any response exists — the second arm cannot
+    // help, so the type set must carry them.
+    expect(ShipError.config('bad ship.json').status).toBeUndefined();
+    expect(ShipError.config('bad ship.json').isClientError()).toBe(true);
+    expect(ShipError.file('unreadable').isClientError()).toBe(true);
+  });
+
+  it('leaves genuine server faults uncategorised, so they render generically', () => {
+    for (const err of [ShipError.api('boom'), ShipError.api('down', 503)]) {
+      expect(err.isClientError()).toBe(false);
+      expect(err.isAuthError()).toBe(false);
+      expect(err.isNetworkError()).toBe(false);
+    }
   });
 
   it('treats network as its own category, not a client fault', () => {
