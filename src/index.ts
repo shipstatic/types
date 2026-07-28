@@ -61,11 +61,24 @@ export interface DeploymentCreateResponse extends Deployment {
 /**
  * Every path the public API answers on, declared once.
  *
- * The URL surface used to be written out in four places — the API's mounts,
- * the SDK's client, the dashboard's client, and the post-deploy smoke — so a
- * rename meant finding all four. Here it is one table that the producer
- * mounts from and the consumers request against, which is the only way a
- * path and its handler cannot drift apart.
+ * The URL surface was written out in four places — the API's mounts, the
+ * SDK's client, the dashboard's client, and the post-deploy smoke — so a
+ * rename meant finding all four. The first three now read this table.
+ *
+ * The smoke (`cloudflare/api/smoke.mjs`) deliberately still spells its own:
+ * five of its nine paths are `/admin/*`, which this table excludes by
+ * design, and splitting one list between a registry and literals reads worse
+ * than keeping it uniform.
+ *
+ * **What this guarantees, exactly.** Collection paths are mounted from here,
+ * so producer and consumer cannot diverge. Item paths are declared here and
+ * consumed by clients, but the API spells them relative to their mount
+ * (`/:deployment/config`), so the table does not *generate* them — it is
+ * held to them by `api/tests/architecture/api-paths.test.ts`, which fails if
+ * any entry names a path no route answers. Some entries have no client yet
+ * (`DEPLOYMENT_CONFIG`, `DOMAIN_PROPAGATION` — endpoints the SDK
+ * deliberately does not reach); the fence is what keeps those honest rather
+ * than merely asserted.
  *
  * **The operator surface is deliberately absent.** `/admin/*` paths belong
  * to `web/my`, for the same reason its row types do: this package is
@@ -322,6 +335,41 @@ export interface DomainRecordsResponse {
   apex: string;
   /** Required DNS records for configuration */
   records: DnsRecord[];
+}
+
+/**
+ * The envelope an `Idempotency-Key` must fit, and how long a replay lasts.
+ *
+ * Format lives here rather than on the server alone by the format-vs-policy
+ * rule: a client can decide offline whether a key is well-formed, and the
+ * API would reject the same value the same way.
+ */
+export const IDEMPOTENCY_KEY_CONSTRAINTS = {
+  MAX_LENGTH: 256,
+  /** How long a stored 201 stays replayable. */
+  WINDOW_SECONDS: 24 * 60 * 60,
+} as const;
+
+/**
+ * Validate an idempotency key, returning the trimmed value or `undefined`
+ * when none was supplied. Throws {@link ShipError.validation} when the value
+ * cannot be sent — the same verdict the API would reach, reached earlier.
+ */
+export function validateIdempotencyKey(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'string') {
+    throw ShipError.validation('Idempotency key must be a string.');
+  }
+  const key = value.trim();
+  if (!key) {
+    throw ShipError.validation('Idempotency key must not be empty.');
+  }
+  if (key.length > IDEMPOTENCY_KEY_CONSTRAINTS.MAX_LENGTH) {
+    throw ShipError.validation(
+      `Idempotency key must be at most ${IDEMPOTENCY_KEY_CONSTRAINTS.MAX_LENGTH} characters.`,
+    );
+  }
+  return key;
 }
 
 /**
@@ -1534,6 +1582,25 @@ export interface DeploymentUploadOptions {
   spa?: boolean;
   /** @internal reCAPTCHA proof for the anonymous human deploy channel. Only available via /upload endpoint. */
   captcha?: string;
+  /**
+   * Makes this deploy replayable instead of repeatable.
+   *
+   * A deploy is not naturally idempotent: a client-side timeout on a slow
+   * one leaves the caller unable to tell "it never landed" from "it landed
+   * and the response was lost", and retrying produces a second deployment.
+   * Send the same key on the retry and the platform replays the original
+   * 201 verbatim rather than creating anything
+   * ({@link IDEMPOTENCY_KEY_CONSTRAINTS.WINDOW_SECONDS}).
+   *
+   * **Agents are the audience.** A human notices a duplicate; an automated
+   * retry does not. Pick a key that identifies the ATTEMPT — a run id, a
+   * commit sha, a uuid minted before the first try — never one that varies
+   * per attempt, which would defeat the point.
+   *
+   * The replay is per-caller, and it stores successes only: a failed deploy
+   * retries fresh under the same key.
+   */
+  idempotencyKey?: string;
 }
 
 /**
