@@ -42,6 +42,8 @@ Single file: `src/index.ts`, organized into named sections in this order:
 ```bash
 pnpm build      # TypeScript compilation validates all types
 pnpm test --run # Runtime tests: validation constants, blocked extensions, label patterns
+pnpm typecheck  # tsc -p tsconfig.check.json — src AND tests
+
 ```
 
 ## Key Patterns
@@ -206,6 +208,27 @@ Use `readonly` for stable fields (`id`, `created`, `url`). Leave mutable fields 
 | `cloudflare/api` | All entity types, ShipError, constants |
 | `cloudflare/consumer` | `AccountPlanType`, `DeploymentStatus` directly (ShipError arrives via `cloudflare/shared`) |
 | `web/my` | Entity types, response types |
+
+## The typecheck covers `tests/` too
+
+`pnpm typecheck` runs `tsc -p tsconfig.check.json` over **`src` and
+`tests`** — `tsconfig.json` stays build-shaped (`rootDir: src`, declaration
+output) and is what `pnpm build` reads. This matches `npm/ship`,
+`cloudflare`, and `web/my`, each of which records the same reason: vitest
+transpiles through esbuild **without** typechecking, so a test tree outside
+the program is entirely unchecked.
+
+The gap was sharper here than elsewhere, and it is why the config exists.
+`tests/` carries **compile-time** assertions about the resource contracts —
+the list-contract fence in `validation-constants.test.ts`, which asserts
+that every paginated collection's `list` takes `ListOptions` and every list
+response carries `cursor` + `total`. Those assert by failing to compile.
+Outside the program they asserted *nothing*, and were verified silently
+passing while `TokenResource.list` was live with the drift they target.
+
+**A fence written as a type assertion is only a fence if the typecheck sees
+it.** After adding one, prove it fires — introduce the drift, watch the
+typecheck fail, restore.
 
 ## Adding New Types
 
