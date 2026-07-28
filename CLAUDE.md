@@ -31,7 +31,7 @@ Single file: `src/index.ts`, organized into named sections in this order:
 | URL Constant | `DEFAULT_API` |
 | Resource Contracts | `DeployInput`, `DeploymentUploadOptions`, `*Resource` interfaces |
 | Billing Types | `BillingStatus`, `CheckoutSession` |
-| Activity Types | `ActivityEvent`, `UserVisibleActivityEvent`, `Activity`, `ActivityMeta` |
+| Activity Types | `ActivityEvent`, `UserVisibleActivityEvent`, `Activity`, `ActivityMeta`, `ActivityListResponse` — wire contracts for `GET /activities`, produced by the API and consumed by `web/my`. There is deliberately **no** `ActivityResource`: the SDK does not reach that endpoint (recorded in `npm/ship/CLAUDE.md`), and a resource interface nothing implements would be dead surface. A shared type needs two consumers, not three. |
 | File Upload Types | `FileValidationStatus`, `ValidationIssue`, `ValidatableFile`, `FileValidationResult`, `UploadedFile` |
 | Domain Utilities | `isPlatformDomain`, `isCustomDomain`, `extractSubdomain`, `generate*Url` |
 | Label Utilities | `LABEL_CONSTRAINTS`, `LABEL_PATTERN`, `serializeLabels`, `deserializeLabels` |
@@ -222,8 +222,9 @@ the program is entirely unchecked.
 The gap was sharper here than elsewhere, and it is why the config exists.
 `tests/` carries **compile-time** assertions about the resource contracts —
 the list-contract fence in `validation-constants.test.ts`, which asserts
-that every paginated collection's `list` takes `ListOptions` and every list
-response carries `cursor` + `total`. Those assert by failing to compile.
+that every paginated collection's `list` takes `ListOptions`, that every
+list response carries a `cursor`, and that none carries a `total`. Those
+assert by failing to compile.
 Outside the program they asserted *nothing*, and were verified silently
 passing while `TokenResource.list` was live with the drift they target.
 

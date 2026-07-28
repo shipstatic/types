@@ -264,10 +264,34 @@ export type AccountPlanType = (typeof AccountPlan)[keyof typeof AccountPlan];
 
 /**
  * Account usage metrics — always available regardless of billing provider.
+ *
+ * This is where a caller's own totals live. Lists answer pages and carry no
+ * `total` (see {@link ListOptions}); a count is an aggregate over a
+ * collection, so it belongs to the summary resource that owns the
+ * collection. `GET /account` is that resource for one caller, `GET
+ * /admin/stats` for the platform.
+ *
+ * The counted dimensions are the ones the plan caps — deployments and
+ * domains (`PlatformLimits`) — plus the billable custom-domain subset, so a
+ * surface can render "3 of 10" without a second request.
  */
 export interface AccountUsage {
   /** Number of active custom domains (excludes paused) */
   customDomains: number;
+  /**
+   * Deployments counted against the plan's deployment cap — every row
+   * whatever its status, because that is what the cap counts, so a surface
+   * renders "3 of 10" against the denominator the 403 divides by. (`GET
+   * /deployments` lists successful ones only; that is a different question
+   * asked of a different resource.) Optional by the additive-evolution law:
+   * an API predating this field omits it.
+   */
+  deployments?: number;
+  /**
+   * Domains counted against the plan's domain cap — every domain, platform
+   * and custom alike, unlike `customDomains`. Optional for the same reason.
+   */
+  domains?: number;
 }
 
 /**
