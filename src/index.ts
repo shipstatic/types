@@ -105,7 +105,7 @@ export interface Domain {
   labels: string[];
   /** Unix timestamp (seconds) when domain was created */
   readonly created: number;
-  /** When deployment was last linked (Unix timestamp), null if never linked */
+  /** Unix timestamp (seconds) when deployment was last linked, null if never linked */
   linked: number | null;
   /** Total deployment links */
   links: number;
