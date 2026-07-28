@@ -16,7 +16,7 @@ Single file: `src/index.ts`, organized into named sections in this order:
 
 | Section | Purpose |
 |---------|---------|
-| Core Entities | Deployment, Domain (+ `DomainSetResult`), Token, Account (+ `AccountGetResponse` — request-scoped `authMethod` lives on the response, not the entity; `AccountUsage`, `AccountOverrides`) — status consts, interfaces, list responses (+ `ListResponse`, `ListOptions`), DNS/domain response shapes (`DnsRecord`, `DnsProvider`, `DomainDnsResponse`, `DomainRecordsResponse`, `DomainValidateResponse`) |
+| Core Entities | Deployment, Domain (+ `DomainSetResult`), Token, Account (+ `AccountGetResponse` — request-scoped `authMethod` lives on the response, not the entity; `AccountUsage`, `AccountOverrides`) — status consts, interfaces, list responses (+ `ListResponse`, `ListOptions`), DNS/domain response shapes (`DnsRecord`, `DnsProvider`, `DomainDnsResponse`, `DomainRecordsResponse`, `DomainValidateResponse`), and the mutation acknowledgements (`DeploymentDeleteResponse` — where the law is written — `DomainDeleteResponse`, `DomainVerifyResponse`, `TokenDeleteResponse`, `AccountDeleteResponse`, `AccountKeyResponse`) |
 | Error System | `ErrorType` (`as const` + type), `ShipError` class, `isShipError` guard |
 | Platform Limits | `PlatformLimits` (plan-based caps from the `/limits` endpoint — file size, file count, total size) |
 | Extension Blocklist | `BLOCKED_EXTENSIONS`, `isBlockedExtension()` |
@@ -241,7 +241,7 @@ typecheck fail, restore.
 
 ### The composition laws
 
-Three rules, each of which was broken once and is now structural:
+Four rules, each of which was broken once and is now structural:
 
 - **A unit type is a single noun** — `Deployment`, `Domain`, `Account`,
   `Activity`, `Token`. Never name an entity for the surface that returns it.
@@ -258,6 +258,19 @@ Three rules, each of which was broken once and is now structural:
   declared once, on `ListResponse`, so a fifth list cannot get the envelope
   subtly wrong — and the "no `total`" doctrine is stated in one place instead
   of four.
+- **A mutation that leaves no entity behind answers with the resource noun
+  and nothing it did not have to compute.** The noun carries the item's
+  canonical key; the resource's own state field joins it only where the
+  resource survived mid-transition (`DeploymentDeleteResponse.status`,
+  `AccountDeleteResponse.plan`), and a hard delete is the key alone
+  (`DomainDeleteResponse`, `TokenDeleteResponse`). No `message` — an
+  acknowledgement is data, and every surface composes its own copy. No
+  constant either: `changed: true`, `queued: true` and `success: true` are
+  fields whose value the type already fixes, so they answer a question the
+  caller had already answered by making the request. Sync versus accepted is
+  the status code's job (200 / 202), not a boolean's. The law is written out
+  once, in the doc comment on `DeploymentDeleteResponse`; the other five link
+  to it rather than restating it.
 
 **New fields on existing response entities are optional** (`readonly x?: T`),
 by the additive-evolution law: published SDK versions return the entity

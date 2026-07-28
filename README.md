@@ -21,13 +21,18 @@ npm install @shipstatic/types
 ```typescript
 import type {
   ListResponse,
-  Deployment, DeploymentListResponse,
-  Domain, DomainSetResult, DomainListResponse, DnsRecord, DomainDnsResponse, DomainRecordsResponse, DomainValidateResponse,
-  Token, TokenListResponse, TokenCreateResponse,
-  Account, AccountUsage, AccountOverrides,
+  Deployment, DeploymentListResponse, DeploymentDeleteResponse,
+  Domain, DomainSetResult, DomainListResponse, DnsRecord, DomainDnsResponse, DomainRecordsResponse, DomainValidateResponse, DomainDeleteResponse, DomainVerifyResponse,
+  Token, TokenListResponse, TokenCreateResponse, TokenDeleteResponse,
+  Account, AccountUsage, AccountOverrides, AccountDeleteResponse, AccountKeyResponse,
   StaticFile
 } from '@shipstatic/types';
 ```
+
+A mutation answers with the resource it affected — the entity when it
+survives, otherwise the `*DeleteResponse` shape: the resource noun carrying
+the canonical key, plus the resource's own state field where the resource is
+mid-transition. No `message`, no `success`, no constant flags.
 
 ### Error System
 
