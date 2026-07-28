@@ -127,6 +127,7 @@ import type {
 import {
   validateApiKey,
   validateDeployToken,
+  validateIdempotencyKey,
   validateApiUrl,
   isDeployment,
   isBlockedExtension,
