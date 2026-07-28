@@ -20,13 +20,17 @@ npm install @shipstatic/types
 
 ```typescript
 import type {
-  ListResponse,
-  Deployment, DeploymentListResponse, DeploymentDeleteResponse,
-  Domain, DomainSetResult, DomainListResponse, DnsRecord, DomainDnsResponse, DomainRecordsResponse, DomainValidateResponse, DomainDeleteResponse, DomainVerifyResponse,
-  Token, TokenListResponse, TokenCreateResponse, TokenDeleteResponse,
+  ListResponse, ListOptions,
+  Deployment, DeploymentListResponse, DeploymentDeleteResponse, DeploymentSetOptions,
+  Domain, DomainSetResult, DomainSetOptions, DomainListResponse, DnsRecord, DnsLookup, DomainDnsResponse, DomainRecordsResponse, DomainShareResponse, DomainValidateResponse, DomainDeleteResponse, DomainVerifyResponse,
+  Token, TokenListResponse, TokenCreateResponse, TokenCreateOptions, TokenDeleteResponse,
   Account, AccountUsage, AccountOverrides, AccountDeleteResponse, AccountKeyResponse,
+  LabelsResponse, SetupInstructionsResponse,
   StaticFile
 } from '@shipstatic/types';
+
+// Every public path, declared once — the API mounts from it, clients request against it.
+import { API_PATHS } from '@shipstatic/types';
 ```
 
 A mutation answers with the resource it affected — the entity when it

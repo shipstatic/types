@@ -59,6 +59,50 @@ export interface DeploymentCreateResponse extends Deployment {
 }
 
 /**
+ * Every path the public API answers on, declared once.
+ *
+ * The URL surface used to be written out in four places — the API's mounts,
+ * the SDK's client, the dashboard's client, and the post-deploy smoke — so a
+ * rename meant finding all four. Here it is one table that the producer
+ * mounts from and the consumers request against, which is the only way a
+ * path and its handler cannot drift apart.
+ *
+ * **The operator surface is deliberately absent.** `/admin/*` paths belong
+ * to `web/my`, for the same reason its row types do: this package is
+ * published, and the operator surface is not public (see `CLAUDE.md`, "Admin
+ * types"). A path here is a promise to every npm consumer; `/admin` is a
+ * promise to one dashboard.
+ *
+ * Item paths are functions rather than templates so the key is interpolated
+ * in one place, encoded the same way by every caller.
+ */
+export const API_PATHS = {
+  DEPLOYMENTS: '/deployments',
+  DEPLOYMENT: (deployment: string) => `/deployments/${deployment}`,
+  DEPLOYMENT_CONFIG: (deployment: string) => `/deployments/${deployment}/config`,
+  DOMAINS: '/domains',
+  DOMAIN: (domain: string) => `/domains/${domain}`,
+  DOMAIN_VERIFY: (domain: string) => `/domains/${domain}/verify`,
+  DOMAIN_DNS: (domain: string) => `/domains/${domain}/dns`,
+  DOMAIN_RECORDS: (domain: string) => `/domains/${domain}/records`,
+  DOMAIN_SHARE: (domain: string) => `/domains/${domain}/share`,
+  DOMAIN_PROPAGATION: (domain: string) => `/domains/${domain}/propagation`,
+  DOMAINS_VALIDATE: '/domains/validate',
+  TOKENS: '/tokens',
+  TOKEN: (token: string) => `/tokens/${token}`,
+  ACCOUNT: '/account',
+  ACCOUNT_KEY: '/account/key',
+  ACCOUNT_CLAIM: '/account/claim',
+  ACTIVITIES: '/activities',
+  LABELS: '/labels',
+  LIMITS: '/limits',
+  PING: '/ping',
+  SETUP: '/setup',
+  SPA_CHECK: '/spa-check',
+  UPLOAD: '/upload',
+} as const;
+
+/**
  * The half of a list response that is identical on every list.
  *
  * `GET /<collection>` answers exactly two fields — the collection under its
@@ -97,12 +141,23 @@ export interface DeploymentListResponse extends ListResponse {
  * Where the resource is simply gone, the key alone is the whole answer
  * ({@link DomainDeleteResponse}, {@link TokenDeleteResponse}).
  *
- * Nothing else rides along. No prose (`message`), because an acknowledgement
- * is data and each surface composes its own copy; and no constant
- * (`changed: true`, `queued: true`, `success: true`), because a field whose
- * value the type already fixes tells a caller nothing it did not know before
- * it made the request. Sync versus accepted is the HTTP status code's job —
- * 200 versus 202 — not a boolean's.
+ * Put positively: **an acknowledgement is a projection of the resource** —
+ * its key, plus its own state field where the state changed. That is the
+ * test to apply, and it is sharper than "no constant", which this shape
+ * would fail on its own terms: `status` here is the literal `'deleting'` on
+ * every success, exactly as fixed as a `changed: true` would be.
+ *
+ * The difference is not how predictable the value is, it is what the field
+ * IS. `status` is the deployment's own field — the same one `GET
+ * /deployments/:deployment` returns — so this response is `Deployment`
+ * narrowed to two members, and a client renders it with the code it already
+ * has. `changed: true`, `queued: true` and `success: true` are not fields of
+ * any entity; they exist only to assert that the call worked, which the
+ * status code already said. Sync versus accepted is likewise the status
+ * code's job — 200 versus 202 — not a boolean's.
+ *
+ * No prose either (`message`): an acknowledgement is data, and each surface
+ * composes its own copy.
  */
 export interface DeploymentDeleteResponse {
   /** The deployment hostname that was marked for removal */
@@ -226,11 +281,35 @@ export interface DnsProvider {
 /**
  * Response for domain DNS provider lookup
  */
+/**
+ * What a DNS lookup found for a domain. An envelope rather than a bare
+ * {@link DnsProvider} because a lookup can succeed and learn more than the
+ * provider later; the shape is named so a consumer can hold one.
+ */
+export interface DnsLookup {
+  /** The provider serving this domain's DNS, absent when unidentified */
+  provider?: DnsProvider;
+}
+
 export interface DomainDnsResponse {
   /** The domain name */
   domain: string;
   /** DNS provider information, null if not yet looked up */
-  dns: { provider?: DnsProvider } | null;
+  dns: DnsLookup | null;
+}
+
+/**
+ * Response for `GET /domains/:domain/share` — the domain plus the salted
+ * hash that lets someone else complete its DNS setup without an account.
+ *
+ * `/admin/domains/:domain/share` answers the same shape, which is the admin
+ * law working: the operator surface is the public grammar with a prefix.
+ */
+export interface DomainShareResponse {
+  /** The domain the setup link is for */
+  readonly domain: string;
+  /** The salted setup hash that authorizes the share */
+  readonly hash: string;
 }
 
 /**
@@ -243,6 +322,37 @@ export interface DomainRecordsResponse {
   apex: string;
   /** Required DNS records for configuration */
   records: DnsRecord[];
+}
+
+/**
+ * Response for `GET /labels` — every label in use across the caller's
+ * deployments, domains and tokens, grouped and ordered by last use.
+ *
+ * The one plural noun outside the list contract, deliberately: labels have
+ * no identity, no row and no `created`, so there is nothing for a keyset
+ * cursor to resume after, and its consumer is an autocomplete that wants the
+ * whole set. Bounded by `PAGINATION.GLOBAL_LIMIT` rather than paginated.
+ */
+export interface LabelsResponse {
+  readonly labels: string[];
+}
+
+/**
+ * Response for `POST /setup` — the DNS instructions for one domain, written
+ * for a human to follow at their registrar.
+ *
+ * `custom` is the provider-specific walkthrough when the provider is known;
+ * `generic` always answers, so a caller never has nothing to show.
+ */
+export interface SetupInstructionsResponse {
+  /** One-line summary of what to do */
+  readonly tldr: string;
+  /** Provider-specific instructions, null when the provider is unknown */
+  readonly custom: string | null;
+  /** Provider-agnostic instructions — always present */
+  readonly generic: string;
+  /** The identified DNS provider, null when unknown */
+  readonly provider: string | null;
 }
 
 /**
@@ -1320,16 +1430,23 @@ export interface SPACheckRequest {
 /**
  * Response from SPA check endpoint
  */
+/**
+ * Which of the classifier's tiers reached the verdict, and why. Named rather
+ * than inline so the API's own `checkSPA` can return `SPACheckResponse`
+ * instead of restating its shape.
+ */
+export interface SPACheckDebug {
+  /** Which tier made the detection */
+  tier: 'exclusions' | 'inclusions' | 'scoring' | 'ai' | 'fallback';
+  /** The reason for the detection result */
+  reason: string;
+}
+
 export interface SPACheckResponse {
   /** Whether the project is detected as a Single Page Application */
   isSPA: boolean;
   /** Debugging information about detection */
-  debug: {
-    /** Which tier made the detection: 'exclusions', 'inclusions', 'scoring', 'ai', or 'fallback' */
-    tier: 'exclusions' | 'inclusions' | 'scoring' | 'ai' | 'fallback';
-    /** The reason for the detection result */
-    reason: string;
-  };
+  debug: SPACheckDebug;
 }
 
 // =============================================================================
@@ -1443,6 +1560,36 @@ export interface ListOptions {
 }
 
 /**
+ * What a caller may change on an existing deployment.
+ *
+ * Labels and nothing else: a deployment's content is immutable by design, so
+ * this is the whole mutable surface rather than a subset someone chose.
+ */
+export interface DeploymentSetOptions {
+  labels: string[];
+}
+
+/**
+ * What `domains.set()` may create or change. Every field is optional because
+ * the call is a natural-key upsert: omitting `deployment` reserves the
+ * domain, naming one links or re-points it, and labels travel either way.
+ *
+ * `deployment` is deliberately not nullable — unlinking is refused (400).
+ * See `npm/ship/CLAUDE.md`, "Domain Write Semantics".
+ */
+export interface DomainSetOptions {
+  deployment?: string;
+  labels?: string[];
+}
+
+/** What a caller may set when minting a deploy token. */
+export interface TokenCreateOptions {
+  /** Seconds until expiry; omit for a token that never expires. */
+  ttl?: number;
+  labels?: string[];
+}
+
+/**
  * Deployment resource interface - the contract all implementations must follow.
  *
  * The interface defines the minimal wire contract; SDK implementations may
@@ -1456,26 +1603,23 @@ export interface DeploymentResource<
   upload: (input: DeployInput, options?: UploadOptions) => Promise<DeploymentCreateResponse>;
   list: (options?: ListOptions) => Promise<DeploymentListResponse>;
   get: (id: string) => Promise<Deployment>;
-  set: (id: string, options: { labels: string[] }) => Promise<Deployment>;
-  remove: (id: string) => Promise<void>;
+  set: (id: string, options: DeploymentSetOptions) => Promise<Deployment>;
+  remove: (id: string) => Promise<DeploymentDeleteResponse>;
 }
 
 /**
  * Domain resource interface - the contract all implementations must follow
  */
 export interface DomainResource {
-  set: (
-    name: string,
-    options?: { deployment?: string; labels?: string[] },
-  ) => Promise<DomainSetResult>;
+  set: (name: string, options?: DomainSetOptions) => Promise<DomainSetResult>;
   list: (options?: ListOptions) => Promise<DomainListResponse>;
   get: (name: string) => Promise<Domain>;
-  remove: (name: string) => Promise<void>;
+  remove: (name: string) => Promise<DomainDeleteResponse>;
   verify: (name: string) => Promise<DomainVerifyResponse>;
   validate: (name: string) => Promise<DomainValidateResponse>;
   dns: (name: string) => Promise<DomainDnsResponse>;
   records: (name: string) => Promise<DomainRecordsResponse>;
-  share: (name: string) => Promise<{ domain: string; hash: string }>;
+  share: (name: string) => Promise<DomainShareResponse>;
 }
 
 /**
@@ -1489,9 +1633,10 @@ export interface AccountResource {
  * Token resource interface - the contract all implementations must follow
  */
 export interface TokenResource {
-  create: (options?: { ttl?: number; labels?: string[] }) => Promise<TokenCreateResponse>;
+  create: (options?: TokenCreateOptions) => Promise<TokenCreateResponse>;
   list: (options?: ListOptions) => Promise<TokenListResponse>;
-  remove: (token: string) => Promise<void>;
+  get: (token: string) => Promise<Token>;
+  remove: (token: string) => Promise<TokenDeleteResponse>;
 }
 
 // =============================================================================
