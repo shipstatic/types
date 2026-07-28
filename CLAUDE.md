@@ -4,7 +4,7 @@ Claude Code instructions for the **Types** package.
 
 ## Package Identity
 
-**@shipstatic/types** is the single source of truth for all shared TypeScript types, constants, and utilities across the ShipStatic platform. If a type is used by more than one package, it belongs here.
+**@shipstatic/types** is the single source of truth for all shared TypeScript types, constants, and utilities across the ShipStatic platform. If a type is used by more than one package, it belongs here — with one carved-out exception, "Admin types" under "Adding New Types". Read it before adding anything named `Admin*`.
 
 **Maturity:** Stable; semver applies — breaking changes require a major version bump.
 
@@ -16,7 +16,7 @@ Single file: `src/index.ts`, organized into named sections in this order:
 
 | Section | Purpose |
 |---------|---------|
-| Core Entities | Deployment, Domain (+ `DomainSetResult`), `TokenListItem`, Account (+ `AccountGetResponse` — request-scoped `authMethod` lives on the response, not the entity; `AccountUsage`, `AccountOverrides`) — status consts, interfaces, list responses (+ `ListOptions`), DNS/domain response shapes (`DnsRecord`, `DnsProvider`, `DomainDnsResponse`, `DomainRecordsResponse`, `DomainValidateResponse`) |
+| Core Entities | Deployment, Domain (+ `DomainSetResult`), Token, Account (+ `AccountGetResponse` — request-scoped `authMethod` lives on the response, not the entity; `AccountUsage`, `AccountOverrides`) — status consts, interfaces, list responses (+ `ListResponse`, `ListOptions`), DNS/domain response shapes (`DnsRecord`, `DnsProvider`, `DomainDnsResponse`, `DomainRecordsResponse`, `DomainValidateResponse`) |
 | Error System | `ErrorType` (`as const` + type), `ShipError` class, `isShipError` guard |
 | Platform Limits | `PlatformLimits` (plan-based caps from the `/limits` endpoint — file size, file count, total size) |
 | Extension Blocklist | `BLOCKED_EXTENSIONS`, `isBlockedExtension()` |
@@ -239,6 +239,26 @@ typecheck fail, restore.
 3. Follow existing entity pattern: status const → entity interface → list response → resource contract
 4. Run `pnpm build` to validate
 
+### The composition laws
+
+Three rules, each of which was broken once and is now structural:
+
+- **A unit type is a single noun** — `Deployment`, `Domain`, `Account`,
+  `Activity`, `Token`. Never name an entity for the surface that returns it.
+  `Token` was `TokenListItem` until 2026-07-28, and that name is exactly why
+  `TokenCreateResponse` restated its fields rather than extending it: there
+  was no entity to extend, only a list's item.
+- **A response composes its entity, never restates it.**
+  `DeploymentCreateResponse extends Deployment`, `TokenCreateResponse extends
+  Token`, `DomainSetResult extends Domain`, `AccountGetResponse extends
+  Account`. Request-scoped and one-time fields (`claim`, `secret`,
+  `isCreate`, `authMethod`) live on the response; the entity stays the
+  entity.
+- **A list response is `ListResponse` plus its plural noun.** The cursor is
+  declared once, on `ListResponse`, so a fifth list cannot get the envelope
+  subtly wrong — and the "no `total`" doctrine is stated in one place instead
+  of four.
+
 **New fields on existing response entities are optional** (`readonly x?: T`),
 by the additive-evolution law: published SDK versions return the entity
 without the field, and a required field would make every additive API change
@@ -247,6 +267,35 @@ required at the entity's next natural break (major bump) once every
 published consumer carries it.
 
 **New error types:** Add to `ErrorType` enum + a static factory on `ShipError`.
+
+### Admin types
+
+**The operator surface does not ship here.** `AdminAccount`,
+`AdminDeployment`, `AdminDomain`, `AdminToken`, `AdminActivity`,
+`AdminStats` and the `/admin/*` page shapes live in
+`web/my/src/features/admin/types.ts` and nowhere else. Do not move them,
+mirror them, or add a sibling for a new operator endpoint.
+
+The two-consumer rule above is what makes this need saying: those types
+genuinely have two consumers (`cloudflare/api` produces, `web/my` consumes),
+so the general rule argues *for* promoting them. It is overridden here. This
+package is published to npm, so its contents are the platform's public
+vocabulary — shipping the operator schema would enumerate every internal
+column, filter, and lifecycle field we hold on an account to anyone who runs
+`npm install`. Reach is the cost, not correctness.
+
+**The price is paid in `web/my`, deliberately.** With no shared type, nothing
+compile-checks the operator wire against its client, and the two have drifted
+before — by sixteen fields, including a billing reference read under a name
+the API has never sent, which left an operator action permanently
+unreachable. Two things hold the seam instead:
+`cloudflare/api/tests/integration/list-contract.test.ts` spells out all five
+operator row shapes and fails when a projection changes, and the header of
+`web/my`'s `features/admin/types.ts` states the obligation to change both in
+one commit. A new operator column touches both files or it is drift.
+
+If the operator surface ever needs a third consumer, that is the moment to
+reopen this — a private `@shipstatic/admin-types` package, not this one.
 
 ### Validation: format vs policy
 

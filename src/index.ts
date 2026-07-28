@@ -59,13 +59,33 @@ export interface DeploymentCreateResponse extends Deployment {
 }
 
 /**
+ * The half of a list response that is identical on every list.
+ *
+ * `GET /<collection>` answers exactly two fields — the collection under its
+ * own plural noun, and this cursor — so the cursor is declared once here and
+ * each response below adds only its noun. `cursor: null` means last page and
+ * is the ENTIRE has-more signal, which is why there is no `has_more`.
+ *
+ * There is deliberately no `total`. A count is an aggregate over a
+ * collection, not a property of a page; producing one would cost a COUNT
+ * beside every page read, which is precisely what keyset pagination exists
+ * to avoid. Counts live on the resource that summarises the collection —
+ * `GET /account`'s `usage` for one caller, `GET /admin/stats` platform-wide.
+ *
+ * The operator lists (`/admin/*`) answer this same shape behind the prefix;
+ * their types live in `web/my`, not here — see `CLAUDE.md`, "Admin types".
+ */
+export interface ListResponse {
+  /** Opaque cursor from this page; `null` on the last page. */
+  cursor: string | null;
+}
+
+/**
  * Response for listing deployments
  */
-export interface DeploymentListResponse {
+export interface DeploymentListResponse extends ListResponse {
   /** Array of deployments */
   deployments: Deployment[];
-  /** Cursor for pagination, null if no more pages */
-  cursor: string | null;
 }
 
 // =============================================================================
@@ -129,11 +149,9 @@ export interface DomainSetResult extends Domain {
 /**
  * Response for listing domains
  */
-export interface DomainListResponse {
+export interface DomainListResponse extends ListResponse {
   /** Array of domains */
   domains: Domain[];
-  /** Cursor for pagination, null if no more pages */
-  cursor: string | null;
 }
 
 /**
@@ -202,11 +220,19 @@ export interface DomainValidateResponse {
 // =============================================================================
 
 /**
- * Token as returned by the list endpoint.
- * The secret is shown once at creation and never again — listings carry
- * only the management identifier and lifecycle metadata.
+ * Core deploy token object - used in both API responses and SDK.
+ *
+ * A single noun, like every other entity here: the platform's unit types are
+ * `Deployment`, `Domain`, `Account`, `Activity` and this. It was once called
+ * `TokenListItem`, named for the surface that returned it rather than for
+ * what it is, which is exactly why {@link TokenCreateResponse} used to
+ * restate its fields instead of extending it.
+ *
+ * The token itself is never here. The secret is shown once at creation
+ * ({@link TokenCreateResponse.secret}) and never again, so an entity read
+ * carries only the management identifier and lifecycle metadata.
  */
-export interface TokenListItem {
+export interface Token {
   /** 7-char management identifier (e.g., "a1b2c3d") */
   readonly token: string;
   /** Labels for categorization and filtering. Always present, empty array when none. */
@@ -222,25 +248,20 @@ export interface TokenListItem {
 /**
  * Response for listing tokens
  */
-export interface TokenListResponse {
-  /** Array of tokens (security-redacted for list display) */
-  tokens: TokenListItem[];
-  /** Cursor for pagination, null if no more pages */
-  cursor: string | null;
+export interface TokenListResponse extends ListResponse {
+  /** Array of tokens (the secret is never among them) */
+  tokens: Token[];
 }
 
 /**
- * Response for token creation
+ * Response from token creation. Extends Token with the one field that
+ * exists only on creation — the same shape as
+ * {@link DeploymentCreateResponse}, because a 201 returns the resource it
+ * created plus whatever is knowable only once.
  */
-export interface TokenCreateResponse {
-  /** 7-char management identifier */
-  token: string;
+export interface TokenCreateResponse extends Token {
   /** The raw credential value (shown once at creation, then never again) */
-  secret: string;
-  /** Labels for categorization and filtering. Always present, empty array when none. */
-  labels: string[];
-  /** Unix timestamp (seconds) when token expires, null for never */
-  expires: number | null;
+  readonly secret: string;
 }
 
 // =============================================================================
@@ -1577,11 +1598,9 @@ export interface ActivityMeta {
 /**
  * Response from GET /activities endpoint
  */
-export interface ActivityListResponse {
+export interface ActivityListResponse extends ListResponse {
   /** Array of activities */
   activities: Activity[];
-  /** Cursor for pagination, null if no more pages */
-  cursor: string | null;
 }
 
 // =============================================================================
