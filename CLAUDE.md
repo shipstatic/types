@@ -284,15 +284,22 @@ vocabulary — shipping the operator schema would enumerate every internal
 column, filter, and lifecycle field we hold on an account to anyone who runs
 `npm install`. Reach is the cost, not correctness.
 
-**The price is paid in `web/my`, deliberately.** With no shared type, nothing
-compile-checks the operator wire against its client, and the two have drifted
-before — by sixteen fields, including a billing reference read under a name
-the API has never sent, which left an operator action permanently
-unreachable. Two things hold the seam instead:
+**The price is paid in `web/my`, deliberately — and this is the one place it
+is written down.** With no shared type, nothing compile-checks the operator
+wire against its client. By 2026-07-28 the two had drifted by sixteen fields:
+`web/my` declared nine the API never sent — five of which
+(`status`, `units`, `synced`, `grace`, `overrides`) it also *rendered*, so
+those columns had shown an empty cell on every row since the table was
+written — and omitted seven the API did send. Among the phantoms was the
+billing reference, read as `sub` where the API has always sent `billing`,
+which left the operator's delete-billing action permanently unreachable
+because its visibility was gated on that field.
+
+Two things hold the seam instead of a compiler:
 `cloudflare/api/tests/integration/list-contract.test.ts` spells out all five
 operator row shapes and fails when a projection changes, and the header of
-`web/my`'s `features/admin/types.ts` states the obligation to change both in
-one commit. A new operator column touches both files or it is drift.
+`web/my`'s `features/admin/types.ts` states the obligation. A new operator
+column touches both files in one commit or it is drift.
 
 If the operator surface ever needs a third consumer, that is the moment to
 reopen this — a private `@shipstatic/admin-types` package, not this one.
