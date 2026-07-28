@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ErrorType, isShipError, ShipError } from '../src/index';
+import { assertShipJsonSyntax, ErrorType, isShipError, ShipError } from '../src/index';
 
 describe('ShipError construction', () => {
   it('direct constructor sets type, message, status, details and is an Error/ShipError', () => {
@@ -107,6 +107,58 @@ describe('ShipError factories', () => {
     expect(err.type).toBe(ErrorType.Config);
     expect(err.message).toBe('Config is bad');
     expect(err.status).toBeUndefined();
+  });
+});
+
+describe('semantic categories', () => {
+  /**
+   * The partition law: every 4xx-class error is either the auth category or
+   * the client category — never neither. Consumers branch on the categories
+   * alone (auth → re-credential, client → show the wire message, else →
+   * generic server fault), so a 4xx type in neither set would be reported to
+   * users as a server error.
+   *
+   * Asserted over the factories rather than a hand-listed set, so a new 4xx
+   * type fails here until it is categorised.
+   */
+  it('categorises every 4xx-class error as auth or client', () => {
+    const fourXX = [
+      ShipError.validation('v'),
+      ShipError.notFound('Resource'),
+      ShipError.forbidden('f'),
+      ShipError.rateLimit(),
+      ShipError.authentication(),
+      ShipError.business('b'),
+      ShipError.config('c'),
+      ShipError.file('f'),
+    ];
+
+    for (const err of fourXX) {
+      expect(
+        err.isAuthError() || err.isClientError(),
+        `${err.type} belongs to neither category`,
+      ).toBe(true);
+    }
+  });
+
+  it('keeps notFound and rateLimit inside the client category', () => {
+    // Both are 4xx carrying user-facing wire messages. Excluding them forced
+    // consumers to pair isClientError() with their own status-range check.
+    expect(ShipError.notFound('Deployment', 'abc').isClientError()).toBe(true);
+    expect(ShipError.rateLimit().isClientError()).toBe(true);
+  });
+
+  it('leaves server faults in no category, so they render generically', () => {
+    const api = ShipError.api('boom');
+    expect(api.isClientError()).toBe(false);
+    expect(api.isAuthError()).toBe(false);
+    expect(api.isNetworkError()).toBe(false);
+  });
+
+  it('treats network as its own category, not a client fault', () => {
+    const net = ShipError.network('offline');
+    expect(net.isNetworkError()).toBe(true);
+    expect(net.isClientError()).toBe(false);
   });
 });
 
@@ -510,5 +562,52 @@ describe('ShipError.fromFetchError', () => {
     const generic = new Error('boom');
     const err = ShipError.fromFetchError(generic);
     expect(err.message).toBe('Request failed: boom');
+  });
+});
+
+describe('assertShipJsonSyntax', () => {
+  // Syntax only. Schema evolves on the server, so anything a client judges
+  // beyond these two properties could reject a config a newer platform accepts.
+  it('accepts any well-formed JSON object, including keys it does not know', () => {
+    expect(() => assertShipJsonSyntax('{}')).not.toThrow();
+    expect(() => assertShipJsonSyntax('{"cleanUrls":true}')).not.toThrow();
+    // A future schema field must not be rejected by an older client.
+    expect(() => assertShipJsonSyntax('{"somethingInventedLater":{"a":1}}')).not.toThrow();
+  });
+
+  it('rejects the hand-edit mistakes that otherwise cost an upload round-trip', () => {
+    const broken = [
+      '{"redirects":[],}', // trailing comma
+      '{ // a comment\n"cleanUrls":true}', // JSONC habit
+      "{'cleanUrls':true}", // single quotes
+      '{cleanUrls:true}', // unquoted key
+      '{“cleanUrls”:true}', // smart quotes pasted from docs
+      '', // empty file
+    ];
+    for (const text of broken) {
+      expect(() => assertShipJsonSyntax(text), text).toThrow(ShipError);
+    }
+  });
+
+  it('strips a UTF-8 BOM rather than rejecting it, matching the server', () => {
+    // Windows editors and PowerShell redirects write one; the server accepts
+    // it, so rejecting here would be a false negative.
+    expect(() => assertShipJsonSyntax('﻿{"cleanUrls":true}')).not.toThrow();
+  });
+
+  it('rejects valid JSON that is not an object', () => {
+    for (const text of ['[]', '"a string"', '42', 'null', 'true']) {
+      expect(() => assertShipJsonSyntax(text), text).toThrow(ShipError);
+    }
+  });
+
+  it('reports Config — the same type the server uses, so the contract matches', () => {
+    try {
+      assertShipJsonSyntax('{oops}');
+      throw new Error('expected a throw');
+    } catch (err) {
+      expect(isShipError(err)).toBe(true);
+      expect((err as ShipError).type).toBe(ErrorType.Config);
+    }
   });
 });

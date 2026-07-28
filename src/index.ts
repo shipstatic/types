@@ -229,6 +229,8 @@ export interface TokenListItem {
 export interface TokenListResponse {
   /** Array of tokens (security-redacted for list display) */
   tokens: TokenListItem[];
+  /** Cursor for pagination, null if no more pages */
+  cursor: string | null;
   /** Total number of tokens */
   total: number;
 }
@@ -397,11 +399,19 @@ const CLIENT_ONLY_ERROR_TYPES = new Set<string>([
  * union so `.has(error.type)` accepts any value from the union.
  */
 const ERROR_CATEGORIES = {
+  /**
+   * Every 4xx-class type — the caller's request or state is at fault, and
+   * the authored message is safe to surface verbatim. The set is exhaustive
+   * on purpose: a partial one forces consumers to add a status-range check
+   * beside every `isClientError()` call for the types it forgot.
+   */
   client: new Set<ErrorType>([
     ErrorType.Business,
     ErrorType.Config,
     ErrorType.File,
     ErrorType.Forbidden,
+    ErrorType.NotFound,
+    ErrorType.RateLimit,
     ErrorType.Validation,
   ]),
   network: new Set<ErrorType>([ErrorType.Network]),
@@ -1004,6 +1014,54 @@ export const SPA_DEFAULT_CONFIG = {
   rewrites: [{ source: '/(.*)', destination: '/index.html' }],
 } as const;
 
+/**
+ * Assert that a ship.json file is *syntactically* loadable. Syntax only —
+ * never schema.
+ *
+ * ship.json is validated and compiled on the server, deliberately: the schema
+ * and the compiler evolve, and a client that judged them would reject configs
+ * a newer platform accepts. That reasoning bounds what a client may check to
+ * the properties which are true of *every* past and future schema:
+ *
+ *   1. it parses as JSON — JSON syntax is frozen (RFC 8259), so text that
+ *      does not parse can never be a valid config;
+ *   2. its top level is an object — ship.json is `{ ... }` in every version.
+ *
+ * Both are monotonic: neither can ever reject something the server would
+ * accept. Everything beyond them (field names, types, rule semantics, which
+ * keys are permitted) stays server-side, where it can change.
+ *
+ * The payoff is the common case. Hand-edited JSON fails on a trailing comma,
+ * a `//` comment, single quotes, unquoted keys, or smart quotes pasted from
+ * documentation — mistakes that otherwise cost a full upload round-trip to
+ * discover. A UTF-8 BOM (Windows editors, PowerShell redirects) is stripped
+ * before parsing rather than rejected, because the server accepts it too;
+ * diverging there would reintroduce exactly the false rejection this
+ * function exists to avoid.
+ *
+ * @throws {ShipError} `ErrorType.Config` — the same type the server's own
+ * config rejection carries, so the error contract is identical wherever the
+ * failure is detected.
+ */
+export function assertShipJsonSyntax(text: string): void {
+  const withoutBom = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(withoutBom);
+  } catch (error) {
+    throw ShipError.config(`invalid JSON format in config: ${(error as Error).message}`, {
+      filePath: DEPLOYMENT_CONFIG_FILENAME,
+    });
+  }
+
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw ShipError.config(`${DEPLOYMENT_CONFIG_FILENAME} must contain a JSON object`, {
+      filePath: DEPLOYMENT_CONFIG_FILENAME,
+    });
+  }
+}
+
 // =============================================================================
 // VALIDATION UTILITIES
 // =============================================================================
@@ -1480,6 +1538,10 @@ export interface ActivityMeta {
 export interface ActivityListResponse {
   /** Array of activities */
   activities: Activity[];
+  /** Cursor for pagination, null if no more pages */
+  cursor: string | null;
+  /** Total number of activities */
+  total: number;
 }
 
 // =============================================================================
