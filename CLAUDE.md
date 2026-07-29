@@ -119,7 +119,36 @@ const internal = (error.details as { internal?: string } | undefined)?.internal;
 
 ### Error Flow
 
-**The message authoring law.** The wire `message` is displayed verbatim on every surface — web console alerts, CLI stderr, SDK consumers. Producers therefore author messages for end users at the throw site (plain sentences; machine data like timestamps, bucket names, or ids goes in `details`, never in prose). Surfaces may add context-actionable guidance in their own vocabulary (the CLI mentions its flags) or presentation chrome (toast titles), and may compose copy where no wire exists (network failures, timeouts) — but they never re-word a wire message. Clients branch on `error` type / `status`, never on message strings, which is what keeps message improvements free.
+**The message authoring law.** The wire `message` is authored for the person
+who will read it, at the throw site, and every surface relays it — web console
+alerts, CLI stderr, SDK consumers. Producers write plain sentences; machine
+data (timestamps, bucket names, ids) goes in `details`, which rides
+`toResponse()` into the machine channels and is deliberately not rendered in
+human ones. Clients branch on `error` type / `status`, never on message
+strings, which is what keeps message improvements free.
+
+**A surface composes its own copy in exactly two cases, and both are the
+absence of a wire message rather than a disagreement with one:**
+
+- **Nothing was received.** Network failure, timeout, cancellation — no
+  response exists, so there is nothing to relay and the surface owns the words.
+- **Authentication.** The API makes these messages uninformative *on purpose*:
+  `toResponse()` strips `details.internal`, so every cause — missing subject,
+  expired session, unknown key — arrives as the same flat "Authentication
+  failed", because naming the failed check tells an attacker which one to fix.
+  There is therefore nothing to relay by construction, and the remedy is
+  client-specific besides: the CLI names its flags, the dashboard says the
+  session expired. The `internal:` telemetry pattern below and this exception
+  are two halves of one decision.
+
+**Everything else is relayed, including 5xx.** A server fault has nothing to
+withhold: the API's global handler emits either a deliberately authored
+sentence (a 503 naming what is unavailable) or a flat generic, and sends the
+raw failure to Slack rather than to the client. A surface may **add** its own
+chrome around a relayed message — a toast title, a status-page pointer — but
+never replaces it. The CLI discarded every 5xx message until 2026-07-29, which
+is what this clause exists to prevent: the platform authored a sentence for the
+user and one surface threw it away.
 
 
 Errors flow through the platform along a single, symmetric path. Every HTTP client (SDK, web console, future) uses the same two helpers; the API worker does the inverse. There is no other way to construct or hydrate a `ShipError` in HTTP context.
@@ -182,9 +211,9 @@ Errors flow through the platform along a single, symmetric path. Every HTTP clie
 Interfaces define the **minimal contract** — SDK implementations may add runtime options (timeout, signal, callbacks). Always match the full interface:
 
 ```
-DeploymentResource : upload, list, get, set, remove
-DomainResource     : set, list, get, remove, verify, validate, dns, records, share
-TokenResource      : create, list, remove
+DeploymentResource : upload, list, get, set, delete
+DomainResource     : set, list, get, delete, verify, validate, dns, records, share
+TokenResource      : create, list, delete
 AccountResource    : get
 ```
 
@@ -289,6 +318,35 @@ Four rules, each of which was broken once and is now structural:
   versus accepted is the status code's job (200 / 202), never a boolean's.
   The law is written out once, on `DeploymentDeleteResponse`; the other five
   link to it.
+- **A report answers a question and carries only the answer.** The fourth
+  shape, and the largest: `PlatformLimits`, `LabelsResponse`,
+  `SetupInstructionsResponse`, `DomainRecordsResponse`, `DomainDnsResponse`,
+  `DomainShareResponse`, `DomainValidateResponse`, `SPACheckResponse`,
+  `PingResponse`, `AccountKeyResponse`. A report names no resource it did not
+  compute and restates nothing the status code already said — `GET /ping`
+  answers with the server clock, because a 200 IS the liveness answer.
+
+  **Booleans are allowed only when they ARE the answer.** `valid`, `isSPA`,
+  `available` answer the question that was asked; `success`, `changed`,
+  `queued` assert that the call happened, which the status code owns. The two
+  read alike and are opposites.
+
+  This law is why the middle ground has no shared type, and the question is
+  worth answering once: an error body is metadata about a non-event, so
+  failure has exactly one shape and `ErrorResponse` can be one type. A report
+  body IS the product — three byte counts, a DNS record list, a clock — so it
+  has no shape to share. Unify errors by a TYPE because they have one shape;
+  unify reports by a LAW because they have one purpose. A shared base would
+  have admitted every field the fence below bans, which is the tell that it
+  was the wrong instrument.
+
+  **The law is mechanical, not prose** — `tests/response-shapes.test.ts` walks
+  this file and fails on a banned field. It exists because the three laws
+  above were policed and this one was not, which is exactly how `PingResponse`
+  grew a `success` that was a literal constant in the route, and how an admin
+  endpoint came to ship a `note` field carrying API documentation in every
+  response body.
+
 - **A published contract names every shape it exposes.** No anonymous object
   types in an exported signature — not as a return (`share` once answered
   `Promise<{domain, hash}>`, so the CLI declared its own
@@ -298,6 +356,23 @@ Four rules, each of which was broken once and is now structural:
   cannot be imported, so every consumer that needs to hold one redeclares it
   — which is the drift this package exists to prevent, committed inside the
   package itself.
+
+- **One operation, one verb — and destruction is `delete`.** The verb is the
+  same word in the method, the command, the response type, the activity event,
+  and the sentence a user reads. `delete` is the platform's, chosen because two
+  layers cannot say anything else: HTTP names the method `DELETE`, and the
+  activity events persisted in D1 are `deployment.delete` / `domain.delete` /
+  `token.delete` / `account.delete`, which the dashboard renders as "Deployment
+  Deleted". It is also the accurate word — JavaScript's own collections use
+  `Map.prototype.delete` to destroy, while `Element.remove()` merely detaches a
+  node that goes on existing. ShipStatic destroys.
+
+  This was `remove` on the client tier until 2026-07-29, and the split was
+  user-visible rather than cosmetic: one action produced "token removed" in the
+  CLI and "Token Deleted" in the dashboard minutes apart. The published contract
+  contradicted itself on a single line — `remove: (id) => Promise<DeploymentDeleteResponse>`
+  — which is the tell to watch for. **A method whose name disagrees with its own
+  return type is the drift announcing itself.**
 
 **New fields on existing response entities are optional** (`readonly x?: T`),
 by the additive-evolution law: published SDK versions return the entity

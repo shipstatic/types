@@ -304,6 +304,10 @@ export interface DnsLookup {
   provider?: DnsProvider;
 }
 
+/**
+ * A report: it answers a question and carries only the answer (`CLAUDE.md`,
+ * "A report answers a question").
+ */
 export interface DomainDnsResponse {
   /** The domain name */
   domain: string;
@@ -317,6 +321,9 @@ export interface DomainDnsResponse {
  *
  * `/admin/domains/:domain/share` answers the same shape, which is the admin
  * law working: the operator surface is the public grammar with a prefix.
+ *
+ * A report: it answers a question and carries only the answer (`CLAUDE.md`,
+ * "A report answers a question").
  */
 export interface DomainShareResponse {
   /** The domain the setup link is for */
@@ -327,6 +334,9 @@ export interface DomainShareResponse {
 
 /**
  * Response for domain DNS records
+ *
+ * A report: it answers a question and carries only the answer (`CLAUDE.md`,
+ * "A report answers a question").
  */
 export interface DomainRecordsResponse {
   /** The domain name */
@@ -380,6 +390,9 @@ export function validateIdempotencyKey(value: unknown): string | undefined {
  * no identity, no row and no `created`, so there is nothing for a keyset
  * cursor to resume after, and its consumer is an autocomplete that wants the
  * whole set. Bounded by `PAGINATION.GLOBAL_LIMIT` rather than paginated.
+ *
+ * A report: it answers a question and carries only the answer (`CLAUDE.md`,
+ * "A report answers a question").
  */
 export interface LabelsResponse {
   readonly labels: string[];
@@ -391,8 +404,13 @@ export interface LabelsResponse {
  *
  * `custom` is the provider-specific walkthrough when the provider is known;
  * `generic` always answers, so a caller never has nothing to show.
+ *
+ * A report: it answers a question and carries only the answer (`CLAUDE.md`,
+ * "A report answers a question").
  */
 export interface SetupInstructionsResponse {
+  /** The domain the instructions are for — a report names its subject */
+  readonly domain: string;
   /** One-line summary of what to do */
   readonly tldr: string;
   /** Provider-specific instructions, null when the provider is unknown */
@@ -404,7 +422,14 @@ export interface SetupInstructionsResponse {
 }
 
 /**
- * Response for domain validation
+ * `POST /domains/validate` — a report answering "is this name usable, and if
+ * not, why".
+ *
+ * An unusable name is a legitimate ANSWER, not a failure, so this is a 200 and
+ * the verdict rides the body. `reason` was named `error` until 2026-07-29,
+ * which collided with {@link ErrorResponse}'s reserved key — there `error` is
+ * an `ErrorType` a client branches on, here it is prose a client displays, and
+ * one key cannot mean both. See {@link DeploymentDeleteResponse} for the law.
  */
 export interface DomainValidateResponse {
   /** Whether the domain is valid */
@@ -413,8 +438,8 @@ export interface DomainValidateResponse {
   normalized: string | null;
   /** Whether the domain is available, null when invalid */
   available: boolean | null;
-  /** Error message, null when valid */
-  error: string | null;
+  /** Why the name is unusable, null when valid — displayed verbatim. */
+  reason: string | null;
 }
 
 // =============================================================================
@@ -590,6 +615,9 @@ export interface AccountDeleteResponse {
  * (`Account.hint`), and the plaintext exists exactly once, in this response.
  * The raw credential is `secret` on every surface that mints one — the same
  * field `TokenCreateResponse` carries — because one concept gets one name.
+ *
+ * A report: it answers a question and carries only the answer (`CLAUDE.md`,
+ * "A report answers a question").
  */
 export interface AccountKeyResponse {
   /** The raw API key (shown once at mint, then never again) */
@@ -682,12 +710,19 @@ const CLIENT_ONLY_ERROR_TYPES = new Set<string>([
 const ERROR_CATEGORIES = {
   /**
    * Client-attributable types. Exhaustive over the 4xx-carrying types, and
-   * it must include the statusless ones (`Config`, `File`) — those are
-   * raised locally by the SDK and have no status for `isClientError`'s
-   * second arm to read.
+   * over the statusless ones too — those are raised locally and have no
+   * status for `isClientError`'s second arm to read, so omitting one makes it
+   * read as a server fault. The rule is the membership test: every type in
+   * `CLIENT_ONLY_ERROR_TYPES` except `Network` (which `isNetworkError` owns)
+   * belongs here.
+   *
+   * `Cancelled` was missing until 2026-07-29, which is exactly that failure:
+   * a caller who aborted their own deploy was told "server error: please try
+   * again" — the CLI's fallback for everything this set does not claim.
    */
   client: new Set<ErrorType>([
     ErrorType.Business,
+    ErrorType.Cancelled,
     ErrorType.Config,
     ErrorType.File,
     ErrorType.Forbidden,
@@ -1021,6 +1056,9 @@ export function isShipError(error: unknown): error is ShipError {
  *
  * These are the *platform's* posted caps for the current account — server
  * truth delivered at runtime, never hard-coded on the client.
+ *
+ * A report: it answers a question and carries only the answer (`CLAUDE.md`,
+ * "A report answers a question").
  */
 export interface PlatformLimits {
   /** Maximum size in bytes for a single file. */
@@ -1171,13 +1209,20 @@ export function hasUnbuiltMarker(filePath: string): boolean {
 // =============================================================================
 
 /**
- * Simple ping response for health checks
+ * `GET /ping` — a report of the server clock.
+ *
+ * Liveness is the STATUS CODE's answer, not a field's: a 200 means reachable,
+ * and any other outcome throws before a body is read. So the body carries the
+ * one thing a status code cannot — the server's own clock, which is what lets a
+ * client detect skew against a token expiry. It read `{ success: true,
+ * timestamp? }` until 2026-07-29, where `success` was a literal constant in the
+ * route (zero bits, and the platform's own named anti-pattern) while the field
+ * that IS the payload was optional. See {@link DeploymentDeleteResponse} for
+ * the law, and `tests/response-shapes.test.ts` for the fence that holds it.
  */
 export interface PingResponse {
-  /** Always true if service is healthy */
-  success: boolean;
   /** Server time in unix seconds — the one wire unit for timestamps. */
-  timestamp?: number;
+  readonly timestamp: number;
 }
 
 // =============================================================================
@@ -1516,6 +1561,10 @@ export interface SPACheckDebug {
   reason: string;
 }
 
+/**
+ * A report: it answers a question and carries only the answer (`CLAUDE.md`,
+ * "A report answers a question").
+ */
 export interface SPACheckResponse {
   /** Whether the project is detected as a Single Page Application */
   isSPA: boolean;
@@ -1697,7 +1746,7 @@ export interface DeploymentResource<
   list: (options?: ListOptions) => Promise<DeploymentListResponse>;
   get: (id: string) => Promise<Deployment>;
   set: (id: string, options: DeploymentSetOptions) => Promise<Deployment>;
-  remove: (id: string) => Promise<DeploymentDeleteResponse>;
+  delete: (id: string) => Promise<DeploymentDeleteResponse>;
 }
 
 /**
@@ -1707,7 +1756,7 @@ export interface DomainResource {
   set: (name: string, options?: DomainSetOptions) => Promise<DomainSetResult>;
   list: (options?: ListOptions) => Promise<DomainListResponse>;
   get: (name: string) => Promise<Domain>;
-  remove: (name: string) => Promise<DomainDeleteResponse>;
+  delete: (name: string) => Promise<DomainDeleteResponse>;
   verify: (name: string) => Promise<DomainVerifyResponse>;
   validate: (name: string) => Promise<DomainValidateResponse>;
   dns: (name: string) => Promise<DomainDnsResponse>;
@@ -1729,7 +1778,7 @@ export interface TokenResource {
   create: (options?: TokenCreateOptions) => Promise<TokenCreateResponse>;
   list: (options?: ListOptions) => Promise<TokenListResponse>;
   get: (token: string) => Promise<Token>;
-  remove: (token: string) => Promise<TokenDeleteResponse>;
+  delete: (token: string) => Promise<TokenDeleteResponse>;
 }
 
 // =============================================================================
@@ -1753,6 +1802,26 @@ export interface BillingStatus {
   status: string | null;
   /** Link to Creem customer portal for billing management, null if unavailable */
   portal: string | null;
+}
+
+/**
+ * Acknowledgement of `POST /billing/cancel`.
+ *
+ * Cancelling leaves no billing entity to return, so it answers with the
+ * account and the one field of the account the call changed — the plan it
+ * landed on. See {@link DeploymentDeleteResponse} for the law.
+ *
+ * This read `{ success: true, message: 'Subscription canceled successfully…' }`
+ * until 2026-07-29, an anonymous shape that `web/my` redeclared inline and
+ * whose prose no surface ever displayed: both callers await the promise and
+ * discard the body, then compose their own toast. The message was written,
+ * serialized, and thrown away on every cancellation.
+ */
+export interface BillingCancelResponse {
+  /** The account whose subscription was cancelled */
+  readonly account: string;
+  /** The plan the account now holds — `free` on a successful cancellation */
+  readonly plan: AccountPlanType;
 }
 
 /**
