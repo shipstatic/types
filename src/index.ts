@@ -703,6 +703,15 @@ const SERVER_PRODUCIBLE_ERROR_TYPES = new Set<string>(
 );
 
 /**
+ * Ceiling on a message adopted from a **non-JSON** error body — a foreign
+ * responder's, never this platform's. Generous for the plain-text one-liners
+ * intermediaries actually send (`error code: 1015`), far below a document.
+ * Our own messages are never measured against it: a JSON body is the API's
+ * contract, and truncating a long validation message would be the bug.
+ */
+const MAX_FOREIGN_MESSAGE_LENGTH = 200;
+
+/**
  * Standard error response format used everywhere
  */
 export interface ErrorResponse {
@@ -788,8 +797,17 @@ export class ShipError extends Error {
           }
         }
       } else {
-        const text = await response.text();
-        if (text) message = text;
+        // A non-JSON body did not come from this platform — every API error
+        // is `ErrorResponse` JSON — so it is an intermediary's output, and
+        // the two kinds it produces need opposite treatment. A CDN's plain
+        // `error code: 1015` is the most useful thing there is to say. A
+        // proxy's HTML error page is a *document*, not a message: adopting it
+        // verbatim made a misconfigured `apiUrl` print 2,059 characters of
+        // markup as the error. Trust it only when it reads as a message.
+        const text = (await response.text()).trim();
+        if (text && !text.startsWith('<') && text.length <= MAX_FOREIGN_MESSAGE_LENGTH) {
+          message = text;
+        }
       }
     } catch {
       // Body unreadable; fall through to operationName-derived message.

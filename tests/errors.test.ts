@@ -469,6 +469,50 @@ describe('ShipError.fromHttpResponse', () => {
       expect(err.message).toBe('Internal Server Error');
     });
 
+    // A non-JSON body is a foreign responder's — never this platform's, which
+    // always emits ErrorResponse JSON. These four pin the line between "a
+    // message worth quoting" and "a document that must not become one": a
+    // misconfigured apiUrl once put 2,059 characters of a proxy's HTML error
+    // page into `message`, and every surface printed all of it.
+    it('does NOT adopt an HTML error page as the message', async () => {
+      const page = `<!DOCTYPE html><html><head><title>404</title></head><body>${'x'.repeat(2000)}</body></html>`;
+      const res = new Response(page, {
+        status: 404,
+        headers: { 'content-type': 'text/html' },
+      });
+      const err = await ShipError.fromHttpResponse(res, 'Get deployment');
+      expect(err.message).toBe('Get deployment failed with status 404');
+    });
+
+    it('does NOT adopt markup even when the content-type claims text/plain', async () => {
+      // The predicate reads the body, not the header — an intermediary that
+      // mislabels its own HTML must not slip through.
+      const res = new Response('<html><body>nope</body></html>', {
+        status: 502,
+        headers: { 'content-type': 'text/plain' },
+      });
+      const err = await ShipError.fromHttpResponse(res, 'Ping');
+      expect(err.message).toBe('Ping failed with status 502');
+    });
+
+    it('does NOT adopt an over-long plain-text body as the message', async () => {
+      const res = new Response('x'.repeat(201), {
+        status: 500,
+        headers: { 'content-type': 'text/plain' },
+      });
+      const err = await ShipError.fromHttpResponse(res, 'Ping');
+      expect(err.message).toBe('Ping failed with status 500');
+    });
+
+    it("keeps a CDN's short plain-text message — the case worth quoting", async () => {
+      const res = new Response('  error code: 1015  ', {
+        status: 429,
+        headers: { 'content-type': 'text/plain' },
+      });
+      const err = await ShipError.fromHttpResponse(res);
+      expect(err.message).toBe('error code: 1015');
+    });
+
     it('composes operationName-derived fallback when body is empty (no content-type)', async () => {
       const res = new Response(null, { status: 500 });
       const err = await ShipError.fromHttpResponse(res, 'Ping');
