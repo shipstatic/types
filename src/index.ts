@@ -627,7 +627,15 @@ export interface AccountOverrides {
  * (`DeploymentStatus`, `DomainStatus`, `AccountPlan`, `AuthMethod`) follow.
  */
 export const ErrorType = {
-  /** Validation failed (400). Input shape is wrong. */
+  /**
+   * Validation failed. Input shape is wrong.
+   *
+   * Carries 400 when an API judged it — including a client-side pre-check of a
+   * rule the server enforces too, which keeps the error identical wherever it
+   * was caught. **Statusless** when a client rejects something no API judges,
+   * such as a CLI's own command grammar: `status` is documented "(API
+   * contexts)" on `ErrorResponse`, so there is none to report.
+   */
   Validation: 'validation_failed',
   /** Resource not found (404). */
   NotFound: 'not_found',

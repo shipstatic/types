@@ -68,6 +68,17 @@ ShipError.file(message, details?)               // pass `{ filePath }` for the p
 ShipError.config(message, details?)
 ShipError.api(message, status?, details?)       // status defaults to 500
 
+// The four CLIENT-ONLY factories above (`network`, `cancelled`, `file`,
+// `config`) are exactly the statusless ones, and that pairing is load-bearing:
+// `ErrorResponse.status` is documented "(API contexts)", so it answers "what
+// would the wire say?" — not "is this a 4xx-ish sort of problem?". A local
+// pre-check that MIRRORS a server rule (blocked extension, label shape, token
+// format) rightly keeps the server's type and 400, because dual validation
+// exists precisely so the error reads the same wherever it was caught. A fault
+// with no server rule to mirror (wrong runtime, unreadable file, a CLI's own
+// command grammar) has no status to report, and reaches for one of these four.
+// See `npm/ship/CLAUDE.md`, "What a status means", for the worked split.
+
 // Type checks — semantic categories cover the UX-relevant decisions.
 // For specific-type checks, use `error.type === ErrorType.X` or `isType(t)`.
 error.isClientError()      // client-attributable: a client-fault TYPE, or any 4xx STATUS
