@@ -347,6 +347,27 @@ Four rules, each of which was broken once and is now structural:
   endpoint came to ship a `note` field carrying API documentation in every
   response body.
 
+- **One response is outside the four shapes, and it is recorded rather than
+  reshaped.** `GET /deployments/:deployment/config` answers the caller's own
+  `ship.json` — re-parsed through the public schema from the byte-exact R2
+  escrow, which is THE record — or `null` when the deployment carries no
+  config. It is not a projection of a platform entity, so no shape above fits,
+  and it has no type here because the document's schema is ship.json's, which
+  the API owns and evolves.
+
+  **Wrapping it would be the worse answer.** An envelope would make a caller
+  unwrap a platform shape to reach a document the platform did not author,
+  against the whole point of the escrow. `null` rather than a 404 for the same
+  reason it is cheap: `Deployment.config` is a boolean on the entity, so
+  "is there one" is already answered before anyone asks for it — this endpoint
+  answers with the document or its absence. Its two mid-transition cases
+  (escrow not yet written, cleanup already swept) answer like a no-config
+  deployment deliberately, while a missing record on a LIVE deployment is
+  storage drift and raises a 500 loudly.
+
+  Written down because the alternative is a future reader finding the platform's
+  only unnamed response body and correctly concluding it is drift.
+
 - **A published contract names every shape it exposes.** No anonymous object
   types in an exported signature — not as a return (`share` once answered
   `Promise<{domain, hash}>`, so the CLI declared its own
