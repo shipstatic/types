@@ -21,6 +21,7 @@ Single file: `src/index.ts`, organized into named sections in this order:
 | Error System | `ErrorType` (`as const` + type), `ShipError` class, `isShipError` guard |
 | Platform Limits | `PlatformLimits` (plan-based caps from the `/limits` endpoint — file size, file count, total size) |
 | Extension Blocklist | `BLOCKED_EXTENSIONS`, `isBlockedExtension()` |
+| Picker Accept Hint | `WEB_FILE_ACCEPT` — the `accept` value for a browser file picker. A **hint, never a rule**: `accept` can express only an allowlist while the platform's rule is a blocklist, so this list is necessarily narrower than what the platform hosts and must never decide whether a file may be deployed. It sits beside the blocklist so one file holds both, which is what lets `tests/validation-constants.test.ts` fence the invariant that matters — the picker never offers what the platform will refuse. |
 | Filename Character Validation | `UNSAFE_FILENAME_CHARS`, `hasUnsafeChars()` |
 | Unbuilt Project Markers | `UNBUILT_PROJECT_MARKERS`, `hasUnbuiltMarker()` |
 | Common Responses | `PingResponse` (`timestamp` in unix seconds) |

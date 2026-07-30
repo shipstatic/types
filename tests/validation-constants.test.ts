@@ -29,6 +29,7 @@ import {
   validateCaller,
   validatePassword,
   validateToken,
+  WEB_FILE_ACCEPT,
 } from '../src/index';
 
 describe('Validation Constants - @shipstatic/types', () => {
@@ -112,6 +113,39 @@ describe('Validation Constants - @shipstatic/types', () => {
       const unknownExtensions = ['xyz', 'custom', 'parquet', 'avro'];
       for (const ext of unknownExtensions) {
         expect(BLOCKED_EXTENSIONS.has(ext)).toBe(false);
+      }
+    });
+  });
+
+  describe('WEB_FILE_ACCEPT', () => {
+    // Parsed from the PUBLISHED string rather than an exported array: the
+    // attribute value is the whole contract, so the fence must hold against
+    // exactly what a consumer receives.
+    const tokens = WEB_FILE_ACCEPT.split(',');
+    const extensions = tokens.map((token) => token.slice(1));
+
+    it('offers nothing the platform will refuse', () => {
+      // THE invariant. A picker that shows a file the deploy then rejects
+      // turns a hint into a lie, and there is no second place to catch it.
+      const offered = extensions.filter((ext) => BLOCKED_EXTENSIONS.has(ext));
+      expect(offered).toEqual([]);
+    });
+
+    it('is a well-formed accept attribute', () => {
+      for (const token of tokens) {
+        expect(token).toMatch(/^\.[a-z0-9]+$/);
+      }
+      expect(new Set(extensions).size).toBe(extensions.length);
+    });
+
+    it('offers a ZIP — a whole site in one file is the headline case', () => {
+      expect(extensions).toContain('zip');
+    });
+
+    it('offers the files a static site is actually made of', () => {
+      const staples = ['html', 'css', 'js', 'json', 'svg', 'png', 'woff2', 'webmanifest'];
+      for (const ext of staples) {
+        expect(extensions).toContain(ext);
       }
     });
   });
