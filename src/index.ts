@@ -1148,6 +1148,128 @@ export function isBlockedExtension(filename: string): boolean {
 }
 
 // =============================================================================
+// PICKER ACCEPT HINT
+// =============================================================================
+
+/**
+ * The extensions a browser file picker offers by default, grouped by role.
+ *
+ * Private on purpose: the only published form is `WEB_FILE_ACCEPT`, the
+ * attribute value itself. A published set would invite a call site to ask it
+ * whether a file is allowed — which is the one thing this list must never
+ * answer. See `WEB_FILE_ACCEPT`.
+ *
+ * Extensionless files (`LICENSE`, most `.well-known` entries) are inexpressible
+ * in `accept`, and reach a deployment by folder pick, ZIP, or drag-and-drop.
+ */
+const WEB_FILE_EXTENSIONS = [
+  // Markup & documents
+  'html',
+  'htm',
+  'xhtml',
+  'xml',
+  'txt',
+  'md',
+  'markdown',
+  'pdf',
+  'csv',
+  // Data & config
+  'json',
+  'jsonc',
+  'webmanifest',
+  'map',
+  'toml',
+  'yaml',
+  'yml',
+  'rss',
+  'atom',
+  // Styles
+  'css',
+  'scss',
+  'sass',
+  'less',
+  // Scripts & modules
+  'js',
+  'mjs',
+  'cjs',
+  'jsx',
+  'ts',
+  'tsx',
+  'wasm',
+  'vue',
+  'svelte',
+  // Images
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'avif',
+  'svg',
+  'ico',
+  'bmp',
+  'tif',
+  'tiff',
+  'heic',
+  'heif',
+  // Fonts
+  'woff',
+  'woff2',
+  'ttf',
+  'otf',
+  'eot',
+  // Audio
+  'mp3',
+  'wav',
+  'ogg',
+  'oga',
+  'opus',
+  'm4a',
+  'aac',
+  'flac',
+  'weba',
+  // Video
+  'mp4',
+  'webm',
+  'ogv',
+  'mov',
+  'm4v',
+  'avi',
+  // 3D models
+  'glb',
+  'gltf',
+  'usdz',
+  // Text tracks
+  'vtt',
+  'srt',
+  // Archive — a whole site in one file
+  'zip',
+] as const;
+
+/**
+ * The `accept` attribute value for a browser file picker offering web files.
+ *
+ * **This is a hint, never a rule.** `BLOCKED_EXTENSIONS` is the platform's
+ * gate and the only thing that decides what may be hosted; this constant
+ * decides what a *file dialog* shows first. The two are not two halves of one
+ * policy, and this one must never be consulted to accept or reject a file.
+ *
+ * The distinction is structural, not stylistic. `accept` can express only an
+ * allowlist, while the platform's rule is a blocklist — so this list is
+ * necessarily *narrower* than what the platform hosts, and reading it as
+ * authority would reject files the platform serves happily. It is also not
+ * enforcement in the browser's own terms: every file dialog offers an
+ * all-files escape, and **drag-and-drop ignores `accept` entirely**. The
+ * dropzone and the picker must reach the same verdict on the same files, and
+ * they do — because the verdict is `validateFiles`, downstream of both.
+ *
+ * Kept beside `BLOCKED_EXTENSIONS` so one file holds both, which is what lets
+ * `tests/validation-constants.test.ts` fence the invariant that matters: the
+ * picker must never offer a file the platform will refuse.
+ */
+export const WEB_FILE_ACCEPT: string = WEB_FILE_EXTENSIONS.map((ext) => `.${ext}`).join(',');
+
+// =============================================================================
 // FILENAME CHARACTER VALIDATION
 // =============================================================================
 
