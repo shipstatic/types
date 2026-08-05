@@ -755,6 +755,42 @@ const SERVER_PRODUCIBLE_ERROR_TYPES = new Set<string>(
 const MAX_FOREIGN_MESSAGE_LENGTH = 200;
 
 /**
+ * Did the runtime say the exchange never completed?
+ *
+ * WHATWG has `fetch` reject with a **TypeError** on network error, and undici,
+ * Chromium and Firefox comply. Bun does not: it rejects with a plain `Error`
+ * carrying a system `code` string. Captured 2026-08-05 (the capture script is
+ * in `tests/errors.test.ts`, "runtime failure shapes"):
+ *
+ * | failure       | Node 22 / undici          | Bun 1.3.14                                   |
+ * |---------------|---------------------------|----------------------------------------------|
+ * | refused       | `TypeError: fetch failed` | `Error` `code: 'ConnectionRefused'`          |
+ * | DNS failure   | `TypeError: fetch failed` | `Error` `code: 'ConnectionRefused'`          |
+ * | reset         | `TypeError: fetch failed` | `Error` `code: 'ECONNRESET'`                 |
+ * | TLS rejected  | `TypeError: fetch failed` | `Error` `code: 'UNKNOWN_CERTIFICATE_…ERROR'` |
+ *
+ * So the test is the **evidence, not a list of dialect strings**: a string
+ * `code` is a runtime naming a transport-level failure. An allowlist of codes
+ * was written first and rejected — the TLS row alone would mean enumerating
+ * BoringSSL's certificate table, and a code nobody guessed is precisely the bug
+ * this closes. Two kinds of error are deliberately NOT caught: ordinary JS
+ * faults carry no `code` at all, and a `DOMException`'s is a **number**, so
+ * aborts and timeouts fall through to their own arms.
+ *
+ * The accepted trade: a caller's `TokenProvider` that throws a coded error
+ * (`ENOENT` from a keychain read) is typed `Network` rather than `Api`. Both
+ * are wrong for it, `Network` is the cheaper wrong — it says "nothing was
+ * exchanged", which is true, where `Api` claims a server answered.
+ */
+function isTransportFailure(cause: Error): boolean {
+  if (typeof (cause as { code?: unknown }).code === 'string') return true;
+  // Spec runtimes put no code on the rejection itself. The message test is what
+  // keeps fetch's ARGUMENT errors out — `Failed to parse URL from …` is a
+  // caller's config mistake, not a transport failure.
+  return cause instanceof TypeError && cause.message.includes('fetch');
+}
+
+/**
  * Standard error response format used everywhere
  */
 export interface ErrorResponse {
@@ -900,7 +936,8 @@ export class ShipError extends Error {
    * Routing:
    * - Already a `ShipError` → returned as-is (caller's intent preserved)
    * - `AbortError` → `ShipError.cancelled(...)`
-   * - `TypeError` whose message mentions "fetch" → `ShipError.network(...)`
+   * - A transport failure → `ShipError.network(...)` — see `isTransportFailure`
+   *   for what each runtime offers as evidence
    * - Any other `Error` → `ShipError(Api, ...)` (no HTTP status — fetch never reached the server)
    * - Anything else (string, undefined, etc.) → `ShipError(Api, ...)`
    *
@@ -917,7 +954,7 @@ export class ShipError extends Error {
       if (cause.name === 'AbortError') {
         return ShipError.cancelled(`${op} was cancelled`);
       }
-      if (cause instanceof TypeError && cause.message.includes('fetch')) {
+      if (isTransportFailure(cause)) {
         return ShipError.network(`${op} failed: ${cause.message}`, { cause });
       }
       return new ShipError(ErrorType.Api, `${op} failed: ${cause.message}`);

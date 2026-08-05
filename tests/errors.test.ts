@@ -620,6 +620,95 @@ describe('ShipError.fromFetchError', () => {
     const err = ShipError.fromFetchError(generic);
     expect(err.message).toBe('Request failed: boom');
   });
+
+  /**
+   * Runtime failure shapes — CAPTURED, not guessed.
+   *
+   * `ship` ships as a Bun-compiled binary as well as an npm package, so one
+   * program runs on two engines and a failure must carry the same `ErrorType`
+   * on both. Clients branch on that type and never on message strings, so a
+   * refused connection typed `internal_server_error` under Bun means an agent
+   * that retries on `network_error` silently does not.
+   *
+   * Every fixture below is a transcript. To re-capture after a Bun upgrade,
+   * write this to a file and run it under `bun` and under `node`:
+   *
+   * ```js
+   * for (const [label, url] of [
+   *   ['refused', 'http://127.0.0.1:45999/'],
+   *   ['dns', 'http://no-such-host.invalid/'],
+   *   ['tls', 'https://127.0.0.1:45999/'],
+   * ]) {
+   *   try { await fetch(url); } catch (e) {
+   *     console.log(label, e.constructor.name, e.name, e.code, JSON.stringify(e.message));
+   *   }
+   * }
+   * ```
+   *
+   * A `reset` row needs a server that destroys the socket on connect; it was
+   * captured the same way and yields Bun `code: 'ECONNRESET'`.
+   */
+  describe('runtime failure shapes', () => {
+    /** Bun rejects with a plain `Error` carrying a system code — not the spec's TypeError. */
+    const bun = (code: string, message: string): Error =>
+      Object.assign(new Error(message), { code });
+
+    /** undici rejects with the spec's TypeError and hangs the detail off `cause`. */
+    const undici = (code: string, causeMessage: string): TypeError =>
+      Object.assign(new TypeError('fetch failed'), {
+        cause: Object.assign(new Error(causeMessage), { code }),
+      });
+
+    const UNABLE = 'Unable to connect. Is the computer able to access the url?';
+
+    it.each([
+      ['bun 1.3.14 · refused', bun('ConnectionRefused', UNABLE)],
+      // Bun collapses DNS failure into the same shape as a refused connection.
+      ['bun 1.3.14 · dns', bun('ConnectionRefused', UNABLE)],
+      ['bun 1.3.14 · reset', bun('ECONNRESET', 'The socket connection was closed unexpectedly.')],
+      // The row that rules out an allowlist: covering it by code would mean
+      // enumerating BoringSSL's certificate table.
+      [
+        'bun 1.3.14 · tls',
+        bun('UNKNOWN_CERTIFICATE_VERIFICATION_ERROR', 'unknown certificate verification error'),
+      ],
+      ['node 22 · refused', undici('ECONNREFUSED', 'connect ECONNREFUSED 127.0.0.1:45999')],
+      ['node 22 · dns', undici('ENOTFOUND', 'getaddrinfo ENOTFOUND no-such-host.invalid')],
+      ['node 22 · reset', undici('ECONNRESET', 'read ECONNRESET')],
+    ])('%s → ErrorType.Network', (_label, thrown) => {
+      const err = ShipError.fromFetchError(thrown, 'Ping');
+      expect(err.type).toBe(ErrorType.Network);
+      expect(err.isNetworkError()).toBe(true);
+      expect(err.status).toBeUndefined();
+      // The runtime's own sentence is relayed; only the TYPE is normalized.
+      expect(err.message).toBe(`Ping failed: ${thrown.message}`);
+      expect((err.details as { cause?: Error })?.cause).toBe(thrown);
+    });
+
+    // Both runtimes agree here, and the agreement is what these pin: a
+    // DOMException's `code` is a NUMBER, so the transport test must not claim
+    // it. `ship`'s own timeout is an AbortController, so it lands on the first
+    // row; `AbortSignal.timeout()` from a caller's `signal` lands on the second.
+    it.each([
+      ['abort', 'AbortError', 20, 'The operation was aborted.'],
+      ['timeout', 'TimeoutError', 23, 'The operation timed out.'],
+    ])('%s stays out of the Network arm (DOMException code is numeric)', (_l, name, code, msg) => {
+      const err = ShipError.fromFetchError(Object.assign(new Error(msg), { name, code }), 'Ping');
+      expect(err.type).not.toBe(ErrorType.Network);
+    });
+
+    it('a coded Error is transport evidence; an uncoded one is not', () => {
+      expect(ShipError.fromFetchError(bun('ConnectionRefused', 'x')).type).toBe(ErrorType.Network);
+      expect(ShipError.fromFetchError(new Error('x')).type).toBe(ErrorType.Api);
+    });
+
+    it("fetch's own argument errors are not transport failures", () => {
+      // A malformed `apiUrl`, not an unreachable one — no exchange was
+      // attempted, and nothing about the network is wrong.
+      const err = ShipError.fromFetchError(new TypeError('Failed to parse URL from ship'), 'Ping');
+      expect(err.type).toBe(ErrorType.Api);
+    });
+  });
 });
 
 describe('assertShipJsonSyntax', () => {
