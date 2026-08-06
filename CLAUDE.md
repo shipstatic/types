@@ -30,7 +30,7 @@ Single file: `src/index.ts`, organized into named sections in this order:
 | Validation Utilities | `validateIdempotencyKey` (+ `IDEMPOTENCY_KEY_CONSTRAINTS`), `validateToken` (classify, then apply the population's format rules via one shared prefixed-credential helper), `validateApiKey`, `validateDeployToken`, `validateCaller`, `validateApiUrl`, `isDeployment` |
 | SPA Check Types | `SPACheckRequest`, `SPACheckResponse` |
 | Static File | `StaticFile` (cross-environment file representation) |
-| URL Constant | `DEFAULT_API` |
+| Platform Constants | `DEFAULT_API`, `PUBLIC_DEPLOYMENT_TTL_SECONDS` (the anonymous-deploy lifetime — the API stamps `expires` and the claim window from it, and both MCP transports derive the duration they quote to agents; it was four restatements until 2026-08-06) |
 | Resource Contracts | `DeployInput`, `DeploymentUploadOptions`, `*Resource` interfaces |
 | Billing Types | `BillingStatus`, `CheckoutSession` |
 | Activity Types | `ActivityEvent`, `UserVisibleActivityEvent`, `Activity`, `ActivityMeta`, `ActivityListResponse` — wire contracts for `GET /activities`, produced by the API and consumed by `web/my`. There is deliberately **no** `ActivityResource`: the SDK does not reach that endpoint (recorded in `npm/ship/CLAUDE.md`), and a resource interface nothing implements would be dead surface. A shared type needs two consumers, not three. |
