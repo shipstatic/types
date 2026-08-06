@@ -1772,6 +1772,22 @@ export interface StaticFile {
 /** Default API URL if not otherwise configured. */
 export const DEFAULT_API = 'https://api.shipstatic.com';
 
+/**
+ * How long an anonymous deployment lives before it expires.
+ *
+ * The lifetime of the public tier, and one fact with several readers. The API
+ * stamps a deployment's `expires` from it and gives a claim code exactly the
+ * same window — a live site with a dead claim link is a coherence bug, so the
+ * two are one constant rather than two that agree. Both MCP transports quote
+ * the duration in prose an agent reads, and derive it from here rather than
+ * writing it out, which they did in eight places until this export existed.
+ *
+ * Seconds, spelled in the name: this platform has both second- and
+ * millisecond-valued durations, and the pair is only safe when each says which
+ * it is.
+ */
+export const PUBLIC_DEPLOYMENT_TTL_SECONDS = 3 * 24 * 60 * 60;
+
 // =============================================================================
 // RESOURCE INTERFACE CONTRACTS
 // =============================================================================
@@ -1828,8 +1844,8 @@ export interface DeploymentUploadOptions {
    *
    * **Agents are the audience.** A human notices a duplicate; an automated
    * retry does not. Pick a key that identifies the ATTEMPT — a run id, a
-   * commit sha, a uuid minted before the first try — never one that varies
-   * per attempt, which would defeat the point.
+   * commit sha, a uuid minted before the first try — never one minted fresh
+   * on each retry, which would defeat the point.
    *
    * The replay is per-caller, and it stores successes only: a failed deploy
    * retries fresh under the same key.
