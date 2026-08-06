@@ -20,6 +20,30 @@ export const DeploymentStatus = {
 export type DeploymentStatusType = (typeof DeploymentStatus)[keyof typeof DeploymentStatus];
 
 /**
+ * Which client made a deployment — the origin-tracking vocabulary.
+ *
+ * A closed set with many authors: the CLI, the SDK, the dashboard, both MCP
+ * transports, the GitHub Action, the n8n node and the VS Code extension each
+ * name themselves here. It lived in the API's config until 2026-08-06, where
+ * being server-side made it unenforceable in the one direction that matters —
+ * every client wrote a bare string, and a value outside the set was **silently
+ * dropped** by the server, so a typo did not fail anywhere. It stopped
+ * recording where deploys came from and said nothing.
+ */
+export const DeploymentVia = {
+  WEB: 'web',
+  SDK: 'sdk',
+  CLI: 'cli',
+  MCP: 'mcp',
+  GIT: 'git',
+  N8N: 'n8n',
+  GPT: 'gpt',
+  VSC: 'vsc',
+} as const;
+
+export type DeploymentViaType = (typeof DeploymentVia)[keyof typeof DeploymentVia];
+
+/**
  * Core deployment object - used in both API responses and SDK
  */
 export interface Deployment {
@@ -39,7 +63,15 @@ export interface Deployment {
   readonly password: boolean;
   /** Labels for categorization and filtering (lowercase, alphanumeric with separators). Always present, empty array when none. */
   labels: string[];
-  /** The client/tool used to create this deployment (e.g., 'web', 'sdk', 'cli'), null if unknown */
+  /**
+   * The client/tool that created this deployment, null if unknown.
+   *
+   * Deliberately wider than {@link DeploymentViaType}: this is stored data,
+   * and rows predate the vocabulary being closed. Narrowing the ENTITY would
+   * be a claim about every row already in the database; narrowing the
+   * REQUEST option ({@link DeploymentUploadOptions.via}) is a claim about
+   * what a client may send, which is ours to make.
+   */
   readonly via: string | null;
   /** Unix timestamp (seconds) when deployment was created */
   readonly created: number;
@@ -355,10 +387,40 @@ export interface DomainRecordsResponse {
  * API would reject the same value the same way.
  */
 export const IDEMPOTENCY_KEY_CONSTRAINTS = {
+  /**
+   * HTTP header name. Here for the same reason {@link CALLER.HEADER} is: a
+   * wire header has two ends, and the package that owns the value's format
+   * is the only place both ends can read its name from.
+   */
+  HEADER: 'Idempotency-Key',
   MAX_LENGTH: 256,
   /** How long a stored 201 stays replayable. */
   WINDOW_SECONDS: 24 * 60 * 60,
 } as const;
+
+/**
+ * Normalize a `via` value from any transport — trimmed, lowercased, and a
+ * member of {@link DeploymentVia}, or `undefined`.
+ *
+ * A format rule by this package's own test: a client can decide offline
+ * whether a value is well-formed, and the API reaches the same verdict on the
+ * same input. It lived server-side until 2026-08-06, which meant clients could
+ * only learn their label was unusable by noticing analytics had gone quiet.
+ *
+ * **Not knowing your `via` is not an error** — an unrecognized value yields
+ * `undefined` rather than throwing, because origin tracking is telemetry and a
+ * deploy must never fail over it. A caller that has an honest default should
+ * prefer it (`normalizeVia(process.env.SHIP_VIA) ?? DeploymentVia.CLI`): the
+ * deploy really did come from the CLI, so recording that beats recording
+ * nothing.
+ */
+export function normalizeVia(value: unknown): DeploymentViaType | undefined {
+  if (!value || typeof value !== 'string') return undefined;
+  const via = value.trim().toLowerCase();
+  return (Object.values(DeploymentVia) as string[]).includes(via)
+    ? (via as DeploymentViaType)
+    : undefined;
+}
 
 /**
  * Validate an idempotency key, returning the trimmed value or `undefined`
@@ -1811,8 +1873,12 @@ export type DeployInput = File[] | string | string[];
 export interface DeploymentUploadOptions {
   /** Optional labels for categorization and filtering */
   labels?: string[];
-  /** Client identifier (e.g., 'cli', 'sdk', 'web') */
-  via?: string;
+  /**
+   * Which client is making this deploy. Closed, because the server silently
+   * ignores anything outside the set — so an unchecked string turned a typo
+   * into missing analytics rather than an error. See {@link DeploymentVia}.
+   */
+  via?: DeploymentViaType;
   /**
    * Optional password that protects this deployment.
    *

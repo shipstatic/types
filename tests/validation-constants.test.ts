@@ -8,15 +8,19 @@ import {
   classifyToken,
   type DeploymentListResponse,
   type DeploymentResource,
+  DeploymentVia,
+  type DeploymentViaType,
   type DomainListResponse,
   type DomainResource,
   FileValidationStatus,
   type FileValidationStatusType,
   hasUnbuiltMarker,
   hasUnsafeChars,
+  IDEMPOTENCY_KEY_CONSTRAINTS,
   isBlockedExtension,
   LABEL_CONSTRAINTS,
   LABEL_PATTERN,
+  normalizeVia,
   OAuthScope,
   type OAuthScopeType,
   PASSWORD_CONSTRAINTS,
@@ -684,5 +688,49 @@ describe('list contract coherence', () => {
     ];
 
     expect(assertions.every((held) => held)).toBe(true);
+  });
+});
+
+describe('DeploymentVia — the origin vocabulary', () => {
+  it('normalizes case and surrounding whitespace, the way the API always has', () => {
+    // The server trimmed and lowercased before comparing; moving the rule
+    // client-side is only safe if it reaches the identical verdict, so these
+    // are the server's own transformations, not new leniency.
+    expect(normalizeVia('  CLI  ')).toBe(DeploymentVia.CLI);
+    expect(normalizeVia('Web')).toBe(DeploymentVia.WEB);
+  });
+
+  it('accepts every member of the vocabulary', () => {
+    // Derived, so a member added to the const is covered without editing this.
+    for (const via of Object.values(DeploymentVia)) {
+      expect(normalizeVia(via)).toBe(via);
+    }
+  });
+
+  it('answers undefined for anything outside the set, and never throws', () => {
+    // Origin tracking is telemetry: a deploy must not fail because a wrapper
+    // labelled itself something we do not know. `undefined` lets the caller
+    // choose an honest default instead.
+    for (const bad of ['github', '', '   ', 'CLI ish', null, undefined, 7, {}, []]) {
+      expect(normalizeVia(bad)).toBeUndefined();
+    }
+  });
+
+  it('types the request option but NOT the stored entity', () => {
+    // Deliberate asymmetry: rows predate the vocabulary being closed, so the
+    // entity's `via` stays `string | null`. These bindings fail the typecheck
+    // if either half moves.
+    const option: DeploymentViaType = DeploymentVia.GPT;
+    const stored: string | null = 'some-legacy-value';
+    expect(option).toBe('gpt');
+    expect(stored).toBe('some-legacy-value');
+  });
+});
+
+describe('IDEMPOTENCY_KEY_CONSTRAINTS', () => {
+  it('owns the header name beside the format, like CALLER does', () => {
+    // Both ends of one wire header read the name from here; it was a literal
+    // in the API middleware, the SDK, and two CORS allow-lists.
+    expect(IDEMPOTENCY_KEY_CONSTRAINTS.HEADER).toBe('Idempotency-Key');
   });
 });
