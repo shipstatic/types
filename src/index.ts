@@ -148,6 +148,42 @@ export const API_PATHS = {
 } as const;
 
 /**
+ * The deploy request's multipart field names — the other half of the wire
+ * surface beside {@link API_PATHS}. `POST /deployments` (and the first-party
+ * `/upload`) is multipart/form-data, and these are the names the API reads.
+ *
+ * Declared once because the body has three independent WRITERS — the SDK's
+ * Node and browser body builders, and the n8n community node's hand-rolled
+ * client (which cannot import this under n8n Cloud's zero-dependency rule,
+ * and fences its restated copy instead) — and until this export every writer
+ * restated the strings the API parses, with nothing comparing them.
+ *
+ * `FILES` carries one entry per file (the API reads it with `getAll`); every
+ * other field is single. The `@internal` flags are serialized as the literal
+ * string `'true'` and belong to first-party surfaces only.
+ */
+export const DEPLOY_FIELDS = {
+  /** One entry per file — read with `getAll`. */
+  FILES: 'files[]',
+  /** JSON array of MD5 hex digests, index-aligned with `FILES`. */
+  CHECKSUMS: 'checksums',
+  /** JSON array of label strings. */
+  LABELS: 'labels',
+  /** The deploying surface's {@link DeploymentVia} member. */
+  VIA: 'via',
+  /** Plaintext password — the API hashes it server-side. */
+  PASSWORD: 'password',
+  /** @internal Server-processing flag — first-party `/upload` only. */
+  BUILD: 'build',
+  /** @internal Server-processing flag — first-party `/upload` only. */
+  PRERENDER: 'prerender',
+  /** @internal Server-processing flag — first-party `/upload` only. */
+  SPA: 'spa',
+  /** @internal reCAPTCHA proof — `web/www`'s public uploader only. */
+  CAPTCHA: 'captcha',
+} as const;
+
+/**
  * The half of a list response that is identical on every list.
  *
  * `GET /<collection>` answers exactly two fields — the collection under its
@@ -1594,6 +1630,27 @@ export const SPA_DEFAULT_CONFIG = {
 } as const;
 
 /**
+ * The `/spa-check` pre-flight's client-side envelope: which file is the
+ * check's subject, and how large it may be before a client skips the call.
+ *
+ * One fact with three holders until this export — the API's config declared
+ * the cap, the SDK's `checkSPA` hardcoded `100 * 1024`, and prose restated
+ * "100KB". `INDEX_FILE` is the selection rule (the file whose content rides
+ * `SPACheckRequest.index`), restated by every client that builds the request.
+ *
+ * Neither member is a validation boundary: a client over the cap simply
+ * skips the pre-flight, because the server answers an oversized index
+ * `isSPA: false` anyway. A consumer that cannot import this (n8n) needs no
+ * size copy at all — outcome parity is the server's, not the client's.
+ */
+export const SPA_CHECK_CONSTRAINTS = {
+  /** The file whose content is the check's subject. */
+  INDEX_FILE: 'index.html',
+  /** Skip the pre-flight above this size — the server would answer false. */
+  MAX_INDEX_BYTES: 100 * 1024,
+} as const;
+
+/**
  * Assert that a ship.json file is *syntactically* loadable. Syntax only —
  * never schema.
  *
@@ -1833,6 +1890,37 @@ export interface StaticFile {
 
 /** Default API URL if not otherwise configured. */
 export const DEFAULT_API = 'https://api.shipstatic.com';
+
+/**
+ * The Node SDK's ambient configuration pair — the ONLY environment variables
+ * the SDK reads, and therefore the COMPLETE list an embedding host must
+ * scrub (per `npm/ship`'s strict-isolation contract, scrubbing is the host's
+ * job, not the SDK's). A host that derives its scrub from this object's
+ * values — as the VS Code extension's child-process env block does — picks
+ * up a grown contract at the next pin bump instead of by remembered prose.
+ *
+ * Browser builds read no environment at all, and the CLI-only variables
+ * (`SHIP_PASSWORD`, `SHIP_VIA`) are deliberately NOT here: they are the
+ * CLI's operational levers, not the SDK's ambient contract — see
+ * `npm/ship/CLAUDE.md`, "CLI-only env vars".
+ */
+export const SHIP_ENV = {
+  /** The one credential slot — any platform token. */
+  TOKEN: 'SHIP_TOKEN',
+  /** The API endpoint override. */
+  API_URL: 'SHIP_API_URL',
+} as const;
+
+/**
+ * Where a human creates an API key — the console deep link quoted by every
+ * surface that teaches authentication (the CLI's config wizard, the VS Code
+ * and n8n listings, the n8n rate-limit hint and credential copy). Written
+ * out in five files across three repos until this export.
+ *
+ * Production-branded by design: published artifacts name the product, never
+ * an environment (root `CLAUDE.md`, "Environment-Aware URLs").
+ */
+export const MY_API_KEY_URL = 'https://my.shipstatic.com/api-key';
 
 /**
  * How long an anonymous deployment lives before it expires.
