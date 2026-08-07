@@ -4,7 +4,7 @@
  */
 
 // =============================================================================
-// I. CORE ENTITIES
+// DEPLOYMENT TYPES
 // =============================================================================
 
 /**
@@ -91,99 +91,6 @@ export interface DeploymentCreateResponse extends Deployment {
 }
 
 /**
- * Every path the public API answers on, declared once.
- *
- * The URL surface was written out in four places — the API's mounts, the
- * SDK's client, the dashboard's client, and the post-deploy smoke — so a
- * rename meant finding all four. The first three now read this table.
- *
- * The smoke (`cloudflare/api/smoke.mjs`) deliberately still spells its own:
- * five of its nine paths are `/admin/*`, which this table excludes by
- * design, and splitting one list between a registry and literals reads worse
- * than keeping it uniform.
- *
- * **What this guarantees, exactly.** Collection paths are mounted from here,
- * so producer and consumer cannot diverge. Item paths are declared here and
- * consumed by clients, but the API spells them relative to their mount
- * (`/:deployment/config`), so the table does not *generate* them — it is
- * held to them by `api/tests/architecture/api-paths.test.ts`, which fails if
- * any entry names a path no route answers. Some entries have no client yet
- * (`DEPLOYMENT_CONFIG`, `DOMAIN_PROPAGATION` — endpoints the SDK
- * deliberately does not reach); the fence is what keeps those honest rather
- * than merely asserted.
- *
- * **The operator surface is deliberately absent.** `/admin/*` paths belong
- * to `web/my`, for the same reason its row types do: this package is
- * published, and the operator surface is not public (see `CLAUDE.md`, "Admin
- * types"). A path here is a promise to every npm consumer; `/admin` is a
- * promise to one dashboard.
- *
- * Item paths are functions rather than templates so the key is interpolated
- * in one place, encoded the same way by every caller.
- */
-export const API_PATHS = {
-  DEPLOYMENTS: '/deployments',
-  DEPLOYMENT: (deployment: string) => `/deployments/${deployment}`,
-  DEPLOYMENT_CONFIG: (deployment: string) => `/deployments/${deployment}/config`,
-  DOMAINS: '/domains',
-  DOMAIN: (domain: string) => `/domains/${domain}`,
-  DOMAIN_VERIFY: (domain: string) => `/domains/${domain}/verify`,
-  DOMAIN_DNS: (domain: string) => `/domains/${domain}/dns`,
-  DOMAIN_RECORDS: (domain: string) => `/domains/${domain}/records`,
-  DOMAIN_SHARE: (domain: string) => `/domains/${domain}/share`,
-  DOMAIN_PROPAGATION: (domain: string) => `/domains/${domain}/propagation`,
-  DOMAINS_VALIDATE: '/domains/validate',
-  TOKENS: '/tokens',
-  TOKEN: (token: string) => `/tokens/${token}`,
-  ACCOUNT: '/account',
-  ACCOUNT_KEY: '/account/key',
-  ACCOUNT_CLAIM: '/account/claim',
-  ACTIVITIES: '/activities',
-  LABELS: '/labels',
-  LIMITS: '/limits',
-  PING: '/ping',
-  SETUP: '/setup',
-  SPA_CHECK: '/spa-check',
-  UPLOAD: '/upload',
-} as const;
-
-/**
- * The deploy request's multipart field names — the other half of the wire
- * surface beside {@link API_PATHS}. `POST /deployments` (and the first-party
- * `/upload`) is multipart/form-data, and these are the names the API reads.
- *
- * Declared once because the body has three independent WRITERS — the SDK's
- * Node and browser body builders, and the n8n community node's hand-rolled
- * client (which cannot import this under n8n Cloud's zero-dependency rule,
- * and fences its restated copy instead) — and until this export every writer
- * restated the strings the API parses, with nothing comparing them.
- *
- * `FILES` carries one entry per file (the API reads it with `getAll`); every
- * other field is single. The `@internal` flags are serialized as the literal
- * string `'true'` and belong to first-party surfaces only.
- */
-export const DEPLOY_FIELDS = {
-  /** One entry per file — read with `getAll`. */
-  FILES: 'files[]',
-  /** JSON array of MD5 hex digests, index-aligned with `FILES`. */
-  CHECKSUMS: 'checksums',
-  /** JSON array of label strings. */
-  LABELS: 'labels',
-  /** The deploying surface's {@link DeploymentVia} member. */
-  VIA: 'via',
-  /** Plaintext password — the API hashes it server-side. */
-  PASSWORD: 'password',
-  /** @internal Server-processing flag — first-party `/upload` only. */
-  BUILD: 'build',
-  /** @internal Server-processing flag — first-party `/upload` only. */
-  PRERENDER: 'prerender',
-  /** @internal Server-processing flag — first-party `/upload` only. */
-  SPA: 'spa',
-  /** @internal reCAPTCHA proof — `web/www`'s public uploader only. */
-  CAPTCHA: 'captcha',
-} as const;
-
-/**
  * The half of a list response that is identical on every list.
  *
  * `GET /<collection>` answers exactly two fields — the collection under its
@@ -200,6 +107,29 @@ export const DEPLOY_FIELDS = {
 export interface ListResponse {
   /** Opaque cursor from this page; `null` on the last page. */
   cursor: string | null;
+}
+
+/**
+ * Pagination options for every list endpoint. The response's `cursor` feeds
+ * the next request; a `null` cursor means the last page. Omitting both
+ * returns the server's default first page.
+ *
+ * A list answers `{ <collection>, cursor }` and nothing else — `cursor`
+ * carries the entire has-more signal, so no redundant boolean, and no
+ * `total`. **A count is an aggregate over a collection, not a property of a
+ * page:** including one makes every read pay for a full scan it did not ask
+ * for, which is precisely the cost keyset pagination exists to avoid.
+ *
+ * Counts therefore live on the summary resource that owns them —
+ * `GET /account` (`usage`) for a caller's own totals, `GET /admin/stats` for
+ * platform-wide ones. Ask for a count when you want a count; ask for a page
+ * when you want a page.
+ */
+export interface ListOptions {
+  /** Maximum number of items to return in one page. */
+  limit?: number;
+  /** Opaque cursor from the previous page's response. */
+  cursor?: string;
 }
 
 /**
@@ -740,6 +670,103 @@ export interface AccountOverrides {
 }
 
 // =============================================================================
+// WIRE SURFACE
+// =============================================================================
+
+/**
+ * Every path the public API answers on, declared once.
+ *
+ * The URL surface was written out in four places — the API's mounts, the
+ * SDK's client, the dashboard's client, and the post-deploy smoke — so a
+ * rename meant finding all four. The first three now read this table.
+ *
+ * The smoke (`cloudflare/api/smoke.mjs`) deliberately still spells its own:
+ * five of its nine paths are `/admin/*`, which this table excludes by
+ * design, and splitting one list between a registry and literals reads worse
+ * than keeping it uniform.
+ *
+ * **What this guarantees, exactly.** Collection paths are mounted from here,
+ * so producer and consumer cannot diverge. Item paths are declared here and
+ * consumed by clients, but the API spells them relative to their mount
+ * (`/:deployment/config`), so the table does not *generate* them — it is
+ * held to them by `api/tests/architecture/api-paths.test.ts`, which fails if
+ * any entry names a path no route answers. Some entries have no client yet
+ * (`DEPLOYMENT_CONFIG`, `DOMAIN_PROPAGATION` — endpoints the SDK
+ * deliberately does not reach); the fence is what keeps those honest rather
+ * than merely asserted.
+ *
+ * **The operator surface is deliberately absent.** `/admin/*` paths belong
+ * to `web/my`, for the same reason its row types do: this package is
+ * published, and the operator surface is not public (see `CLAUDE.md`, "Admin
+ * types"). A path here is a promise to every npm consumer; `/admin` is a
+ * promise to one dashboard.
+ *
+ * Item paths are functions rather than templates so the key is interpolated
+ * in one place, encoded the same way by every caller.
+ */
+export const API_PATHS = {
+  DEPLOYMENTS: '/deployments',
+  DEPLOYMENT: (deployment: string) => `/deployments/${deployment}`,
+  DEPLOYMENT_CONFIG: (deployment: string) => `/deployments/${deployment}/config`,
+  DOMAINS: '/domains',
+  DOMAIN: (domain: string) => `/domains/${domain}`,
+  DOMAIN_VERIFY: (domain: string) => `/domains/${domain}/verify`,
+  DOMAIN_DNS: (domain: string) => `/domains/${domain}/dns`,
+  DOMAIN_RECORDS: (domain: string) => `/domains/${domain}/records`,
+  DOMAIN_SHARE: (domain: string) => `/domains/${domain}/share`,
+  DOMAIN_PROPAGATION: (domain: string) => `/domains/${domain}/propagation`,
+  DOMAINS_VALIDATE: '/domains/validate',
+  TOKENS: '/tokens',
+  TOKEN: (token: string) => `/tokens/${token}`,
+  ACCOUNT: '/account',
+  ACCOUNT_KEY: '/account/key',
+  ACCOUNT_CLAIM: '/account/claim',
+  ACTIVITIES: '/activities',
+  LABELS: '/labels',
+  LIMITS: '/limits',
+  PING: '/ping',
+  SETUP: '/setup',
+  SPA_CHECK: '/spa-check',
+  UPLOAD: '/upload',
+} as const;
+
+/**
+ * The deploy request's multipart field names — the other half of the wire
+ * surface beside {@link API_PATHS}. `POST /deployments` (and the first-party
+ * `/upload`) is multipart/form-data, and these are the names the API reads.
+ *
+ * Declared once because the body has three independent WRITERS — the SDK's
+ * Node and browser body builders, and the n8n community node's hand-rolled
+ * client (which cannot import this under n8n Cloud's zero-dependency rule,
+ * and fences its restated copy instead) — and until this export every writer
+ * restated the strings the API parses, with nothing comparing them.
+ *
+ * `FILES` carries one entry per file (the API reads it with `getAll`); every
+ * other field is single. The `@internal` flags are serialized as the literal
+ * string `'true'` and belong to first-party surfaces only.
+ */
+export const DEPLOY_FIELDS = {
+  /** One entry per file — read with `getAll`. */
+  FILES: 'files[]',
+  /** JSON array of MD5 hex digests, index-aligned with `FILES`. */
+  CHECKSUMS: 'checksums',
+  /** JSON array of label strings. */
+  LABELS: 'labels',
+  /** The deploying surface's {@link DeploymentVia} member. */
+  VIA: 'via',
+  /** Plaintext password — the API hashes it server-side. */
+  PASSWORD: 'password',
+  /** @internal Server-processing flag — first-party `/upload` only. */
+  BUILD: 'build',
+  /** @internal Server-processing flag — first-party `/upload` only. */
+  PRERENDER: 'prerender',
+  /** @internal Server-processing flag — first-party `/upload` only. */
+  SPA: 'spa',
+  /** @internal reCAPTCHA proof — `web/www`'s public uploader only. */
+  CAPTCHA: 'captcha',
+} as const;
+
+// =============================================================================
 // ERROR SYSTEM
 // =============================================================================
 
@@ -1179,7 +1206,7 @@ export function isShipError(error: unknown): error is ShipError {
 }
 
 // =============================================================================
-// CONFIG TYPES
+// PLATFORM LIMITS
 // =============================================================================
 
 /**
@@ -2005,29 +2032,6 @@ export interface DeploymentUploadOptions {
    * retries fresh under the same key.
    */
   idempotencyKey?: string;
-}
-
-/**
- * Pagination options for every list endpoint. The response's `cursor` feeds
- * the next request; a `null` cursor means the last page. Omitting both
- * returns the server's default first page.
- *
- * A list answers `{ <collection>, cursor }` and nothing else — `cursor`
- * carries the entire has-more signal, so no redundant boolean, and no
- * `total`. **A count is an aggregate over a collection, not a property of a
- * page:** including one makes every read pay for a full scan it did not ask
- * for, which is precisely the cost keyset pagination exists to avoid.
- *
- * Counts therefore live on the summary resource that owns them —
- * `GET /account` (`usage`) for a caller's own totals, `GET /admin/stats` for
- * platform-wide ones. Ask for a count when you want a count; ask for a page
- * when you want a page.
- */
-export interface ListOptions {
-  /** Maximum number of items to return in one page. */
-  limit?: number;
-  /** Opaque cursor from the previous page's response. */
-  cursor?: string;
 }
 
 /**
