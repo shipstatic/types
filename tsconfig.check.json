@@ -1,0 +1,24 @@
+{
+  // Typecheck config: `src` AND `tests`.
+  //
+  // `tsconfig.json` stays build-shaped (rootDir: src, declaration output) and
+  // is what `pnpm build` reads. This one exists because vitest transpiles via
+  // esbuild WITHOUT typechecking, so a test tree outside the program is
+  // unchecked — the condition `npm/ship` recorded after an audit found four
+  // fictional shapes living there, and the reason `web/my` and `cloudflare`
+  // both pull their test trees in too.
+  //
+  // For this package the gap was sharper than elsewhere: `tests/` holds
+  // compile-time assertions about the resource contracts (the list-contract
+  // fence in `validation-constants.test.ts`). Those assert by failing to
+  // compile, so outside the program they asserted nothing at all — a fence
+  // that silently passed while the drift it targets was live.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["src/**/*", "tests/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
