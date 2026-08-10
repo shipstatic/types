@@ -13,6 +13,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "prepack": "pnpm run build",
     "clean": "rm -rf dist",
     "test": "vitest",
     "lint": "biome check .",
@@ -47,5 +48,9 @@
     "@types/node": "^24.13.3",
     "typescript": "^5.9.3",
     "vitest": "^2.1.9"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }
