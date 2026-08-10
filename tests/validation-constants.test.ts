@@ -1,32 +1,57 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  BLOCKED_EXTENSIONS,
-  isBlockedExtension,
-  UNBUILT_PROJECT_MARKERS,
-  hasUnbuiltMarker,
-  UNSAFE_FILENAME_CHARS,
-  hasUnsafeChars,
-  FileValidationStatus,
-  LABEL_PATTERN,
-  LABEL_CONSTRAINTS,
-  PASSWORD_CONSTRAINTS,
-  validatePassword,
+  type ActivityListResponse,
+  AUTH_BASE_PATH,
   AuthMethod,
-  OAuthScope,
-  TokenKind,
-  classifyToken,
-  validateToken,
+  BLOCKED_EXTENSIONS,
   CALLER,
-  validateCaller,
-  type PlatformLimits,
+  classifyToken,
+  type DeploymentListResponse,
+  type DeploymentResource,
+  DeploymentVia,
+  type DeploymentViaType,
+  type DomainListResponse,
+  type DomainResource,
+  FileValidationStatus,
   type FileValidationStatusType,
-  type OAuthScopeType
+  hasUnbuiltMarker,
+  hasUnsafeChars,
+  IDEMPOTENCY_KEY_CONSTRAINTS,
+  isBlockedExtension,
+  LABEL_CONSTRAINTS,
+  LABEL_PATTERN,
+  normalizeVia,
+  OAuthScope,
+  type OAuthScopeType,
+  PASSWORD_CONSTRAINTS,
+  type PlatformLimits,
+  TokenKind,
+  type TokenListResponse,
+  type TokenResource,
+  UNBUILT_PROJECT_MARKERS,
+  UNSAFE_FILENAME_CHARS,
+  validateCaller,
+  validatePassword,
+  validateToken,
+  WEB_FILE_ACCEPT,
 } from '../src/index';
 
 describe('Validation Constants - @shipstatic/types', () => {
   describe('BLOCKED_EXTENSIONS', () => {
     it('should block executable extensions', () => {
-      const executables = ['exe', 'msi', 'dll', 'scr', 'bat', 'cmd', 'com', 'pif', 'app', 'deb', 'rpm'];
+      const executables = [
+        'exe',
+        'msi',
+        'dll',
+        'scr',
+        'bat',
+        'cmd',
+        'com',
+        'pif',
+        'app',
+        'deb',
+        'rpm',
+      ];
       for (const ext of executables) {
         expect(BLOCKED_EXTENSIONS.has(ext)).toBe(true);
       }
@@ -71,7 +96,18 @@ describe('Validation Constants - @shipstatic/types', () => {
     });
 
     it('should NOT block web file extensions', () => {
-      const webExtensions = ['html', 'css', 'js', 'json', 'png', 'jpg', 'svg', 'woff2', 'pdf', 'wasm'];
+      const webExtensions = [
+        'html',
+        'css',
+        'js',
+        'json',
+        'png',
+        'jpg',
+        'svg',
+        'woff2',
+        'pdf',
+        'wasm',
+      ];
       for (const ext of webExtensions) {
         expect(BLOCKED_EXTENSIONS.has(ext)).toBe(false);
       }
@@ -81,6 +117,39 @@ describe('Validation Constants - @shipstatic/types', () => {
       const unknownExtensions = ['xyz', 'custom', 'parquet', 'avro'];
       for (const ext of unknownExtensions) {
         expect(BLOCKED_EXTENSIONS.has(ext)).toBe(false);
+      }
+    });
+  });
+
+  describe('WEB_FILE_ACCEPT', () => {
+    // Parsed from the PUBLISHED string rather than an exported array: the
+    // attribute value is the whole contract, so the fence must hold against
+    // exactly what a consumer receives.
+    const tokens = WEB_FILE_ACCEPT.split(',');
+    const extensions = tokens.map((token) => token.slice(1));
+
+    it('offers nothing the platform will refuse', () => {
+      // THE invariant. A picker that shows a file the deploy then rejects
+      // turns a hint into a lie, and there is no second place to catch it.
+      const offered = extensions.filter((ext) => BLOCKED_EXTENSIONS.has(ext));
+      expect(offered).toEqual([]);
+    });
+
+    it('is a well-formed accept attribute', () => {
+      for (const token of tokens) {
+        expect(token).toMatch(/^\.[a-z0-9]+$/);
+      }
+      expect(new Set(extensions).size).toBe(extensions.length);
+    });
+
+    it('offers a ZIP — a whole site in one file is the headline case', () => {
+      expect(extensions).toContain('zip');
+    });
+
+    it('offers the files a static site is actually made of', () => {
+      const staples = ['html', 'css', 'js', 'json', 'svg', 'png', 'woff2', 'webmanifest'];
+      for (const ext of staples) {
+        expect(extensions).toContain(ext);
       }
     });
   });
@@ -303,6 +372,15 @@ describe('Validation Constants - @shipstatic/types', () => {
     });
   });
 
+  describe('AUTH_BASE_PATH', () => {
+    // The identity mount is a wire contract — the API mounts Better Auth
+    // here and the web console's auth client posts here. Changing it is a
+    // coordinated breaking change across the auth pair.
+    it('should be the /auth mount both halves agree on', () => {
+      expect(AUTH_BASE_PATH).toBe('/auth');
+    });
+  });
+
   describe('AuthMethod', () => {
     it('should have all credential populations', () => {
       expect(AuthMethod.SESSION).toBe('session');
@@ -347,8 +425,8 @@ describe('Validation Constants - @shipstatic/types', () => {
 
   describe('TokenKind & classifyToken()', () => {
     it('classifies by prefix — the shared wire dispatch', () => {
-      expect(classifyToken('ship-' + 'a'.repeat(64))).toBe(TokenKind.API_KEY);
-      expect(classifyToken('deploy-' + 'a'.repeat(64))).toBe(TokenKind.DEPLOY_TOKEN);
+      expect(classifyToken(`ship-${'a'.repeat(64)}`)).toBe(TokenKind.API_KEY);
+      expect(classifyToken(`deploy-${'a'.repeat(64)}`)).toBe(TokenKind.DEPLOY_TOKEN);
       expect(classifyToken('some-oauth-access-token')).toBe(TokenKind.OPAQUE);
       expect(classifyToken('')).toBe(TokenKind.OPAQUE);
     });
@@ -388,8 +466,8 @@ describe('Validation Constants - @shipstatic/types', () => {
     it('applies strict format rules to prefixed populations', () => {
       expect(() => validateToken('ship-tooshort')).toThrow(/characters total/);
       expect(() => validateToken('deploy-tooshort')).toThrow(/characters total/);
-      expect(validateToken('ship-' + 'a'.repeat(64))).toBeUndefined();
-      expect(validateToken('deploy-' + 'b'.repeat(64))).toBeUndefined();
+      expect(validateToken(`ship-${'a'.repeat(64)}`)).toBeUndefined();
+      expect(validateToken(`deploy-${'b'.repeat(64)}`)).toBeUndefined();
     });
 
     it('passes opaque tokens through when non-empty', () => {
@@ -410,20 +488,15 @@ describe('Validation Constants - @shipstatic/types', () => {
         'release.candidate',
       ];
 
-      valid.forEach(label => {
+      valid.forEach((label) => {
         expect(LABEL_PATTERN.test(label)).toBe(true);
       });
     });
 
     it('should reject invalid label formats', () => {
-      const invalidFormat = [
-        '-prod',
-        'prod-',
-        'pr od',
-        'PROD',
-      ];
+      const invalidFormat = ['-prod', 'prod-', 'pr od', 'PROD'];
 
-      invalidFormat.forEach(label => {
+      invalidFormat.forEach((label) => {
         expect(LABEL_PATTERN.test(label)).toBe(false);
       });
     });
@@ -434,7 +507,6 @@ describe('Validation Constants - @shipstatic/types', () => {
       expect(LABEL_PATTERN.test('abc')).toBe(true);
       expect(LABEL_PATTERN.test('a'.repeat(100))).toBe(true);
     });
-
 
     it('should handle separator variations', () => {
       expect(LABEL_PATTERN.test('my-label')).toBe(true);
@@ -551,11 +623,114 @@ describe('Validation Constants - @shipstatic/types', () => {
       // would otherwise create a 2-char password masquerading as 12.
       expect(() => validatePassword('     pw     ')).toThrow(/between/);
       // Same shape on the other side — trimmed form one over the cap.
-      const overByOne = ' ' + 'a'.repeat(PASSWORD_CONSTRAINTS.MAX_LENGTH + 1) + ' ';
+      const overByOne = ` ${'a'.repeat(PASSWORD_CONSTRAINTS.MAX_LENGTH + 1)} `;
       expect(() => validatePassword(overByOne)).toThrow(/between/);
       // And the inverse — padded value, trimmed form lands exactly at the cap.
-      const paddedAtMax = '   ' + 'a'.repeat(PASSWORD_CONSTRAINTS.MAX_LENGTH) + '   ';
+      const paddedAtMax = `   ${'a'.repeat(PASSWORD_CONSTRAINTS.MAX_LENGTH)}   `;
       expect(validatePassword(paddedAtMax)).toBe('a'.repeat(PASSWORD_CONSTRAINTS.MAX_LENGTH));
     });
+  });
+});
+
+/**
+ * The list-contract fence.
+ *
+ * Every paginated collection must be reachable the same way from every
+ * client: a `list` that accepts `ListOptions`, answering exactly
+ * `{ <collection>, cursor }`. `TokenResource.list` shipped without the
+ * parameter while its response already paginated — an asymmetry that
+ * compiled fine and only surfaced at the call site.
+ *
+ * These are compile-time assertions: `pnpm typecheck` fails if a resource
+ * contract or a list response drifts from the shape. `Parameters<T> extends
+ * []` distinguishes a genuinely nullary signature from one taking an
+ * optional argument, which plain assignability cannot (a 0-arg function is
+ * assignable to a 1-optional-arg type).
+ */
+describe('list contract coherence', () => {
+  type TakesListOptions<T extends (...args: never[]) => unknown> =
+    Parameters<T> extends [] ? false : true;
+  type Paginated<T> = T extends { cursor: string | null } ? true : false;
+  /** A page carries no aggregate — counts belong to a summary resource. */
+  type HasNoTotal<T> = T extends { total: unknown } ? false : true;
+
+  // Each line fails to compile if that resource's `list` stops taking options.
+  const _deployments: TakesListOptions<DeploymentResource['list']> = true;
+  const _domains: TakesListOptions<DomainResource['list']> = true;
+  const _tokens: TakesListOptions<TokenResource['list']> = true;
+
+  // …and if a list response stops carrying its cursor, or grows a total.
+  const _deploymentList: Paginated<DeploymentListResponse> = true;
+  const _domainList: Paginated<DomainListResponse> = true;
+  const _tokenList: Paginated<TokenListResponse> = true;
+  const _activityList: Paginated<ActivityListResponse> = true;
+  const _deploymentsPure: HasNoTotal<DeploymentListResponse> = true;
+  const _domainsPure: HasNoTotal<DomainListResponse> = true;
+  const _tokensPure: HasNoTotal<TokenListResponse> = true;
+  const _activitiesPure: HasNoTotal<ActivityListResponse> = true;
+
+  it('holds at compile time', () => {
+    // The assertions above ARE the fence; they fail the typecheck, not this
+    // test. This body only keeps the bindings live so nothing prunes them —
+    // hence `every`, not a hand-counted length that a new collection breaks.
+    const assertions = [
+      _deployments,
+      _domains,
+      _tokens,
+      _deploymentList,
+      _domainList,
+      _tokenList,
+      _activityList,
+      _deploymentsPure,
+      _domainsPure,
+      _tokensPure,
+      _activitiesPure,
+    ];
+
+    expect(assertions.every((held) => held)).toBe(true);
+  });
+});
+
+describe('DeploymentVia — the origin vocabulary', () => {
+  it('normalizes case and surrounding whitespace, the way the API always has', () => {
+    // The server trimmed and lowercased before comparing; moving the rule
+    // client-side is only safe if it reaches the identical verdict, so these
+    // are the server's own transformations, not new leniency.
+    expect(normalizeVia('  CLI  ')).toBe(DeploymentVia.CLI);
+    expect(normalizeVia('Web')).toBe(DeploymentVia.WEB);
+  });
+
+  it('accepts every member of the vocabulary', () => {
+    // Derived, so a member added to the const is covered without editing this.
+    for (const via of Object.values(DeploymentVia)) {
+      expect(normalizeVia(via)).toBe(via);
+    }
+  });
+
+  it('answers undefined for anything outside the set, and never throws', () => {
+    // Origin tracking is telemetry: a deploy must not fail because a wrapper
+    // labelled itself something we do not know. `undefined` lets the caller
+    // choose an honest default instead.
+    for (const bad of ['github', '', '   ', 'CLI ish', null, undefined, 7, {}, []]) {
+      expect(normalizeVia(bad)).toBeUndefined();
+    }
+  });
+
+  it('types the request option but NOT the stored entity', () => {
+    // Deliberate asymmetry: rows predate the vocabulary being closed, so the
+    // entity's `via` stays `string | null`. These bindings fail the typecheck
+    // if either half moves.
+    const option: DeploymentViaType = DeploymentVia.GPT;
+    const stored: string | null = 'some-legacy-value';
+    expect(option).toBe('gpt');
+    expect(stored).toBe('some-legacy-value');
+  });
+});
+
+describe('IDEMPOTENCY_KEY_CONSTRAINTS', () => {
+  it('owns the header name beside the format, like CALLER does', () => {
+    // Both ends of one wire header read the name from here; it was a literal
+    // in the API middleware, the SDK, and two CORS allow-lists.
+    expect(IDEMPOTENCY_KEY_CONSTRAINTS.HEADER).toBe('Idempotency-Key');
   });
 });

@@ -20,13 +20,23 @@ npm install @shipstatic/types
 
 ```typescript
 import type {
-  Deployment, DeploymentListResponse,
-  Domain, DomainSetResult, DomainListResponse, DnsRecord, DomainDnsResponse, DomainRecordsResponse, DomainValidateResponse,
-  Token, TokenListItem, TokenListResponse, TokenCreateResponse,
-  Account, AccountUsage, AccountOverrides,
+  ListResponse, ListOptions,
+  Deployment, DeploymentListResponse, DeploymentDeleteResponse, DeploymentSetOptions,
+  Domain, DomainSetResult, DomainSetOptions, DomainListResponse, DnsRecord, DnsLookup, DomainDnsResponse, DomainRecordsResponse, DomainShareResponse, DomainValidateResponse, DomainDeleteResponse, DomainVerifyResponse,
+  Token, TokenListResponse, TokenCreateResponse, TokenCreateOptions, TokenDeleteResponse,
+  Account, AccountUsage, AccountOverrides, AccountDeleteResponse, AccountKeyResponse,
+  LabelsResponse, SetupInstructionsResponse,
   StaticFile
 } from '@shipstatic/types';
+
+// Every public path, declared once — the API mounts from it, clients request against it.
+import { API_PATHS } from '@shipstatic/types';
 ```
+
+A mutation answers with the resource it affected — the entity when it
+survives, otherwise the `*DeleteResponse` shape: the resource noun carrying
+the canonical key, plus the resource's own state field where the resource is
+mid-transition. No `message`, no `success`, no constant flags.
 
 ### Error System
 
@@ -82,7 +92,7 @@ import {
   DomainStatus,       // pending | partial | success | paused
   AccountPlan,        // free | standard | sponsored | enterprise | suspended | terminating | terminated
   FileValidationStatus, // pending | processing_error | excluded | validation_failed | ready
-  AuthMethod,         // jwt | apiKey | token | webhook | system
+  AuthMethod,         // session | apiKey | token | agent | oauth | webhook | system
 } from '@shipstatic/types';
 ```
 
@@ -117,6 +127,7 @@ import type {
 import {
   validateApiKey,
   validateDeployToken,
+  validateIdempotencyKey,
   validateApiUrl,
   isDeployment,
   isBlockedExtension,
@@ -132,7 +143,6 @@ import type {
   FileValidationResult,
   ValidationIssue,
   UploadedFile,
-  ProgressInfo,
 } from '@shipstatic/types';
 ```
 

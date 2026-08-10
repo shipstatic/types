@@ -4,7 +4,7 @@
  */
 
 // =============================================================================
-// I. CORE ENTITIES
+// DEPLOYMENT TYPES
 // =============================================================================
 
 /**
@@ -14,10 +14,34 @@ export const DeploymentStatus = {
   PENDING: 'pending',
   SUCCESS: 'success',
   FAILED: 'failed',
-  DELETING: 'deleting'
+  DELETING: 'deleting',
 } as const;
 
-export type DeploymentStatusType = typeof DeploymentStatus[keyof typeof DeploymentStatus];
+export type DeploymentStatusType = (typeof DeploymentStatus)[keyof typeof DeploymentStatus];
+
+/**
+ * Which client made a deployment — the origin-tracking vocabulary.
+ *
+ * A closed set with many authors: the CLI, the SDK, the dashboard, both MCP
+ * transports, the GitHub Action, the n8n node and the VS Code extension each
+ * name themselves here. It lived in the API's config until 2026-08-06, where
+ * being server-side made it unenforceable in the one direction that matters —
+ * every client wrote a bare string, and a value outside the set was **silently
+ * dropped** by the server, so a typo did not fail anywhere. It stopped
+ * recording where deploys came from and said nothing.
+ */
+export const DeploymentVia = {
+  WEB: 'web',
+  SDK: 'sdk',
+  CLI: 'cli',
+  MCP: 'mcp',
+  GIT: 'git',
+  N8N: 'n8n',
+  GPT: 'gpt',
+  VSC: 'vsc',
+} as const;
+
+export type DeploymentViaType = (typeof DeploymentVia)[keyof typeof DeploymentVia];
 
 /**
  * Core deployment object - used in both API responses and SDK
@@ -39,7 +63,15 @@ export interface Deployment {
   readonly password: boolean;
   /** Labels for categorization and filtering (lowercase, alphanumeric with separators). Always present, empty array when none. */
   labels: string[];
-  /** The client/tool used to create this deployment (e.g., 'web', 'sdk', 'cli'), null if unknown */
+  /**
+   * The client/tool that created this deployment, null if unknown.
+   *
+   * Deliberately wider than {@link DeploymentViaType}: this is stored data,
+   * and rows predate the vocabulary being closed. Narrowing the ENTITY would
+   * be a claim about every row already in the database; narrowing the
+   * REQUEST option ({@link DeploymentUploadOptions.via}) is a claim about
+   * what a client may send, which is ours to make.
+   */
   readonly via: string | null;
   /** Unix timestamp (seconds) when deployment was created */
   readonly created: number;
@@ -48,7 +80,6 @@ export interface Deployment {
   /** Full URL to the deployment screenshot (e.g., 'https://screenshots.shipstatic.com/happy-cat-abc1234/a3f2c1b4d5e6f789') */
   readonly screenshot: string;
 }
-
 
 /**
  * Response from deployment creation. Extends Deployment with one-time fields
@@ -60,15 +91,90 @@ export interface DeploymentCreateResponse extends Deployment {
 }
 
 /**
+ * The half of a list response that is identical on every list.
+ *
+ * `GET /<collection>` answers exactly two fields — the collection under its
+ * own plural noun, and this cursor — so the cursor is declared once here and
+ * each response below adds only its noun. `cursor: null` means last page and
+ * is the ENTIRE has-more signal, which is why there is no `has_more`.
+ *
+ * There is deliberately no `total`. A count is an aggregate over a
+ * collection, not a property of a page; producing one would cost a COUNT
+ * beside every page read, which is precisely what keyset pagination exists
+ * to avoid. Counts live on the resource that summarises the collection —
+ * `GET /account`'s `usage` for one caller, `GET /admin/stats` platform-wide.
+ */
+export interface ListResponse {
+  /** Opaque cursor from this page; `null` on the last page. */
+  cursor: string | null;
+}
+
+/**
+ * Pagination options for every list endpoint. The response's `cursor` feeds
+ * the next request; a `null` cursor means the last page. Omitting both
+ * returns the server's default first page.
+ *
+ * A list answers `{ <collection>, cursor }` and nothing else — `cursor`
+ * carries the entire has-more signal, so no redundant boolean, and no
+ * `total`. **A count is an aggregate over a collection, not a property of a
+ * page:** including one makes every read pay for a full scan it did not ask
+ * for, which is precisely the cost keyset pagination exists to avoid.
+ *
+ * Counts therefore live on the summary resource that owns them —
+ * `GET /account` (`usage`) for a caller's own totals, `GET /admin/stats` for
+ * platform-wide ones. Ask for a count when you want a count; ask for a page
+ * when you want a page.
+ */
+export interface ListOptions {
+  /** Maximum number of items to return in one page. */
+  limit?: number;
+  /** Opaque cursor from the previous page's response. */
+  cursor?: string;
+}
+
+/**
  * Response for listing deployments
  */
-export interface DeploymentListResponse {
+export interface DeploymentListResponse extends ListResponse {
   /** Array of deployments */
   deployments: Deployment[];
-  /** Cursor for pagination, null if no more pages */
-  cursor: string | null;
-  /** Total number of deployments */
-  total: number;
+}
+
+/**
+ * Acknowledgement of `DELETE /deployments/:deployment` — and the shape every
+ * mutation with no entity left to return follows.
+ *
+ * **The law:** a mutation answers with the resource it affected. If the
+ * resource still exists, that means the entity itself (`Deployment`,
+ * `Domain`, …). Otherwise it means this: the resource noun carrying the
+ * item's canonical key, plus the resource's own state field — and ONLY when
+ * the resource survived in a transitional state, as an async deletion's does.
+ * Where the resource is simply gone, the key alone is the whole answer
+ * ({@link DomainDeleteResponse}, {@link TokenDeleteResponse}).
+ *
+ * Put positively: **an acknowledgement is a projection of the resource** —
+ * its key, plus its own state field where the state changed. That is the
+ * test to apply, and it is sharper than "no constant", which this shape
+ * would fail on its own terms: `status` here is the literal `'deleting'` on
+ * every success, exactly as fixed as a `changed: true` would be.
+ *
+ * The difference is not how predictable the value is, it is what the field
+ * IS. `status` is the deployment's own field — the same one `GET
+ * /deployments/:deployment` returns — so this response is `Deployment`
+ * narrowed to two members, and a client renders it with the code it already
+ * has. `changed: true`, `queued: true` and `success: true` are not fields of
+ * any entity; they exist only to assert that the call worked, which the
+ * status code already said. Sync versus accepted is likewise the status
+ * code's job — 200 versus 202 — not a boolean's.
+ *
+ * No prose either (`message`): an acknowledgement is data, and each surface
+ * composes its own copy.
+ */
+export interface DeploymentDeleteResponse {
+  /** The deployment hostname that was marked for removal */
+  readonly deployment: string;
+  /** The state the deployment is in while background cleanup runs */
+  readonly status: DeploymentStatusType;
 }
 
 // =============================================================================
@@ -87,10 +193,10 @@ export const DomainStatus = {
   PENDING: 'pending',
   PARTIAL: 'partial',
   SUCCESS: 'success',
-  PAUSED: 'paused'
+  PAUSED: 'paused',
 } as const;
 
-export type DomainStatusType = typeof DomainStatus[keyof typeof DomainStatus];
+export type DomainStatusType = (typeof DomainStatus)[keyof typeof DomainStatus];
 
 /**
  * Core domain object - used in both API responses and SDK
@@ -108,7 +214,7 @@ export interface Domain {
   labels: string[];
   /** Unix timestamp (seconds) when domain was created */
   readonly created: number;
-  /** When deployment was last linked (Unix timestamp), null if never linked */
+  /** Unix timestamp (seconds) when deployment was last linked, null if never linked */
   linked: number | null;
   /** Total deployment links */
   links: number;
@@ -132,13 +238,30 @@ export interface DomainSetResult extends Domain {
 /**
  * Response for listing domains
  */
-export interface DomainListResponse {
+export interface DomainListResponse extends ListResponse {
   /** Array of domains */
   domains: Domain[];
-  /** Cursor for pagination, null if no more pages */
-  cursor: string | null;
-  /** Total number of domains */
-  total: number;
+}
+
+/**
+ * Acknowledgement of `DELETE /domains/:domain`. The row is gone, so there is
+ * no state to state — the canonical domain name is the whole answer. See
+ * {@link DeploymentDeleteResponse} for the law.
+ */
+export interface DomainDeleteResponse {
+  /** The domain name that was removed, normalized */
+  readonly domain: string;
+}
+
+/**
+ * Acknowledgement of `POST /domains/:domain/verify` (202). The DNS check is
+ * queued, not performed — the accepted status code says so, and the domain's
+ * own status is unchanged until the check runs, which is why none is stated
+ * here. See {@link DeploymentDeleteResponse} for the law.
+ */
+export interface DomainVerifyResponse {
+  /** The domain whose DNS verification was queued, normalized */
+  readonly domain: string;
 }
 
 /**
@@ -169,15 +292,49 @@ export interface DnsProvider {
 /**
  * Response for domain DNS provider lookup
  */
+/**
+ * What a DNS lookup found for a domain. An envelope rather than a bare
+ * {@link DnsProvider} because a lookup can succeed and learn more than the
+ * provider later; the shape is named so a consumer can hold one.
+ */
+export interface DnsLookup {
+  /** The provider serving this domain's DNS, absent when unidentified */
+  provider?: DnsProvider;
+}
+
+/**
+ * A report: it answers a question and carries only the answer (`CLAUDE.md`,
+ * "A report answers a question").
+ */
 export interface DomainDnsResponse {
   /** The domain name */
   domain: string;
   /** DNS provider information, null if not yet looked up */
-  dns: { provider?: DnsProvider } | null;
+  dns: DnsLookup | null;
+}
+
+/**
+ * Response for `GET /domains/:domain/share` — the domain plus the salted
+ * hash that lets someone else complete its DNS setup without an account.
+ *
+ * `/admin/domains/:domain/share` answers the same shape, which is the admin
+ * law working: the operator surface is the public grammar with a prefix.
+ *
+ * A report: it answers a question and carries only the answer (`CLAUDE.md`,
+ * "A report answers a question").
+ */
+export interface DomainShareResponse {
+  /** The domain the setup link is for */
+  readonly domain: string;
+  /** The salted setup hash that authorizes the share */
+  readonly hash: string;
 }
 
 /**
  * Response for domain DNS records
+ *
+ * A report: it answers a question and carries only the answer (`CLAUDE.md`,
+ * "A report answers a question").
  */
 export interface DomainRecordsResponse {
   /** The domain name */
@@ -189,7 +346,118 @@ export interface DomainRecordsResponse {
 }
 
 /**
- * Response for domain validation
+ * The envelope an `Idempotency-Key` must fit, and how long a replay lasts.
+ *
+ * Format lives here rather than on the server alone by the format-vs-policy
+ * rule: a client can decide offline whether a key is well-formed, and the
+ * API would reject the same value the same way.
+ */
+export const IDEMPOTENCY_KEY_CONSTRAINTS = {
+  /**
+   * HTTP header name. Here for the same reason {@link CALLER.HEADER} is: a
+   * wire header has two ends, and the package that owns the value's format
+   * is the only place both ends can read its name from.
+   */
+  HEADER: 'Idempotency-Key',
+  MAX_LENGTH: 256,
+  /** How long a stored 201 stays replayable. */
+  WINDOW_SECONDS: 24 * 60 * 60,
+} as const;
+
+/**
+ * Normalize a `via` value from any transport — trimmed, lowercased, and a
+ * member of {@link DeploymentVia}, or `undefined`.
+ *
+ * A format rule by this package's own test: a client can decide offline
+ * whether a value is well-formed, and the API reaches the same verdict on the
+ * same input. It lived server-side until 2026-08-06, which meant clients could
+ * only learn their label was unusable by noticing analytics had gone quiet.
+ *
+ * **Not knowing your `via` is not an error** — an unrecognized value yields
+ * `undefined` rather than throwing, because origin tracking is telemetry and a
+ * deploy must never fail over it. A caller that has an honest default should
+ * prefer it (`normalizeVia(process.env.SHIP_VIA) ?? DeploymentVia.CLI`): the
+ * deploy really did come from the CLI, so recording that beats recording
+ * nothing.
+ */
+export function normalizeVia(value: unknown): DeploymentViaType | undefined {
+  if (!value || typeof value !== 'string') return undefined;
+  const via = value.trim().toLowerCase();
+  return (Object.values(DeploymentVia) as string[]).includes(via)
+    ? (via as DeploymentViaType)
+    : undefined;
+}
+
+/**
+ * Validate an idempotency key, returning the trimmed value or `undefined`
+ * when none was supplied. Throws {@link ShipError.validation} when the value
+ * cannot be sent — the same verdict the API would reach, reached earlier.
+ */
+export function validateIdempotencyKey(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'string') {
+    throw ShipError.validation('Idempotency key must be a string.');
+  }
+  const key = value.trim();
+  if (!key) {
+    throw ShipError.validation('Idempotency key must not be empty.');
+  }
+  if (key.length > IDEMPOTENCY_KEY_CONSTRAINTS.MAX_LENGTH) {
+    throw ShipError.validation(
+      `Idempotency key must be at most ${IDEMPOTENCY_KEY_CONSTRAINTS.MAX_LENGTH} characters.`,
+    );
+  }
+  return key;
+}
+
+/**
+ * Response for `GET /labels` — every label in use across the caller's
+ * deployments, domains and tokens, grouped and ordered by last use.
+ *
+ * The one plural noun outside the list contract, deliberately: labels have
+ * no identity, no row and no `created`, so there is nothing for a keyset
+ * cursor to resume after, and its consumer is an autocomplete that wants the
+ * whole set. Bounded by `PAGINATION.GLOBAL_LIMIT` rather than paginated.
+ *
+ * A report: it answers a question and carries only the answer (`CLAUDE.md`,
+ * "A report answers a question").
+ */
+export interface LabelsResponse {
+  readonly labels: string[];
+}
+
+/**
+ * Response for `POST /setup` — the DNS instructions for one domain, written
+ * for a human to follow at their registrar.
+ *
+ * `custom` is the provider-specific walkthrough when the provider is known;
+ * `generic` always answers, so a caller never has nothing to show.
+ *
+ * A report: it answers a question and carries only the answer (`CLAUDE.md`,
+ * "A report answers a question").
+ */
+export interface SetupInstructionsResponse {
+  /** The domain the instructions are for — a report names its subject */
+  readonly domain: string;
+  /** One-line summary of what to do */
+  readonly tldr: string;
+  /** Provider-specific instructions, null when the provider is unknown */
+  readonly custom: string | null;
+  /** Provider-agnostic instructions — always present */
+  readonly generic: string;
+  /** The identified DNS provider, null when unknown */
+  readonly provider: string | null;
+}
+
+/**
+ * `POST /domains/validate` — a report answering "is this name usable, and if
+ * not, why".
+ *
+ * An unusable name is a legitimate ANSWER, not a failure, so this is a 200 and
+ * the verdict rides the body. `reason` was named `error` until 2026-07-29,
+ * which collided with {@link ErrorResponse}'s reserved key — there `error` is
+ * an `ErrorType` a client branches on, here it is prose a client displays, and
+ * one key cannot mean both. See {@link DeploymentDeleteResponse} for the law.
  */
 export interface DomainValidateResponse {
   /** Whether the domain is valid */
@@ -198,8 +466,8 @@ export interface DomainValidateResponse {
   normalized: string | null;
   /** Whether the domain is available, null when invalid */
   available: boolean | null;
-  /** Error message, null when valid */
-  error: string | null;
+  /** Why the name is unusable, null when valid — displayed verbatim. */
+  reason: string | null;
 }
 
 // =============================================================================
@@ -207,11 +475,13 @@ export interface DomainValidateResponse {
 // =============================================================================
 
 /**
- * Token as returned by the list endpoint.
- * The secret is shown once at creation and never again — listings carry
- * only the management identifier and lifecycle metadata.
+ * Core deploy token object - used in both API responses and SDK.
+ *
+ * The secret is never here: it is shown once at creation
+ * ({@link TokenCreateResponse.secret}) and never again, so an entity read
+ * carries only the management identifier and lifecycle metadata.
  */
-export interface TokenListItem {
+export interface Token {
   /** 7-char management identifier (e.g., "a1b2c3d") */
   readonly token: string;
   /** Labels for categorization and filtering. Always present, empty array when none. */
@@ -227,25 +497,30 @@ export interface TokenListItem {
 /**
  * Response for listing tokens
  */
-export interface TokenListResponse {
-  /** Array of tokens (security-redacted for list display) */
-  tokens: TokenListItem[];
-  /** Total number of tokens */
-  total: number;
+export interface TokenListResponse extends ListResponse {
+  /** Array of tokens (the secret is never among them) */
+  tokens: Token[];
 }
 
 /**
- * Response for token creation
+ * Response from token creation. Extends Token with the one field that
+ * exists only on creation — the same shape as
+ * {@link DeploymentCreateResponse}, because a 201 returns the resource it
+ * created plus whatever is knowable only once.
  */
-export interface TokenCreateResponse {
-  /** 7-char management identifier */
-  token: string;
+export interface TokenCreateResponse extends Token {
   /** The raw credential value (shown once at creation, then never again) */
-  secret: string;
-  /** Labels for categorization and filtering. Always present, empty array when none. */
-  labels: string[];
-  /** Unix timestamp (seconds) when token expires, null for never */
-  expires: number | null;
+  readonly secret: string;
+}
+
+/**
+ * Acknowledgement of `DELETE /tokens/:token`. The credential is revoked and
+ * its row is gone, so the management identifier is the whole answer. See
+ * {@link DeploymentDeleteResponse} for the law.
+ */
+export interface TokenDeleteResponse {
+  /** The 7-char management identifier that was revoked */
+  readonly token: string;
 }
 
 // =============================================================================
@@ -262,17 +537,41 @@ export const AccountPlan = {
   ENTERPRISE: 'enterprise',
   SUSPENDED: 'suspended',
   TERMINATING: 'terminating',
-  TERMINATED: 'terminated'
+  TERMINATED: 'terminated',
 } as const;
 
-export type AccountPlanType = typeof AccountPlan[keyof typeof AccountPlan];
+export type AccountPlanType = (typeof AccountPlan)[keyof typeof AccountPlan];
 
 /**
  * Account usage metrics — always available regardless of billing provider.
+ *
+ * This is where a caller's own totals live. Lists answer pages and carry no
+ * `total` (see {@link ListOptions}); a count is an aggregate over a
+ * collection, so it belongs to the summary resource that owns the
+ * collection. `GET /account` is that resource for one caller, `GET
+ * /admin/stats` for the platform.
+ *
+ * The counted dimensions are the ones the plan caps — deployments and
+ * domains (`PlatformLimits`) — plus the billable custom-domain subset, so a
+ * surface can render "3 of 10" without a second request.
  */
 export interface AccountUsage {
   /** Number of active custom domains (excludes paused) */
   customDomains: number;
+  /**
+   * Deployments counted against the plan's deployment cap — every row
+   * whatever its status, because that is what the cap counts, so a surface
+   * renders "3 of 10" against the denominator the 403 divides by. (`GET
+   * /deployments` lists successful ones only; that is a different question
+   * asked of a different resource.) Optional by the additive-evolution law:
+   * an API predating this field omits it.
+   */
+  deployments?: number;
+  /**
+   * Domains counted against the plan's domain cap — every domain, platform
+   * and custom alike, unlike `customDomains`. Optional for the same reason.
+   */
+  domains?: number;
 }
 
 /**
@@ -296,6 +595,13 @@ export interface Account {
   readonly activated: number | null;
   /** Last 4 characters of the API key for identification, null when no key generated */
   readonly hint: string | null;
+  /**
+   * Unix timestamp (seconds) of the API key's last use, null when never
+   * used or no key generated. Optional on the type by the additive-evolution
+   * law: published SDK versions may predate the field, so consumers read it
+   * when present rather than forcing a lockstep SDK release.
+   */
+  readonly used?: number | null;
   /** Grace period expiration (unix seconds), null if no grace period active */
   readonly grace: number | null;
 }
@@ -316,6 +622,37 @@ export interface AccountGetResponse extends Account {
 }
 
 /**
+ * Acknowledgement of `DELETE /account` (202). Termination is asynchronous —
+ * a cleanup consumer finishes the job — so the account survives long enough
+ * to state the plan it is transitioning through. `plan` is the account's
+ * state field, the way `status` is a deployment's. See
+ * {@link DeploymentDeleteResponse} for the law.
+ */
+export interface AccountDeleteResponse {
+  /** The account that was marked for termination */
+  readonly account: string;
+  /** The plan the account is in while cleanup runs */
+  readonly plan: AccountPlanType;
+}
+
+/**
+ * Response from `PUT /account/key` — the account's single API key, minted in
+ * place of whatever was there before.
+ *
+ * There is no entity to return: only the key's last-4 `hint` is durable
+ * (`Account.hint`), and the plaintext exists exactly once, in this response.
+ * The raw credential is `secret` on every surface that mints one — the same
+ * field `TokenCreateResponse` carries — because one concept gets one name.
+ *
+ * A report: it answers a question and carries only the answer (`CLAUDE.md`,
+ * "A report answers a question").
+ */
+export interface AccountKeyResponse {
+  /** The raw API key (shown once at mint, then never again) */
+  readonly secret: string;
+}
+
+/**
  * Account-specific configuration overrides
  * Allows per-account customization of limits without changing plan
  */
@@ -333,6 +670,103 @@ export interface AccountOverrides {
 }
 
 // =============================================================================
+// WIRE SURFACE
+// =============================================================================
+
+/**
+ * Every path the public API answers on, declared once.
+ *
+ * The URL surface was written out in four places — the API's mounts, the
+ * SDK's client, the dashboard's client, and the post-deploy smoke — so a
+ * rename meant finding all four. The first three now read this table.
+ *
+ * The smoke (`cloudflare/api/smoke.mjs`) deliberately still spells its own:
+ * five of its nine paths are `/admin/*`, which this table excludes by
+ * design, and splitting one list between a registry and literals reads worse
+ * than keeping it uniform.
+ *
+ * **What this guarantees, exactly.** Collection paths are mounted from here,
+ * so producer and consumer cannot diverge. Item paths are declared here and
+ * consumed by clients, but the API spells them relative to their mount
+ * (`/:deployment/config`), so the table does not *generate* them — it is
+ * held to them by `api/tests/architecture/api-paths.test.ts`, which fails if
+ * any entry names a path no route answers. Some entries have no client yet
+ * (`DEPLOYMENT_CONFIG`, `DOMAIN_PROPAGATION` — endpoints the SDK
+ * deliberately does not reach); the fence is what keeps those honest rather
+ * than merely asserted.
+ *
+ * **The operator surface is deliberately absent.** `/admin/*` paths belong
+ * to `web/my`, for the same reason its row types do: this package is
+ * published, and the operator surface is not public (see `CLAUDE.md`, "Admin
+ * types"). A path here is a promise to every npm consumer; `/admin` is a
+ * promise to one dashboard.
+ *
+ * Item paths are functions rather than templates so the key is interpolated
+ * in one place, encoded the same way by every caller.
+ */
+export const API_PATHS = {
+  DEPLOYMENTS: '/deployments',
+  DEPLOYMENT: (deployment: string) => `/deployments/${deployment}`,
+  DEPLOYMENT_CONFIG: (deployment: string) => `/deployments/${deployment}/config`,
+  DOMAINS: '/domains',
+  DOMAIN: (domain: string) => `/domains/${domain}`,
+  DOMAIN_VERIFY: (domain: string) => `/domains/${domain}/verify`,
+  DOMAIN_DNS: (domain: string) => `/domains/${domain}/dns`,
+  DOMAIN_RECORDS: (domain: string) => `/domains/${domain}/records`,
+  DOMAIN_SHARE: (domain: string) => `/domains/${domain}/share`,
+  DOMAIN_PROPAGATION: (domain: string) => `/domains/${domain}/propagation`,
+  DOMAINS_VALIDATE: '/domains/validate',
+  TOKENS: '/tokens',
+  TOKEN: (token: string) => `/tokens/${token}`,
+  ACCOUNT: '/account',
+  ACCOUNT_KEY: '/account/key',
+  ACCOUNT_CLAIM: '/account/claim',
+  ACTIVITIES: '/activities',
+  LABELS: '/labels',
+  LIMITS: '/limits',
+  PING: '/ping',
+  SETUP: '/setup',
+  SPA_CHECK: '/spa-check',
+  UPLOAD: '/upload',
+} as const;
+
+/**
+ * The deploy request's multipart field names — the other half of the wire
+ * surface beside {@link API_PATHS}. `POST /deployments` (and the first-party
+ * `/upload`) is multipart/form-data, and these are the names the API reads.
+ *
+ * Declared once because the body has three independent WRITERS — the SDK's
+ * Node and browser body builders, and the n8n community node's hand-rolled
+ * client (which cannot import this under n8n Cloud's zero-dependency rule,
+ * and fences its restated copy instead) — and until this export every writer
+ * restated the strings the API parses, with nothing comparing them.
+ *
+ * `FILES` carries one entry per file (the API reads it with `getAll`); every
+ * other field is single. The `@internal` flags are serialized as the literal
+ * string `'true'` and belong to first-party surfaces only.
+ */
+export const DEPLOY_FIELDS = {
+  /** One entry per file — read with `getAll`. */
+  FILES: 'files[]',
+  /** JSON array of MD5 hex digests, index-aligned with `FILES`. */
+  CHECKSUMS: 'checksums',
+  /** JSON array of label strings. */
+  LABELS: 'labels',
+  /** The deploying surface's {@link DeploymentVia} member. */
+  VIA: 'via',
+  /** Plaintext password — the API hashes it server-side. */
+  PASSWORD: 'password',
+  /** @internal Server-processing flag — first-party `/upload` only. */
+  BUILD: 'build',
+  /** @internal Server-processing flag — first-party `/upload` only. */
+  PRERENDER: 'prerender',
+  /** @internal Server-processing flag — first-party `/upload` only. */
+  SPA: 'spa',
+  /** @internal reCAPTCHA proof — `web/www`'s public uploader only. */
+  CAPTCHA: 'captcha',
+} as const;
+
+// =============================================================================
 // ERROR SYSTEM
 // =============================================================================
 
@@ -346,7 +780,15 @@ export interface AccountOverrides {
  * (`DeploymentStatus`, `DomainStatus`, `AccountPlan`, `AuthMethod`) follow.
  */
 export const ErrorType = {
-  /** Validation failed (400). Input shape is wrong. */
+  /**
+   * Validation failed. Input shape is wrong.
+   *
+   * Carries 400 when an API judged it — including a client-side pre-check of a
+   * rule the server enforces too, which keeps the error identical wherever it
+   * was caught. **Statusless** when a client rejects something no API judges,
+   * such as a CLI's own command grammar: `status` is documented "(API
+   * contexts)" on `ErrorResponse`, so there is none to report.
+   */
   Validation: 'validation_failed',
   /** Resource not found (404). */
   NotFound: 'not_found',
@@ -360,6 +802,17 @@ export const ErrorType = {
   Business: 'business_logic_error',
   /** API server error (500). Generic server-side fault. */
   Api: 'internal_server_error',
+  /**
+   * The platform is closed for maintenance (503). A deliberate operator
+   * state, not a fault — nothing errored; the API is refusing work on
+   * purpose, and deployed sites keep serving throughout.
+   *
+   * Distinct from `Api` at 503, which the platform already uses for a
+   * dependency that failed (moderation unavailable). A consumer has to tell
+   * "we closed the door" from "something broke": the two get opposite words
+   * and opposite retry behaviour.
+   */
+  Maintenance: 'maintenance',
   /** Network/connection error. Client-side only — set by HTTP clients on fetch failure; never produced server-side. */
   Network: 'network_error',
   /** Operation was cancelled. Client-side only — set on `AbortSignal` abort; never produced server-side. */
@@ -370,7 +823,7 @@ export const ErrorType = {
   Config: 'config_error',
 } as const;
 
-export type ErrorType = typeof ErrorType[keyof typeof ErrorType];
+export type ErrorType = (typeof ErrorType)[keyof typeof ErrorType];
 
 /**
  * Error types that originate exclusively on the client (HTTP clients, SDK
@@ -391,7 +844,28 @@ const CLIENT_ONLY_ERROR_TYPES = new Set<string>([
  * union so `.has(error.type)` accepts any value from the union.
  */
 const ERROR_CATEGORIES = {
-  client: new Set<ErrorType>([ErrorType.Business, ErrorType.Config, ErrorType.File, ErrorType.Forbidden, ErrorType.Validation]),
+  /**
+   * Client-attributable types. Exhaustive over the 4xx-carrying types, and
+   * over the statusless ones too — those are raised locally and have no
+   * status for `isClientError`'s second arm to read, so omitting one makes it
+   * read as a server fault. The rule is the membership test: every type in
+   * `CLIENT_ONLY_ERROR_TYPES` except `Network` (which `isNetworkError` owns)
+   * belongs here.
+   *
+   * `Cancelled` was missing until 2026-07-29, which is exactly that failure:
+   * a caller who aborted their own deploy was told "server error: please try
+   * again" — the CLI's fallback for everything this set does not claim.
+   */
+  client: new Set<ErrorType>([
+    ErrorType.Business,
+    ErrorType.Cancelled,
+    ErrorType.Config,
+    ErrorType.File,
+    ErrorType.Forbidden,
+    ErrorType.NotFound,
+    ErrorType.RateLimit,
+    ErrorType.Validation,
+  ]),
   network: new Set<ErrorType>([ErrorType.Network]),
   auth: new Set<ErrorType>([ErrorType.Authentication]),
 } as const;
@@ -404,8 +878,53 @@ const ERROR_CATEGORIES = {
  * `ErrorType` is automatically picked up.
  */
 const SERVER_PRODUCIBLE_ERROR_TYPES = new Set<string>(
-  Object.values(ErrorType).filter(t => !CLIENT_ONLY_ERROR_TYPES.has(t)),
+  Object.values(ErrorType).filter((t) => !CLIENT_ONLY_ERROR_TYPES.has(t)),
 );
+
+/**
+ * Ceiling on a message adopted from a **non-JSON** error body — a foreign
+ * responder's, never this platform's. Generous for the plain-text one-liners
+ * intermediaries actually send (`error code: 1015`), far below a document.
+ * Our own messages are never measured against it: a JSON body is the API's
+ * contract, and truncating a long validation message would be the bug.
+ */
+const MAX_FOREIGN_MESSAGE_LENGTH = 200;
+
+/**
+ * Did the runtime say the exchange never completed?
+ *
+ * WHATWG has `fetch` reject with a **TypeError** on network error, and undici,
+ * Chromium and Firefox comply. Bun does not: it rejects with a plain `Error`
+ * carrying a system `code` string. Captured 2026-08-05 (the capture script is
+ * in `tests/errors.test.ts`, "runtime failure shapes"):
+ *
+ * | failure       | Node 22 / undici          | Bun 1.3.14                                   |
+ * |---------------|---------------------------|----------------------------------------------|
+ * | refused       | `TypeError: fetch failed` | `Error` `code: 'ConnectionRefused'`          |
+ * | DNS failure   | `TypeError: fetch failed` | `Error` `code: 'ConnectionRefused'`          |
+ * | reset         | `TypeError: fetch failed` | `Error` `code: 'ECONNRESET'`                 |
+ * | TLS rejected  | `TypeError: fetch failed` | `Error` `code: 'UNKNOWN_CERTIFICATE_…ERROR'` |
+ *
+ * So the test is the **evidence, not a list of dialect strings**: a string
+ * `code` is a runtime naming a transport-level failure. An allowlist of codes
+ * was written first and rejected — the TLS row alone would mean enumerating
+ * BoringSSL's certificate table, and a code nobody guessed is precisely the bug
+ * this closes. Two kinds of error are deliberately NOT caught: ordinary JS
+ * faults carry no `code` at all, and a `DOMException`'s is a **number**, so
+ * aborts and timeouts fall through to their own arms.
+ *
+ * The accepted trade: a caller's `TokenProvider` that throws a coded error
+ * (`ENOENT` from a keychain read) is typed `Network` rather than `Api`. Both
+ * are wrong for it, `Network` is the cheaper wrong — it says "nothing was
+ * exchanged", which is true, where `Api` claims a server answered.
+ */
+function isTransportFailure(cause: Error): boolean {
+  if (typeof (cause as { code?: unknown }).code === 'string') return true;
+  // Spec runtimes put no code on the rejection itself. The message test is what
+  // keeps fetch's ARGUMENT errors out — `Failed to parse URL from …` is a
+  // caller's config mistake, not a transport failure.
+  return cause instanceof TypeError && cause.message.includes('fetch');
+}
 
 /**
  * Standard error response format used everywhere
@@ -441,15 +960,14 @@ export class ShipError extends Error {
     // tag (see `ShipError.authentication` JSDoc) — these are server-side
     // diagnostics like 'session_invalid' that must not leak to clients.
     const authDetails = this.details as { internal?: unknown } | undefined;
-    const details = this.type === ErrorType.Authentication && authDetails?.internal
-      ? undefined
-      : this.details;
+    const details =
+      this.type === ErrorType.Authentication && authDetails?.internal ? undefined : this.details;
 
     return {
       error: this.type,
       message: this.message,
       status: this.status,
-      details
+      details,
     };
   }
 
@@ -475,10 +993,7 @@ export class ShipError extends Error {
    * Async because it reads the response body. Returns rather than throws so
    * callers can compose; most will `throw await ShipError.fromHttpResponse(...)`.
    */
-  static async fromHttpResponse(
-    response: Response,
-    operationName?: string,
-  ): Promise<ShipError> {
+  static async fromHttpResponse(response: Response, operationName?: string): Promise<ShipError> {
     let message: string | undefined;
     let details: unknown;
     let bodyType: ErrorType | undefined;
@@ -497,21 +1012,52 @@ export class ShipError extends Error {
           }
         }
       } else {
-        const text = await response.text();
-        if (text) message = text;
+        // A non-JSON body did not come from this platform — every API error
+        // is `ErrorResponse` JSON — so it is an intermediary's output, and
+        // the two kinds it produces need opposite treatment. A CDN's plain
+        // `error code: 1015` is the most useful thing there is to say. A
+        // proxy's HTML error page is a *document*, not a message: adopting it
+        // verbatim made a misconfigured `apiUrl` print 2,059 characters of
+        // markup as the error. Trust it only when it reads as a message.
+        const text = (await response.text()).trim();
+        if (text && !text.startsWith('<') && text.length <= MAX_FOREIGN_MESSAGE_LENGTH) {
+          message = text;
+        }
       }
     } catch {
       // Body unreadable; fall through to operationName-derived message.
     }
 
+    // Rate-limit (and 503) timing rides the `Retry-After` HEADER, which a
+    // body-only reader would drop. Lift it into `details` as seconds so
+    // consumers can back off from the typed error alone, without keeping the
+    // raw Response around. Body-carried fields are preserved and win.
+    const retryAfterHeader = response.headers.get('retry-after');
+    if (retryAfterHeader !== null) {
+      const value = retryAfterHeader.trim();
+      const seconds = /^\d+$/.test(value)
+        ? Number(value)
+        : Math.ceil((Date.parse(value) - Date.now()) / 1000);
+      if (Number.isFinite(seconds) && seconds >= 0) {
+        const existing =
+          details && typeof details === 'object' ? (details as Record<string, unknown>) : {};
+        if (existing.retryAfter === undefined) {
+          details = { ...existing, retryAfter: seconds };
+        }
+      }
+    }
+
     message = message || `${operationName || 'Request'} failed with status ${response.status}`;
 
-    const type = bodyType ?? (
-      response.status === 401 ? ErrorType.Authentication :
-      response.status === 403 ? ErrorType.Forbidden :
-      response.status === 429 ? ErrorType.RateLimit :
-      ErrorType.Api
-    );
+    const type =
+      bodyType ??
+      (response.status === 401
+        ? ErrorType.Authentication
+        : response.status === 403
+          ? ErrorType.Forbidden
+          : response.status === 429
+            ? ErrorType.RateLimit
+            : ErrorType.Api);
 
     return new ShipError(type, message, response.status, details);
   }
@@ -526,7 +1072,8 @@ export class ShipError extends Error {
    * Routing:
    * - Already a `ShipError` → returned as-is (caller's intent preserved)
    * - `AbortError` → `ShipError.cancelled(...)`
-   * - `TypeError` whose message mentions "fetch" → `ShipError.network(...)`
+   * - A transport failure → `ShipError.network(...)` — see `isTransportFailure`
+   *   for what each runtime offers as evidence
    * - Any other `Error` → `ShipError(Api, ...)` (no HTTP status — fetch never reached the server)
    * - Anything else (string, undefined, etc.) → `ShipError(Api, ...)`
    *
@@ -543,7 +1090,7 @@ export class ShipError extends Error {
       if (cause.name === 'AbortError') {
         return ShipError.cancelled(`${op} was cancelled`);
       }
-      if (cause instanceof TypeError && cause.message.includes('fetch')) {
+      if (isTransportFailure(cause)) {
         return ShipError.network(`${op} failed: ${cause.message}`, { cause });
       }
       return new ShipError(ErrorType.Api, `${op} failed: ${cause.message}`);
@@ -570,7 +1117,7 @@ export class ShipError extends Error {
     return new ShipError(ErrorType.Forbidden, message, 403, details);
   }
 
-  static rateLimit(message: string = "Too many requests", details?: unknown): ShipError {
+  static rateLimit(message: string = 'Too many requests', details?: unknown): ShipError {
     return new ShipError(ErrorType.RateLimit, message, 429, details);
   }
 
@@ -587,7 +1134,7 @@ export class ShipError extends Error {
    * Use this pattern in API auth code; do not put client-visible info under
    * `internal`. Other `details` keys round-trip normally.
    */
-  static authentication(message: string = "Authentication required", details?: unknown): ShipError {
+  static authentication(message: string = 'Authentication required', details?: unknown): ShipError {
     return new ShipError(ErrorType.Authentication, message, 401, details);
   }
 
@@ -615,10 +1162,37 @@ export class ShipError extends Error {
     return new ShipError(ErrorType.Api, message, status, details);
   }
 
-  // Semantic-category type guards. For specific-type checks, use
+  /**
+   * The platform is closed for maintenance (503).
+   *
+   * `message` is REQUIRED and has no default here. The API is the only
+   * producer of that sentence, and a default in this file would be a second
+   * owner of one fact — see CLAUDE.md, "The Constellation Law" (stopping
+   * rule). It is also the one factory whose status is fixed rather than
+   * defaulted: a maintenance refusal is 503 or it is not this error.
+   */
+  static maintenance(message: string, details?: unknown): ShipError {
+    return new ShipError(ErrorType.Maintenance, message, 503, details);
+  }
+
+  // Semantic-category guards. For specific-type checks, use
   // `error.type === ErrorType.X` directly or the generic `isType(t)`.
+
+  /**
+   * The caller is at fault — by HTTP's own definition of a 4xx, or by a type
+   * that is client-attributable without ever having a status (`Config`,
+   * `File`, raised locally by the SDK).
+   *
+   * Both arms are load-bearing, because type and status are independent
+   * axes. `fromHttpResponse` trusts `body.error` only when it names a
+   * server-producible type; a non-OK response without one is status-derived,
+   * so a CDN 404 or any intermediary error arrives as `Api` — a server-fault
+   * *type* carrying a client *status*. Judging by type alone would report it
+   * as a platform failure and bury the server's own message.
+   */
   isClientError(): boolean {
-    return ERROR_CATEGORIES.client.has(this.type);
+    if (ERROR_CATEGORIES.client.has(this.type)) return true;
+    return this.status !== undefined && this.status >= 400 && this.status < 500;
   }
 
   isNetworkError(): boolean {
@@ -656,7 +1230,7 @@ export function isShipError(error: unknown): error is ShipError {
 }
 
 // =============================================================================
-// CONFIG TYPES
+// PLATFORM LIMITS
 // =============================================================================
 
 /**
@@ -668,6 +1242,9 @@ export function isShipError(error: unknown): error is ShipError {
  *
  * These are the *platform's* posted caps for the current account — server
  * truth delivered at runtime, never hard-coded on the client.
+ *
+ * A report: it answers a question and carries only the answer (`CLAUDE.md`,
+ * "A report answers a question").
  */
 export interface PlatformLimits {
   /** Maximum size in bytes for a single file. */
@@ -694,21 +1271,47 @@ export interface PlatformLimits {
  */
 export const BLOCKED_EXTENSIONS: ReadonlySet<string> = new Set([
   // Executables
-  'exe', 'msi', 'dll', 'scr', 'bat', 'cmd', 'com', 'pif', 'app', 'deb', 'rpm',
+  'exe',
+  'msi',
+  'dll',
+  'scr',
+  'bat',
+  'cmd',
+  'com',
+  'pif',
+  'app',
+  'deb',
+  'rpm',
   // Installers
-  'pkg', 'mpkg',
+  'pkg',
+  'mpkg',
   // Disk images
-  'dmg', 'iso', 'img',
+  'dmg',
+  'iso',
+  'img',
   // Malware vectors
-  'cab', 'cpl', 'chm',
+  'cab',
+  'cpl',
+  'chm',
   // Dangerous scripts
-  'ps1', 'vbs', 'vbe', 'ws', 'wsf', 'wsc', 'wsh', 'reg',
+  'ps1',
+  'vbs',
+  'vbe',
+  'ws',
+  'wsf',
+  'wsc',
+  'wsh',
+  'reg',
   // Java
-  'jar', 'jnlp',
+  'jar',
+  'jnlp',
   // Mobile/browser packages
-  'apk', 'crx',
+  'apk',
+  'crx',
   // Shortcut/link
-  'lnk', 'inf', 'hta',
+  'lnk',
+  'inf',
+  'hta',
 ]);
 
 /**
@@ -731,6 +1334,128 @@ export function isBlockedExtension(filename: string): boolean {
 }
 
 // =============================================================================
+// PICKER ACCEPT HINT
+// =============================================================================
+
+/**
+ * The extensions a browser file picker offers by default, grouped by role.
+ *
+ * Private on purpose: the only published form is `WEB_FILE_ACCEPT`, the
+ * attribute value itself. A published set would invite a call site to ask it
+ * whether a file is allowed — which is the one thing this list must never
+ * answer. See `WEB_FILE_ACCEPT`.
+ *
+ * Extensionless files (`LICENSE`, most `.well-known` entries) are inexpressible
+ * in `accept`, and reach a deployment by folder pick, ZIP, or drag-and-drop.
+ */
+const WEB_FILE_EXTENSIONS = [
+  // Markup & documents
+  'html',
+  'htm',
+  'xhtml',
+  'xml',
+  'txt',
+  'md',
+  'markdown',
+  'pdf',
+  'csv',
+  // Data & config
+  'json',
+  'jsonc',
+  'webmanifest',
+  'map',
+  'toml',
+  'yaml',
+  'yml',
+  'rss',
+  'atom',
+  // Styles
+  'css',
+  'scss',
+  'sass',
+  'less',
+  // Scripts & modules
+  'js',
+  'mjs',
+  'cjs',
+  'jsx',
+  'ts',
+  'tsx',
+  'wasm',
+  'vue',
+  'svelte',
+  // Images
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'avif',
+  'svg',
+  'ico',
+  'bmp',
+  'tif',
+  'tiff',
+  'heic',
+  'heif',
+  // Fonts
+  'woff',
+  'woff2',
+  'ttf',
+  'otf',
+  'eot',
+  // Audio
+  'mp3',
+  'wav',
+  'ogg',
+  'oga',
+  'opus',
+  'm4a',
+  'aac',
+  'flac',
+  'weba',
+  // Video
+  'mp4',
+  'webm',
+  'ogv',
+  'mov',
+  'm4v',
+  'avi',
+  // 3D models
+  'glb',
+  'gltf',
+  'usdz',
+  // Text tracks
+  'vtt',
+  'srt',
+  // Archive — a whole site in one file
+  'zip',
+] as const;
+
+/**
+ * The `accept` attribute value for a browser file picker offering web files.
+ *
+ * **This is a hint, never a rule.** `BLOCKED_EXTENSIONS` is the platform's
+ * gate and the only thing that decides what may be hosted; this constant
+ * decides what a *file dialog* shows first. The two are not two halves of one
+ * policy, and this one must never be consulted to accept or reject a file.
+ *
+ * The distinction is structural, not stylistic. `accept` can express only an
+ * allowlist, while the platform's rule is a blocklist — so this list is
+ * necessarily *narrower* than what the platform hosts, and reading it as
+ * authority would reject files the platform serves happily. It is also not
+ * enforcement in the browser's own terms: every file dialog offers an
+ * all-files escape, and **drag-and-drop ignores `accept` entirely**. The
+ * dropzone and the picker must reach the same verdict on the same files, and
+ * they do — because the verdict is `validateFiles`, downstream of both.
+ *
+ * Kept beside `BLOCKED_EXTENSIONS` so one file holds both, which is what lets
+ * `tests/validation-constants.test.ts` fence the invariant that matters: the
+ * picker must never offer a file the platform will refuse.
+ */
+export const WEB_FILE_ACCEPT: string = WEB_FILE_EXTENSIONS.map((ext) => `.${ext}`).join(',');
+
+// =============================================================================
 // FILENAME CHARACTER VALIDATION
 // =============================================================================
 
@@ -745,6 +1470,7 @@ export function isBlockedExtension(filename: string): boolean {
  *
  * Everything else is allowed — browser percent-encodes, Worker decodes, R2 matches.
  */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: blocking control characters is this regex's purpose
 export const UNSAFE_FILENAME_CHARS = /[\x00-\x1f\x7f#?%\\<>"]/;
 
 /**
@@ -783,7 +1509,7 @@ export const UNBUILT_PROJECT_MARKERS: ReadonlySet<string> = new Set([
  */
 export function hasUnbuiltMarker(filePath: string): boolean {
   const segments = filePath.replace(/\\/g, '/').split('/').filter(Boolean);
-  return segments.some(s => UNBUILT_PROJECT_MARKERS.has(s));
+  return segments.some((s) => UNBUILT_PROJECT_MARKERS.has(s));
 }
 
 // =============================================================================
@@ -791,22 +1517,39 @@ export function hasUnbuiltMarker(filePath: string): boolean {
 // =============================================================================
 
 /**
- * Simple ping response for health checks
+ * `GET /ping` — a report of the server clock.
+ *
+ * Liveness is the STATUS CODE's answer, not a field's: a 200 means reachable,
+ * and any other outcome throws before a body is read. So the body carries the
+ * one thing a status code cannot — the server's own clock, which is what lets a
+ * client detect skew against a token expiry. It read `{ success: true,
+ * timestamp? }` until 2026-07-29, where `success` was a literal constant in the
+ * route (zero bits, and the platform's own named anti-pattern) while the field
+ * that IS the payload was optional. See {@link DeploymentDeleteResponse} for
+ * the law, and `tests/response-shapes.test.ts` for the fence that holds it.
  */
 export interface PingResponse {
-  /** Always true if service is healthy */
-  success: boolean;
-  /** Optional timestamp */
-  timestamp?: number;
+  /** Server time in unix seconds — the one wire unit for timestamps. */
+  readonly timestamp: number;
 }
 
 // =============================================================================
 // CREDENTIAL SHAPES
 // =============================================================================
-// The one address for credential vocabulary: how a request is authorized
-// (AuthMethod), the shapes that distinguish populations on the wire
-// (API_KEY, DEPLOY_TOKEN, CALLER), the single dispatch over them (TokenKind,
-// classifyToken), and the delegated-access scopes (OAuthScope).
+// The one address for credential vocabulary: where human identity lives
+// (AUTH_BASE_PATH), how a request is authorized (AuthMethod), the shapes
+// that distinguish populations on the wire (API_KEY, DEPLOY_TOKEN, CALLER),
+// the single dispatch over them (TokenKind, classifyToken), and the
+// delegated-access scopes (OAuthScope).
+
+/**
+ * Where human identity is mounted on the API host. The API mounts Better
+ * Auth at this path (sign-in, sign-out, session reads, admin impersonation)
+ * and the web console's auth client posts to it — shared here so the two
+ * halves of the auth pair agree by construction, the same way both sides
+ * already share the credential prefixes below.
+ */
+export const AUTH_BASE_PATH = '/auth';
 
 /**
  * How a request (or recorded activity) was authorized.
@@ -824,10 +1567,10 @@ export const AuthMethod = {
   AGENT: 'agent',
   OAUTH: 'oauth',
   WEBHOOK: 'webhook',
-  SYSTEM: 'system'
+  SYSTEM: 'system',
 } as const;
 
-export type AuthMethodType = typeof AuthMethod[keyof typeof AuthMethod];
+export type AuthMethodType = (typeof AuthMethod)[keyof typeof AuthMethod];
 
 /**
  * Shape constants for API keys (`ship-{64 hex chars}`).
@@ -891,7 +1634,7 @@ export const TokenKind = {
   OPAQUE: 'opaque',
 } as const;
 
-export type TokenKindType = typeof TokenKind[keyof typeof TokenKind];
+export type TokenKindType = (typeof TokenKind)[keyof typeof TokenKind];
 
 /**
  * Classify a client token by shape. The single dispatch used by both sides
@@ -924,7 +1667,7 @@ export const OAuthScope = {
   DOMAINS_WRITE: 'domains:write',
 } as const;
 
-export type OAuthScopeType = typeof OAuthScope[keyof typeof OAuthScope];
+export type OAuthScopeType = (typeof OAuthScope)[keyof typeof OAuthScope];
 
 // =============================================================================
 // DEPLOYMENT CONFIGURATION CONSTANTS
@@ -933,7 +1676,78 @@ export type OAuthScopeType = typeof OAuthScope[keyof typeof OAuthScope];
 export const DEPLOYMENT_CONFIG_FILENAME = 'ship.json';
 
 /** Default ship.json config for SPA routing. Single source of truth — used by both API and SDK. */
-export const SPA_DEFAULT_CONFIG = { rewrites: [{ source: '/(.*)', destination: '/index.html' }] } as const;
+export const SPA_DEFAULT_CONFIG = {
+  rewrites: [{ source: '/(.*)', destination: '/index.html' }],
+} as const;
+
+/**
+ * The `/spa-check` pre-flight's client-side envelope: which file is the
+ * check's subject, and how large it may be before a client skips the call.
+ *
+ * One fact with three holders until this export — the API's config declared
+ * the cap, the SDK's `checkSPA` hardcoded `100 * 1024`, and prose restated
+ * "100KB". `INDEX_FILE` is the selection rule (the file whose content rides
+ * `SPACheckRequest.index`), restated by every client that builds the request.
+ *
+ * Neither member is a validation boundary: a client over the cap simply
+ * skips the pre-flight, because the server answers an oversized index
+ * `isSPA: false` anyway. A consumer that cannot import this (n8n) needs no
+ * size copy at all — outcome parity is the server's, not the client's.
+ */
+export const SPA_CHECK_CONSTRAINTS = {
+  /** The file whose content is the check's subject. */
+  INDEX_FILE: 'index.html',
+  /** Skip the pre-flight above this size — the server would answer false. */
+  MAX_INDEX_BYTES: 100 * 1024,
+} as const;
+
+/**
+ * Assert that a ship.json file is *syntactically* loadable. Syntax only —
+ * never schema.
+ *
+ * ship.json is validated and compiled on the server, deliberately: the schema
+ * and the compiler evolve, and a client that judged them would reject configs
+ * a newer platform accepts. That reasoning bounds what a client may check to
+ * the properties which are true of *every* past and future schema:
+ *
+ *   1. it parses as JSON — JSON syntax is frozen (RFC 8259), so text that
+ *      does not parse can never be a valid config;
+ *   2. its top level is an object — ship.json is `{ ... }` in every version.
+ *
+ * Both are monotonic: neither can ever reject something the server would
+ * accept. Everything beyond them (field names, types, rule semantics, which
+ * keys are permitted) stays server-side, where it can change.
+ *
+ * The payoff is the common case. Hand-edited JSON fails on a trailing comma,
+ * a `//` comment, single quotes, unquoted keys, or smart quotes pasted from
+ * documentation — mistakes that otherwise cost a full upload round-trip to
+ * discover. A UTF-8 BOM (Windows editors, PowerShell redirects) is stripped
+ * before parsing rather than rejected, because the server accepts it too;
+ * diverging there would reintroduce exactly the false rejection this
+ * function exists to avoid.
+ *
+ * @throws {ShipError} `ErrorType.Config` — the same type the server's own
+ * config rejection carries, so the error contract is identical wherever the
+ * failure is detected.
+ */
+export function assertShipJsonSyntax(text: string): void {
+  const withoutBom = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(withoutBom);
+  } catch (error) {
+    throw ShipError.config(`invalid JSON format in config: ${(error as Error).message}`, {
+      filePath: DEPLOYMENT_CONFIG_FILENAME,
+    });
+  }
+
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw ShipError.config(`${DEPLOYMENT_CONFIG_FILENAME} must contain a JSON object`, {
+      filePath: DEPLOYMENT_CONFIG_FILENAME,
+    });
+  }
+}
 
 // =============================================================================
 // VALIDATION UTILITIES
@@ -947,19 +1761,23 @@ export const SPA_DEFAULT_CONFIG = { rewrites: [{ source: '/(.*)', destination: '
 function validatePrefixedCredential(
   value: string,
   shape: { PREFIX: string; HEX_LENGTH: number; TOTAL_LENGTH: number },
-  label: string
+  label: string,
 ): void {
   if (!value.startsWith(shape.PREFIX)) {
     throw ShipError.validation(`${label} must start with "${shape.PREFIX}"`);
   }
 
   if (value.length !== shape.TOTAL_LENGTH) {
-    throw ShipError.validation(`${label} must be ${shape.TOTAL_LENGTH} characters total (${shape.PREFIX} + ${shape.HEX_LENGTH} hex chars)`);
+    throw ShipError.validation(
+      `${label} must be ${shape.TOTAL_LENGTH} characters total (${shape.PREFIX} + ${shape.HEX_LENGTH} hex chars)`,
+    );
   }
 
   const hexPart = value.slice(shape.PREFIX.length);
   if (!new RegExp(`^[a-f0-9]{${shape.HEX_LENGTH}}$`, 'i').test(hexPart)) {
-    throw ShipError.validation(`${label} must contain ${shape.HEX_LENGTH} hexadecimal characters after "${shape.PREFIX}" prefix`);
+    throw ShipError.validation(
+      `${label} must contain ${shape.HEX_LENGTH} hexadecimal characters after "${shape.PREFIX}" prefix`,
+    );
   }
 }
 
@@ -986,9 +1804,11 @@ export function validateDeployToken(deployToken: string): void {
 export function validateToken(token: string): void {
   switch (classifyToken(token)) {
     case TokenKind.API_KEY:
-      return validateApiKey(token);
+      validateApiKey(token);
+      return;
     case TokenKind.DEPLOY_TOKEN:
-      return validateDeployToken(token);
+      validateDeployToken(token);
+      return;
     case TokenKind.OPAQUE:
       if (!token) throw ShipError.validation('Token must be a non-empty string');
   }
@@ -1002,7 +1822,7 @@ export function validateToken(token: string): void {
 export function validateCaller(caller: string): void {
   if (!caller || caller.length > CALLER.MAX_LENGTH || !CALLER.PATTERN.test(caller)) {
     throw ShipError.validation(
-      `Caller must be 1-${CALLER.MAX_LENGTH} characters: letters, digits, dots, underscores, or hyphens`
+      `Caller must be 1-${CALLER.MAX_LENGTH} characters: letters, digits, dots, underscores, or hyphens`,
     );
   }
 }
@@ -1058,16 +1878,27 @@ export interface SPACheckRequest {
 /**
  * Response from SPA check endpoint
  */
+/**
+ * Which of the classifier's tiers reached the verdict, and why. Named rather
+ * than inline so the API's own `checkSPA` can return `SPACheckResponse`
+ * instead of restating its shape.
+ */
+export interface SPACheckDebug {
+  /** Which tier made the detection */
+  tier: 'exclusions' | 'inclusions' | 'scoring' | 'ai' | 'fallback';
+  /** The reason for the detection result */
+  reason: string;
+}
+
+/**
+ * A report: it answers a question and carries only the answer (`CLAUDE.md`,
+ * "A report answers a question").
+ */
 export interface SPACheckResponse {
   /** Whether the project is detected as a Single Page Application */
   isSPA: boolean;
   /** Debugging information about detection */
-  debug: {
-    /** Which tier made the detection: 'exclusions', 'inclusions', 'scoring', 'ai', or 'fallback' */
-    tier: 'exclusions' | 'inclusions' | 'scoring' | 'ai' | 'fallback';
-    /** The reason for the detection result */
-    reason: string;
-  };
+  debug: SPACheckDebug;
 }
 
 // =============================================================================
@@ -1105,30 +1936,58 @@ export interface StaticFile {
 }
 
 // =============================================================================
-// PROGRESS TRACKING
-// =============================================================================
-
-/**
- * Progress information for deploy/upload operations.
- * Provides consistent percentage-based progress with byte-level details.
- */
-export interface ProgressInfo {
-  /** Progress percentage (0-100) */
-  percent: number;
-  /** Number of bytes loaded so far */
-  loaded: number;
-  /** Total number of bytes to load. May be 0 if unknown initially */
-  total: number;
-  /** Current file being processed (optional) */
-  file?: string;
-}
-
-// =============================================================================
 // PLATFORM CONSTANTS
 // =============================================================================
 
 /** Default API URL if not otherwise configured. */
 export const DEFAULT_API = 'https://api.shipstatic.com';
+
+/**
+ * The Node SDK's ambient configuration pair — the ONLY environment variables
+ * the SDK reads, and therefore the COMPLETE list an embedding host must
+ * scrub (per `npm/ship`'s strict-isolation contract, scrubbing is the host's
+ * job, not the SDK's). A host that derives its scrub from this object's
+ * values — as the VS Code extension's child-process env block does — picks
+ * up a grown contract at the next pin bump instead of by remembered prose.
+ *
+ * Browser builds read no environment at all, and the CLI-only variables
+ * (`SHIP_PASSWORD`, `SHIP_VIA`) are deliberately NOT here: they are the
+ * CLI's operational levers, not the SDK's ambient contract — see
+ * `npm/ship/CLAUDE.md`, "CLI-only env vars".
+ */
+export const SHIP_ENV = {
+  /** The one credential slot — any platform token. */
+  TOKEN: 'SHIP_TOKEN',
+  /** The API endpoint override. */
+  API_URL: 'SHIP_API_URL',
+} as const;
+
+/**
+ * Where a human creates an API key — the console deep link quoted by every
+ * surface that teaches authentication (the CLI's config wizard, the VS Code
+ * and n8n listings, the n8n rate-limit hint and credential copy). Written
+ * out in five files across three repos until this export.
+ *
+ * Production-branded by design: published artifacts name the product, never
+ * an environment (root `CLAUDE.md`, "Environment-Aware URLs").
+ */
+export const MY_API_KEY_URL = 'https://my.shipstatic.com/api-key';
+
+/**
+ * How long an anonymous deployment lives before it expires.
+ *
+ * The lifetime of the public tier, and one fact with several readers. The API
+ * stamps a deployment's `expires` from it and gives a claim code exactly the
+ * same window — a live site with a dead claim link is a coherence bug, so the
+ * two are one constant rather than two that agree. Both MCP transports quote
+ * the duration in prose an agent reads, and derive it from here rather than
+ * writing it out, which they did in eight places until this export existed.
+ *
+ * Seconds, spelled in the name: this platform has both second- and
+ * millisecond-valued durations, and the pair is only safe when each says which
+ * it is.
+ */
+export const PUBLIC_DEPLOYMENT_TTL_SECONDS = 3 * 24 * 60 * 60;
 
 // =============================================================================
 // RESOURCE INTERFACE CONTRACTS
@@ -1153,8 +2012,12 @@ export type DeployInput = File[] | string | string[];
 export interface DeploymentUploadOptions {
   /** Optional labels for categorization and filtering */
   labels?: string[];
-  /** Client identifier (e.g., 'cli', 'sdk', 'web') */
-  via?: string;
+  /**
+   * Which client is making this deploy. Closed, because the server silently
+   * ignores anything outside the set — so an unchecked string turned a typo
+   * into missing analytics rather than an error. See {@link DeploymentVia}.
+   */
+  via?: DeploymentViaType;
   /**
    * Optional password that protects this deployment.
    *
@@ -1174,32 +2037,88 @@ export interface DeploymentUploadOptions {
   spa?: boolean;
   /** @internal reCAPTCHA proof for the anonymous human deploy channel. Only available via /upload endpoint. */
   captcha?: string;
+  /**
+   * Makes this deploy replayable instead of repeatable.
+   *
+   * A deploy is not naturally idempotent: a client-side timeout on a slow
+   * one leaves the caller unable to tell "it never landed" from "it landed
+   * and the response was lost", and retrying produces a second deployment.
+   * Send the same key on the retry and the platform replays the original
+   * 201 verbatim rather than creating anything
+   * ({@link IDEMPOTENCY_KEY_CONSTRAINTS.WINDOW_SECONDS}).
+   *
+   * **Agents are the audience.** A human notices a duplicate; an automated
+   * retry does not. Pick a key that identifies the ATTEMPT — a run id, a
+   * commit sha, a uuid minted before the first try — never one minted fresh
+   * on each retry, which would defeat the point.
+   *
+   * The replay is per-caller, and it stores successes only: a failed deploy
+   * retries fresh under the same key.
+   */
+  idempotencyKey?: string;
 }
 
 /**
- * Deployment resource interface - the contract all implementations must follow
+ * What a caller may change on an existing deployment.
+ *
+ * Labels and nothing else: a deployment's content is immutable by design, so
+ * this is the whole mutable surface rather than a subset someone chose.
  */
-export interface DeploymentResource {
-  upload: (input: DeployInput, options?: DeploymentUploadOptions) => Promise<DeploymentCreateResponse>;
-  list: () => Promise<DeploymentListResponse>;
+export interface DeploymentSetOptions {
+  labels: string[];
+}
+
+/**
+ * What `domains.set()` may create or change. Every field is optional because
+ * the call is a natural-key upsert: omitting `deployment` reserves the
+ * domain, naming one links or re-points it, and labels travel either way.
+ *
+ * `deployment` is deliberately not nullable — unlinking is refused (400).
+ * See `npm/ship/CLAUDE.md`, "Domain Write Semantics".
+ */
+export interface DomainSetOptions {
+  deployment?: string;
+  labels?: string[];
+}
+
+/** What a caller may set when minting a deploy token. */
+export interface TokenCreateOptions {
+  /** Seconds until expiry; omit for a token that never expires. */
+  ttl?: number;
+  labels?: string[];
+}
+
+/**
+ * Deployment resource interface - the contract all implementations must follow.
+ *
+ * The interface defines the minimal wire contract; SDK implementations may
+ * extend the upload options with runtime concerns (timeout, signal, progress
+ * callbacks) by parameterizing: `DeploymentResource<MyUploadOptions>`. The
+ * default keeps plain `DeploymentResource` valid for wire-only consumers.
+ */
+export interface DeploymentResource<
+  UploadOptions extends DeploymentUploadOptions = DeploymentUploadOptions,
+> {
+  upload: (input: DeployInput, options?: UploadOptions) => Promise<DeploymentCreateResponse>;
+  list: (options?: ListOptions) => Promise<DeploymentListResponse>;
   get: (id: string) => Promise<Deployment>;
-  set: (id: string, options: { labels: string[] }) => Promise<Deployment>;
-  remove: (id: string) => Promise<void>;
+  set: (id: string, options: DeploymentSetOptions) => Promise<Deployment>;
+  delete: (id: string) => Promise<DeploymentDeleteResponse>;
 }
 
 /**
  * Domain resource interface - the contract all implementations must follow
  */
 export interface DomainResource {
-  set: (name: string, options?: { deployment?: string; labels?: string[] }) => Promise<DomainSetResult>;
-  list: () => Promise<DomainListResponse>;
+  set: (name: string, options?: DomainSetOptions) => Promise<DomainSetResult>;
+  list: (options?: ListOptions) => Promise<DomainListResponse>;
   get: (name: string) => Promise<Domain>;
-  remove: (name: string) => Promise<void>;
-  verify: (name: string) => Promise<{ message: string }>;
+  delete: (name: string) => Promise<DomainDeleteResponse>;
+  verify: (name: string) => Promise<DomainVerifyResponse>;
   validate: (name: string) => Promise<DomainValidateResponse>;
   dns: (name: string) => Promise<DomainDnsResponse>;
   records: (name: string) => Promise<DomainRecordsResponse>;
-  share: (name: string) => Promise<{ domain: string; hash: string }>;
+  share: (name: string) => Promise<DomainShareResponse>;
 }
 
 /**
@@ -1213,9 +2132,10 @@ export interface AccountResource {
  * Token resource interface - the contract all implementations must follow
  */
 export interface TokenResource {
-  create: (options?: { ttl?: number; labels?: string[] }) => Promise<TokenCreateResponse>;
-  list: () => Promise<TokenListResponse>;
-  remove: (token: string) => Promise<void>;
+  create: (options?: TokenCreateOptions) => Promise<TokenCreateResponse>;
+  list: (options?: ListOptions) => Promise<TokenListResponse>;
+  get: (token: string) => Promise<Token>;
+  delete: (token: string) => Promise<TokenDeleteResponse>;
 }
 
 // =============================================================================
@@ -1241,6 +2161,25 @@ export interface BillingStatus {
   portal: string | null;
 }
 
+/**
+ * Acknowledgement of `POST /billing/cancel`.
+ *
+ * Cancelling leaves no billing entity to return, so it answers with the
+ * account and the one field of the account the call changed — the plan it
+ * landed on. See {@link DeploymentDeleteResponse} for the law.
+ *
+ * This read `{ success: true, message: 'Subscription canceled successfully…' }`
+ * until 2026-07-29, an anonymous shape that `web/my` redeclared inline and
+ * whose prose no surface ever displayed: both callers await the promise and
+ * discard the body, then compose their own toast. The message was written,
+ * serialized, and thrown away on every cancellation.
+ */
+export interface BillingCancelResponse {
+  /** The account whose subscription was cancelled */
+  readonly account: string;
+  /** The plan the account now holds — `free` on a successful cancellation */
+  readonly plan: AccountPlanType;
+}
 
 /**
  * Checkout session response from POST /billing/checkout
@@ -1281,6 +2220,7 @@ export type ActivityEvent =
   // Token events
   | 'token.create'
   | 'token.consume'
+  | 'token.delete'
   // Admin events (not user-visible)
   | 'admin.account.plan.update'
   | 'admin.account.ref.update'
@@ -1305,9 +2245,9 @@ export type ActivityEvent =
   | 'refund.created'
   | 'dispute.created'
   // Billing operational events (admin/debug only, not user-visible)
-  | 'billing.sync'    // Outbound: unit count pushed to payment provider
-  | 'billing.stale'   // Dropped: webhook predates last known state
-  | 'billing.race';   // Dropped: concurrent webhook already updated state
+  | 'billing.sync' // Outbound: unit count pushed to payment provider
+  | 'billing.stale' // Dropped: webhook predates last known state
+  | 'billing.race'; // Dropped: concurrent webhook already updated state
 
 /**
  * Activity events visible to users in the dashboard
@@ -1327,7 +2267,8 @@ export type UserVisibleActivityEvent =
   | 'domain.delete'
   | 'domain.verify'
   | 'token.create'
-  | 'token.consume';
+  | 'token.consume'
+  | 'token.delete';
 
 /**
  * Activity record returned from the API
@@ -1348,6 +2289,12 @@ export interface Activity {
 /**
  * Parsed activity metadata.
  * Different events populate different fields.
+ *
+ * Naming convention: meta booleans are event-scoped predicates and carry
+ * their prefix (`isUpdate`, `wasVerified`, `hasConfig`, `hasPassword`),
+ * while entity booleans are bare nouns (`Deployment.config`,
+ * `Deployment.password`). Two vocabularies, each internally consistent —
+ * deliberate, not drift.
  */
 export interface ActivityMeta {
   // Deployment events
@@ -1391,7 +2338,7 @@ export interface ActivityMeta {
 /**
  * Response from GET /activities endpoint
  */
-export interface ActivityListResponse {
+export interface ActivityListResponse extends ListResponse {
   /** Array of activities */
   activities: Activity[];
 }
@@ -1416,8 +2363,8 @@ export const FileValidationStatus = {
   READY: 'ready',
 } as const;
 
-export type FileValidationStatusType = typeof FileValidationStatus[keyof typeof FileValidationStatus];
-
+export type FileValidationStatusType =
+  (typeof FileValidationStatus)[keyof typeof FileValidationStatus];
 
 /**
  * A validation issue with a display-ready message
