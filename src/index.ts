@@ -802,6 +802,17 @@ export const ErrorType = {
   Business: 'business_logic_error',
   /** API server error (500). Generic server-side fault. */
   Api: 'internal_server_error',
+  /**
+   * The platform is closed for maintenance (503). A deliberate operator
+   * state, not a fault — nothing errored; the API is refusing work on
+   * purpose, and deployed sites keep serving throughout.
+   *
+   * Distinct from `Api` at 503, which the platform already uses for a
+   * dependency that failed (moderation unavailable). A consumer has to tell
+   * "we closed the door" from "something broke": the two get opposite words
+   * and opposite retry behaviour.
+   */
+  Maintenance: 'maintenance',
   /** Network/connection error. Client-side only — set by HTTP clients on fetch failure; never produced server-side. */
   Network: 'network_error',
   /** Operation was cancelled. Client-side only — set on `AbortSignal` abort; never produced server-side. */
@@ -1149,6 +1160,19 @@ export class ShipError extends Error {
 
   static api(message: string, status: number = 500, details?: unknown): ShipError {
     return new ShipError(ErrorType.Api, message, status, details);
+  }
+
+  /**
+   * The platform is closed for maintenance (503).
+   *
+   * `message` is REQUIRED and has no default here. The API is the only
+   * producer of that sentence, and a default in this file would be a second
+   * owner of one fact — see CLAUDE.md, "The Constellation Law" (stopping
+   * rule). It is also the one factory whose status is fixed rather than
+   * defaulted: a maintenance refusal is 503 or it is not this error.
+   */
+  static maintenance(message: string, details?: unknown): ShipError {
+    return new ShipError(ErrorType.Maintenance, message, 503, details);
   }
 
   // Semantic-category guards. For specific-type checks, use

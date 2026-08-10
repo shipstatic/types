@@ -68,6 +68,7 @@ ShipError.cancelled(message, details?)
 ShipError.file(message, details?)               // pass `{ filePath }` for the path
 ShipError.config(message, details?)
 ShipError.api(message, status?, details?)       // status defaults to 500
+ShipError.maintenance(message, details?)        // status FIXED at 503; message required
 
 // The four CLIENT-ONLY factories above (`network`, `cancelled`, `file`,
 // `config`) are exactly the statusless ones, and that pairing is load-bearing:

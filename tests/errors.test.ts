@@ -77,6 +77,16 @@ describe('ShipError factories', () => {
     expect(err.status).toBe(503);
   });
 
+  it('maintenance → type=Maintenance, status fixed at 503, preserves details', () => {
+    // The only factory with a FIXED status rather than a defaulted one: a
+    // maintenance refusal is 503 or it is not this error.
+    const err = ShipError.maintenance('Back at 14:30 UTC.', { window: 'db-migration' });
+    expect(err.type).toBe(ErrorType.Maintenance);
+    expect(err.message).toBe('Back at 14:30 UTC.');
+    expect(err.status).toBe(503);
+    expect(err.details).toEqual({ window: 'db-migration' });
+  });
+
   it('network → type=Network, no status, cause stored in details', () => {
     const cause = new Error('Network down');
     const err = ShipError.network('Connection failed', { cause });
@@ -166,6 +176,16 @@ describe('semantic categories', () => {
       expect(err.isAuthError()).toBe(false);
       expect(err.isNetworkError()).toBe(false);
     }
+  });
+
+  it("leaves maintenance uncategorised — it is a state, not anyone's fault", () => {
+    // Not client (the caller did nothing wrong), not auth, not network. It
+    // renders through the generic arm on purpose, where every surface shows
+    // the operator's own sentence verbatim.
+    const err = ShipError.maintenance('Back shortly.');
+    expect(err.isClientError()).toBe(false);
+    expect(err.isAuthError()).toBe(false);
+    expect(err.isNetworkError()).toBe(false);
   });
 
   it('treats network as its own category, not a client fault', () => {
@@ -296,6 +316,18 @@ describe('ShipError.fromHttpResponse', () => {
       expect((err.details as { retryAfter?: number }).retryAfter).toBe(60);
     });
 
+    it('lifts Retry-After on a maintenance 503, so a client backs off from the typed error alone', async () => {
+      const err = await ShipError.fromHttpResponse(
+        withRetryAfter(
+          { error: ErrorType.Maintenance, message: 'Back shortly.', status: 503 },
+          503,
+          '60',
+        ),
+      );
+      expect(err.type).toBe(ErrorType.Maintenance);
+      expect((err.details as { retryAfter?: number }).retryAfter).toBe(60);
+    });
+
     it('parses an HTTP-date Retry-After into seconds', async () => {
       const inThirty = new Date(Date.now() + 30_000).toUTCString();
       const err = await ShipError.fromHttpResponse(withRetryAfter({}, 503, inThirty));
@@ -352,6 +384,21 @@ describe('ShipError.fromHttpResponse', () => {
         ),
       );
       expect(err.type).toBe(ErrorType.NotFound);
+    });
+
+    it('preserves Maintenance type when body.error is "maintenance" (status 503)', async () => {
+      // The type IS the point. Without it a closed platform arrives as `Api`
+      // — literally "internal_server_error" — and every consumer says
+      // "something broke" about a state the operator chose deliberately.
+      const err = await ShipError.fromHttpResponse(
+        jsonResponse(
+          { error: ErrorType.Maintenance, message: 'Back at 14:30 UTC.', status: 503 },
+          503,
+        ),
+      );
+      expect(err.type).toBe(ErrorType.Maintenance);
+      expect(err.status).toBe(503);
+      expect(err.isClientError()).toBe(false);
     });
 
     it('falls back to status-derived type when body.error is unknown', async () => {
