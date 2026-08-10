@@ -61,19 +61,25 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-          # The BRANCH decides whether that channel may be published from here.
-          # `latest` is main-only. A stable version on an integration branch is a
-          # STAGED release, and staging one before merging is the normal flow — so
-          # this skips rather than fails, exactly like the idempotence check below.
-          if [[ "$TAG" == "latest" && "$GITHUB_REF_NAME" != "main" ]]; then
-            echo "::notice title=Release staged::$NAME@$VERSION is a stable version. latest publishes only from main, so nothing was published from $GITHUB_REF_NAME. Merge to main to release it."
+          # Idempotence FIRST, because "already released" is true regardless of
+          # which branch is asking — and it is the more informative answer. Order
+          # matters: with the branch check first, every push to an integration
+          # branch after a release told the operator to "merge to main to release
+          # it" for a version already on the registry, and kept saying so until
+          # the next version bump. Once the version is published, any push is a
+          # no-op and says exactly that.
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "::notice title=Already released::$NAME@$VERSION is on the registry — nothing to publish. Bump the version to release again."
             echo "publish=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Idempotence: once the version is on the registry, any push is a no-op.
-          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
-            echo "$NAME@$VERSION already on the registry — nothing to publish"
+          # The BRANCH decides whether that channel may be published from here.
+          # `latest` is main-only. A stable version on an integration branch is a
+          # STAGED release, and staging one before merging is the normal flow — so
+          # this skips rather than fails, exactly like the idempotence check above.
+          if [[ "$TAG" == "latest" && "$GITHUB_REF_NAME" != "main" ]]; then
+            echo "::notice title=Release staged::$NAME@$VERSION is a stable version. latest publishes only from main, so nothing was published from $GITHUB_REF_NAME. Merge to main to release it."
             echo "publish=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
