@@ -446,7 +446,8 @@ reopen this — a private `@shipstatic/admin-types` package, not this one.
 
 Every secret the platform mints obeys three clauses, stated at `CREDENTIAL
 SHAPES` in `src/index.ts` and held mechanically by
-`tests/validation-constants.test.ts` (all three drilled — the drift introduced,
+`tests/validation-constants.test.ts` over this package's populations and by the
+API's own suite over `AUTH.CLAIM` (all three drilled — the drift introduced,
 the named check watched to fail, reverted).
 
 1. **One entropy standard.** Every minted random secret is `HEX_LENGTH` hex
@@ -455,17 +456,16 @@ the named check watched to fail, reverted).
    (`cloudflare/api/src/lib/crypto.ts` takes its byte count as a parameter), so
    a minted value and an accepted value cannot be different lengths.
 
-2. **A prefix marks a shared slot, and nothing else.** API keys and deploy
-   tokens both arrive as `Authorization: Bearer`, so something has to say which
-   population a value belongs to — that is what the prefix IS, and
-   `classifyToken` is its only reader. A secret arriving somewhere unambiguous
-   carries none: the deployment claim code reaches its own route in its own
-   field, inside a URL whose path already reads `/claim/`, so a `claim-` prefix
-   would restate what the route states. **Prefixed where a slot is shared, bare
-   where the route names it** — one rule, no exceptions to memorise.
+2. **Every population is named by its prefix.** A credential says what it is
+   before anything parses it. That is what lets `classifyToken` dispatch two
+   populations sharing one `Authorization: Bearer` slot — and what lets a value
+   found in a log, a support ticket or a pasted URL be recognised and revoked on
+   sight. **The name is the credential's own, never its location's:** a claim
+   code is `claim-` prefixed even though it arrives at a route that already
+   reads `/claims/`, because the route is where it was found, not what it is.
 
-3. **No prefix is a prefix of another.** This is why the two populations are
-   named on different axes — `ship-` for the product, `deploy-` for the
+3. **No prefix is a prefix of another.** This is why the populations are named
+   on different axes — `ship-` for the product, `deploy-` and `claim-` for the
    capability — rather than sharing a stem. `ship-` / `ship-deploy-` looks more
    symmetrical and is a trap: every deploy token also matches the API-key
    branch, so correctness would rest on the order of two `if`s. Introducing
