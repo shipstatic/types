@@ -442,6 +442,43 @@ column touches both files in one commit or it is drift.
 If the operator surface ever needs a third consumer, that is the moment to
 reopen this — a private `@shipstatic/admin-types` package, not this one.
 
+### The credential shape law
+
+Every secret the platform mints obeys three clauses, stated at `CREDENTIAL
+SHAPES` in `src/index.ts` and held mechanically by
+`tests/validation-constants.test.ts` (all three drilled — the drift introduced,
+the named check watched to fail, reverted).
+
+1. **One entropy standard.** Every minted random secret is `HEX_LENGTH` hex
+   characters, so "how long is a credential" has one answer instead of one per
+   population. The generators read the constant rather than choosing a number
+   (`cloudflare/api/src/lib/crypto.ts` takes its byte count as a parameter), so
+   a minted value and an accepted value cannot be different lengths.
+
+2. **A prefix marks a shared slot, and nothing else.** API keys and deploy
+   tokens both arrive as `Authorization: Bearer`, so something has to say which
+   population a value belongs to — that is what the prefix IS, and
+   `classifyToken` is its only reader. A secret arriving somewhere unambiguous
+   carries none: the deployment claim code reaches its own route in its own
+   field, inside a URL whose path already reads `/claim/`, so a `claim-` prefix
+   would restate what the route states. **Prefixed where a slot is shared, bare
+   where the route names it** — one rule, no exceptions to memorise.
+
+3. **No prefix is a prefix of another.** This is why the two populations are
+   named on different axes — `ship-` for the product, `deploy-` for the
+   capability — rather than sharing a stem. `ship-` / `ship-deploy-` looks more
+   symmetrical and is a trap: every deploy token also matches the API-key
+   branch, so correctness would rest on the order of two `if`s. Introducing
+   that pair turns **five** tests red, which is the shape of the bug it
+   prevents.
+
+**Not covered, deliberately:** the unsubscribe token is an HMAC-SHA256 output,
+not a minted secret — its width is the algorithm's, and it is verified through
+`crypto.subtle.verify`, which is constant-time by construction. Truncating it
+is safe in principle (RFC 2104 §5) and was declined: it would move a
+correctness guarantee from the primitive into a hand-rolled comparison, in
+exchange for shortening a value no human ever handles.
+
 ### Validation: format vs policy
 
 Validators in this package enforce **wire-format rules** — the rules that define what a value *is*, not what's *allowed*. Format rules belong here because every consumer (SDK, API, web app, integrations) needs to agree on them or the wire breaks.
