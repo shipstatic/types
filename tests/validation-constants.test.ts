@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   type ActivityListResponse,
+  API_KEY,
   AUTH_BASE_PATH,
   AuthMethod,
   BLOCKED_EXTENSIONS,
   CALLER,
   classifyToken,
+  DEPLOY_TOKEN,
   type DeploymentListResponse,
   type DeploymentResource,
   DeploymentVia,
@@ -425,8 +427,10 @@ describe('Validation Constants - @shipstatic/types', () => {
 
   describe('TokenKind & classifyToken()', () => {
     it('classifies by prefix — the shared wire dispatch', () => {
-      expect(classifyToken(`ship-${'a'.repeat(64)}`)).toBe(TokenKind.API_KEY);
-      expect(classifyToken(`deploy-${'a'.repeat(64)}`)).toBe(TokenKind.DEPLOY_TOKEN);
+      expect(classifyToken(`ship-${'a'.repeat(API_KEY.HEX_LENGTH)}`)).toBe(TokenKind.API_KEY);
+      expect(classifyToken(`deploy-${'a'.repeat(DEPLOY_TOKEN.HEX_LENGTH)}`)).toBe(
+        TokenKind.DEPLOY_TOKEN,
+      );
       expect(classifyToken('some-oauth-access-token')).toBe(TokenKind.OPAQUE);
       expect(classifyToken('')).toBe(TokenKind.OPAQUE);
     });
@@ -466,8 +470,10 @@ describe('Validation Constants - @shipstatic/types', () => {
     it('applies strict format rules to prefixed populations', () => {
       expect(() => validateToken('ship-tooshort')).toThrow(/characters total/);
       expect(() => validateToken('deploy-tooshort')).toThrow(/characters total/);
-      expect(validateToken(`ship-${'a'.repeat(64)}`)).toBeUndefined();
-      expect(validateToken(`deploy-${'b'.repeat(64)}`)).toBeUndefined();
+      // Widths come from the shape constants, never a literal: a hand-written
+      // length here would pass while the population it describes had moved.
+      expect(validateToken(`ship-${'a'.repeat(API_KEY.HEX_LENGTH)}`)).toBeUndefined();
+      expect(validateToken(`deploy-${'b'.repeat(DEPLOY_TOKEN.HEX_LENGTH)}`)).toBeUndefined();
     });
 
     it('passes opaque tokens through when non-empty', () => {
