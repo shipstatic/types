@@ -1573,31 +1573,36 @@ export const AuthMethod = {
 export type AuthMethodType = (typeof AuthMethod)[keyof typeof AuthMethod];
 
 /**
- * Shape constants for API keys (`ship-{64 hex chars}`).
+ * Shape constants for API keys (`ship-{32 hex chars}`).
  * Single source of truth used by validation utilities and auth middleware.
  */
 export const API_KEY = {
   /** Prefix that identifies an API key. */
   PREFIX: 'ship-',
   /** Number of hex characters following the prefix. */
-  HEX_LENGTH: 64,
-  /** Total length of an API key including prefix (`PREFIX.length + HEX_LENGTH = 69`). */
-  TOTAL_LENGTH: 69,
+  HEX_LENGTH: 32,
+  /** Total length of an API key including prefix (`PREFIX.length + HEX_LENGTH = 37`). */
+  TOTAL_LENGTH: 37,
   /** Number of trailing characters used to display a redacted hint (e.g. last 4). */
   HINT_LENGTH: 4,
 } as const;
 
 /**
- * Shape constants for deploy tokens (`deploy-{64 hex chars}`).
+ * Shape constants for deploy tokens (`deploy-{32 hex chars}`).
  * Single source of truth used by validation utilities and auth middleware.
+ *
+ * Deliberately the same width as `API_KEY`: both are minted by one generator
+ * and classified by prefix alone, so a length that differed between them
+ * would be a second thing to know about a credential whose prefix already
+ * says what it is.
  */
 export const DEPLOY_TOKEN = {
   /** Prefix that identifies a deploy token. */
   PREFIX: 'deploy-',
   /** Number of hex characters following the prefix. */
-  HEX_LENGTH: 64,
-  /** Total length of a deploy token including prefix (`PREFIX.length + HEX_LENGTH = 71`). */
-  TOTAL_LENGTH: 71,
+  HEX_LENGTH: 32,
+  /** Total length of a deploy token including prefix (`PREFIX.length + HEX_LENGTH = 39`). */
+  TOTAL_LENGTH: 39,
 } as const;
 
 /**

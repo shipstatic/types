@@ -448,7 +448,7 @@ Validators in this package enforce **wire-format rules** — the rules that defi
 
 Examples that belong here:
 
-- `validateApiKey` — `ship-` prefix + 64 hex chars; the format defines the type.
+- `validateApiKey` — `ship-` prefix + `API_KEY.HEX_LENGTH` hex chars; the format defines the type. The width lives in the shape constant, never in prose or a test literal — a hand-written number here is a second owner for it.
 - `validateDeployToken` — same shape, different prefix.
 - `validatePassword` — length 6–128 is the wire-format envelope an API endpoint accepts.
 
