@@ -425,6 +425,55 @@ describe('Validation Constants - @shipstatic/types', () => {
     });
   });
 
+  // The three clauses of the shape law, stated once at CREDENTIAL SHAPES in
+  // src/index.ts. Each was true by construction and checked by nothing, which
+  // is the state a law is in right before it quietly stops holding.
+  describe('the credential shape law', () => {
+    const POPULATIONS = [
+      ['API_KEY', API_KEY],
+      ['DEPLOY_TOKEN', DEPLOY_TOKEN],
+    ] as const;
+
+    it('one entropy standard — every minted population is the same width', () => {
+      const widths = new Set(POPULATIONS.map(([, shape]) => shape.HEX_LENGTH));
+      expect(widths.size).toBe(1);
+    });
+
+    it('total length is derived, never typed twice', () => {
+      for (const [name, shape] of POPULATIONS) {
+        expect(`${name}: ${shape.TOTAL_LENGTH}`).toBe(
+          `${name}: ${shape.PREFIX.length + shape.HEX_LENGTH}`,
+        );
+      }
+    });
+
+    // THE one that makes classifyToken's two `if`s order-independent. A
+    // `ship-` / `ship-deploy-` pair would read tidier and silently classify
+    // every deploy token as an API key the day someone swapped the lines.
+    it('no prefix is a prefix of another — so dispatch cannot depend on order', () => {
+      for (const [aName, a] of POPULATIONS) {
+        for (const [bName, b] of POPULATIONS) {
+          if (aName === bName) continue;
+          expect(`${aName} startsWith ${bName}: ${a.PREFIX.startsWith(b.PREFIX)}`).toBe(
+            `${aName} startsWith ${bName}: false`,
+          );
+        }
+      }
+    });
+
+    // The property the clause above buys, asserted through the real dispatch:
+    // a well-formed member of each population classifies as itself, whichever
+    // order the branches happen to sit in.
+    it('every population classifies as itself', () => {
+      for (const [name, shape] of POPULATIONS) {
+        const token = `${shape.PREFIX}${'a'.repeat(shape.HEX_LENGTH)}`;
+        expect(`${name}: ${classifyToken(token)}`).toBe(
+          `${name}: ${name === 'API_KEY' ? TokenKind.API_KEY : TokenKind.DEPLOY_TOKEN}`,
+        );
+      }
+    });
+  });
+
   describe('TokenKind & classifyToken()', () => {
     it('classifies by prefix — the shared wire dispatch', () => {
       expect(classifyToken(`ship-${'a'.repeat(API_KEY.HEX_LENGTH)}`)).toBe(TokenKind.API_KEY);
