@@ -1542,27 +1542,34 @@ export interface PingResponse {
 // the single dispatch over them (TokenKind, classifyToken), and the
 // delegated-access scopes (OAuthScope).
 //
-// THE SHAPE LAW, in three clauses. Every secret the platform mints obeys it,
-// and `tests/validation-constants.test.ts` holds all three mechanically.
+// THE SHAPE LAW, in three clauses. EVERY secret the platform mints obeys it —
+// the two below, and the deployment claim code, which is the API's own
+// (`AUTH.CLAIM`, server-side: the API mints it and the API validates it, so it
+// has one holder and stays there). `tests/validation-constants.test.ts` holds
+// the clauses over this file's populations; the API's suite holds the same
+// three over its own.
 //
-//  1. ONE ENTROPY STANDARD. Every minted random secret is `HEX_LENGTH` hex
-//     characters — one width for the whole platform, so "how long is a
-//     credential" has a single answer rather than one per population.
+//  1. ONE ENTROPY STANDARD. Every minted secret is `HEX_LENGTH` hex characters
+//     — one width for the whole platform, so "how long is a credential" has a
+//     single answer rather than one per population. Generators read the width
+//     from the population's own constant, so a minted value and an accepted
+//     value cannot differ.
 //
-//  2. A PREFIX MARKS A SHARED SLOT, AND NOTHING ELSE. API keys and deploy
-//     tokens both arrive as `Authorization: Bearer`, so something must say
-//     which population a value belongs to: that is what the prefix IS, and
-//     `classifyToken` below is its only reader. Secrets that arrive somewhere
-//     unambiguous carry none — the deployment claim code reaches its own
-//     route in its own field, inside a URL whose path already says `/claim/`,
-//     so a prefix there would be a second name for what the route states.
+//  2. EVERY POPULATION IS NAMED BY ITS PREFIX. A credential says what it is
+//     before anything parses it — which is what lets `classifyToken` below
+//     dispatch two populations sharing one `Authorization: Bearer` slot, and
+//     what lets a value found in a log, a support ticket or a pasted URL be
+//     recognised and revoked on sight. The name is the credential's own, never
+//     its location's: a claim code is `claim-` prefixed even though it arrives
+//     at a route that already says `/claims/`, because the route is where it
+//     was found, not what it is.
 //
 //  3. NO PREFIX IS A PREFIX OF ANOTHER. This is what makes the dispatch
 //     order-independent, and it is the reason the populations are named on
-//     different axes (`ship-` for the product, `deploy-` for the capability)
-//     rather than sharing a stem. A `ship-` / `ship-deploy-` pair reads tidier
-//     and is a trap: every deploy token would also match the API-key branch,
-//     leaving correctness resting on the order of two `if`s.
+//     different axes (`ship-` for the product, `deploy-` and `claim-` for the
+//     capability) rather than sharing a stem. A `ship-` / `ship-deploy-` pair
+//     reads tidier and is a trap: every deploy token would also match the
+//     API-key branch, leaving correctness resting on the order of two `if`s.
 
 /**
  * Where human identity is mounted on the API host. The API mounts Better
