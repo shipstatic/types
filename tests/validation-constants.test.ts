@@ -4,7 +4,6 @@ import {
   API_KEY,
   AUTH_BASE_PATH,
   AuthMethod,
-  BLOCKED_EXTENSIONS,
   CALLER,
   classifyToken,
   DEPLOY_TOKEN,
@@ -39,90 +38,6 @@ import {
 } from '../src/index';
 
 describe('Validation Constants - @shipstatic/types', () => {
-  describe('BLOCKED_EXTENSIONS', () => {
-    it('should block executable extensions', () => {
-      const executables = [
-        'exe',
-        'msi',
-        'dll',
-        'scr',
-        'bat',
-        'cmd',
-        'com',
-        'pif',
-        'app',
-        'deb',
-        'rpm',
-      ];
-      for (const ext of executables) {
-        expect(BLOCKED_EXTENSIONS.has(ext)).toBe(true);
-      }
-    });
-
-    it('should block disk image extensions', () => {
-      const diskImages = ['dmg', 'iso', 'img'];
-      for (const ext of diskImages) {
-        expect(BLOCKED_EXTENSIONS.has(ext)).toBe(true);
-      }
-    });
-
-    it('should block dangerous script extensions', () => {
-      const scripts = ['ps1', 'vbs', 'vbe', 'ws', 'wsf', 'wsc', 'wsh', 'reg'];
-      for (const ext of scripts) {
-        expect(BLOCKED_EXTENSIONS.has(ext)).toBe(true);
-      }
-    });
-
-    it('should block installer extensions', () => {
-      const installers = ['pkg', 'mpkg'];
-      for (const ext of installers) {
-        expect(BLOCKED_EXTENSIONS.has(ext)).toBe(true);
-      }
-    });
-
-    it('should block Java extensions', () => {
-      expect(BLOCKED_EXTENSIONS.has('jar')).toBe(true);
-      expect(BLOCKED_EXTENSIONS.has('jnlp')).toBe(true);
-    });
-
-    it('should block mobile and browser package extensions', () => {
-      expect(BLOCKED_EXTENSIONS.has('apk')).toBe(true);
-      expect(BLOCKED_EXTENSIONS.has('crx')).toBe(true);
-    });
-
-    it('should block shortcut/link extensions', () => {
-      const shortcuts = ['lnk', 'inf', 'hta'];
-      for (const ext of shortcuts) {
-        expect(BLOCKED_EXTENSIONS.has(ext)).toBe(true);
-      }
-    });
-
-    it('should NOT block web file extensions', () => {
-      const webExtensions = [
-        'html',
-        'css',
-        'js',
-        'json',
-        'png',
-        'jpg',
-        'svg',
-        'woff2',
-        'pdf',
-        'wasm',
-      ];
-      for (const ext of webExtensions) {
-        expect(BLOCKED_EXTENSIONS.has(ext)).toBe(false);
-      }
-    });
-
-    it('should NOT block unknown extensions', () => {
-      const unknownExtensions = ['xyz', 'custom', 'parquet', 'avro'];
-      for (const ext of unknownExtensions) {
-        expect(BLOCKED_EXTENSIONS.has(ext)).toBe(false);
-      }
-    });
-  });
-
   describe('WEB_FILE_ACCEPT', () => {
     // Parsed from the PUBLISHED string rather than an exported array: the
     // attribute value is the whole contract, so the fence must hold against
@@ -130,12 +45,10 @@ describe('Validation Constants - @shipstatic/types', () => {
     const tokens = WEB_FILE_ACCEPT.split(',');
     const extensions = tokens.map((token) => token.slice(1));
 
-    it('offers nothing the platform will refuse', () => {
-      // THE invariant. A picker that shows a file the deploy then rejects
-      // turns a hint into a lie, and there is no second place to catch it.
-      const offered = extensions.filter((ext) => BLOCKED_EXTENSIONS.has(ext));
-      expect(offered).toEqual([]);
-    });
+    // THE invariant — "offers nothing the platform will refuse" — is fenced in
+    // `cloudflare/api/tests/lib/blocklist.test.ts`, which owns the list to
+    // compare against. What stays here is what this constant is true of on its
+    // own terms.
 
     it('is a well-formed accept attribute', () => {
       for (const token of tokens) {
@@ -157,49 +70,94 @@ describe('Validation Constants - @shipstatic/types', () => {
   });
 
   describe('isBlockedExtension()', () => {
-    it('should detect blocked extensions from filenames', () => {
-      expect(isBlockedExtension('virus.exe')).toBe(true);
-      expect(isBlockedExtension('installer.msi')).toBe(true);
-      expect(isBlockedExtension('script.bat')).toBe(true);
-      expect(isBlockedExtension('disk.dmg')).toBe(true);
-      expect(isBlockedExtension('archive.jar')).toBe(true);
+    // Deliberately not the platform's real list — this package does not know
+    // it. The API owns it and delivers it as `PlatformLimits.blockedExtensions`.
+    const BLOCKED = ['exe', 'dmg', 'jar'];
+
+    it('blocks a file whose extension is in the given list', () => {
+      expect(isBlockedExtension('virus.exe', BLOCKED)).toBe(true);
+      expect(isBlockedExtension('disk.dmg', BLOCKED)).toBe(true);
+      expect(isBlockedExtension('archive.jar', BLOCKED)).toBe(true);
     });
 
-    it('should be case-insensitive', () => {
-      expect(isBlockedExtension('virus.EXE')).toBe(true);
-      expect(isBlockedExtension('virus.Exe')).toBe(true);
-      expect(isBlockedExtension('disk.DMG')).toBe(true);
+    it('is case-insensitive on the filename', () => {
+      expect(isBlockedExtension('virus.EXE', BLOCKED)).toBe(true);
+      expect(isBlockedExtension('virus.Exe', BLOCKED)).toBe(true);
     });
 
-    it('should allow web files', () => {
-      expect(isBlockedExtension('index.html')).toBe(false);
-      expect(isBlockedExtension('style.css')).toBe(false);
-      expect(isBlockedExtension('app.js')).toBe(false);
-      expect(isBlockedExtension('data.json')).toBe(false);
-      expect(isBlockedExtension('photo.png')).toBe(false);
+    it('allows anything the list does not name', () => {
+      expect(isBlockedExtension('index.html', BLOCKED)).toBe(false);
+      expect(isBlockedExtension('app.js', BLOCKED)).toBe(false);
+      expect(isBlockedExtension('data.custom', BLOCKED)).toBe(false);
+      expect(isBlockedExtension('README', BLOCKED)).toBe(false);
     });
 
-    it('should allow unknown extensions', () => {
-      expect(isBlockedExtension('data.parquet')).toBe(false);
-      expect(isBlockedExtension('file.custom')).toBe(false);
-      expect(isBlockedExtension('model.onnx')).toBe(false);
+    it('accepts a Set as readily as an array — the API holds one of each', () => {
+      expect(isBlockedExtension('virus.exe', new Set(BLOCKED))).toBe(true);
+      expect(isBlockedExtension('index.html', new Set(BLOCKED))).toBe(false);
     });
 
-    it('should allow files without extensions', () => {
-      expect(isBlockedExtension('README')).toBe(false);
-      expect(isBlockedExtension('Makefile')).toBe(false);
-      expect(isBlockedExtension('LICENSE')).toBe(false);
+    it('blocks nothing when the list is empty — the fail-open a client spells', () => {
+      // A client talking to an API that predates `blockedExtensions` passes
+      // `[]`. It must not guess: the boundary still refuses the file.
+      expect(isBlockedExtension('virus.exe', [])).toBe(false);
     });
 
-    it('should handle edge cases', () => {
-      expect(isBlockedExtension('')).toBe(false);
-      expect(isBlockedExtension('file.')).toBe(false);
-      expect(isBlockedExtension('.gitignore')).toBe(false);
+    // The matching RULE is what this package owns, and it is fenced HERE
+    // rather than against the private `fileExtension` — this is the only
+    // surface anyone can observe it through, so it is the only surface where
+    // drift can be caught. Each case is a realistic (path, blocklist) pair.
+
+    it('reads the LAST extension, which is the one that names the type', () => {
+      expect(isBlockedExtension('image.jpg.exe', BLOCKED)).toBe(true);
+      expect(isBlockedExtension('safe.exe.txt', BLOCKED)).toBe(false);
     });
 
-    it('should check last extension only (double extensions)', () => {
-      expect(isBlockedExtension('image.jpg.exe')).toBe(true);
-      expect(isBlockedExtension('safe.exe.txt')).toBe(false);
+    it('judges a path by its filename, not by a dotted directory above it', () => {
+      // Realistic paths: a bundle's contents must deploy, each judged by its
+      // own name. These hold under a naive `lastIndexOf('.')` too — see below.
+      expect(isBlockedExtension('bundle.dmg/Contents/binary', BLOCKED)).toBe(false);
+      expect(isBlockedExtension('assets/app.exe', BLOCKED)).toBe(true);
+      expect(isBlockedExtension('a.exe/index.html', BLOCKED)).toBe(false);
+      expect(isBlockedExtension('bundle.dmg\\binary', BLOCKED)).toBe(false);
+    });
+
+    it('cannot be tricked by a directory name — the white-box half', () => {
+      // **The blocklist entry below is deliberately impossible in production,
+      // and that impossibility is the whole point.** A naive
+      // `lastIndexOf('.')` reader answers `dmg/Contents/binary` for this path
+      // instead of `null` — but that garbage contains a slash, and a real
+      // blocklist holds only bare extensions (`/^[a-z0-9]+$/`, fenced in
+      // `cloudflare/api/tests/lib/blocklist.test.ts`), so the two readers
+      // reach the SAME verdict on every realistic input. The property is
+      // therefore unfalsifiable from outside unless the test supplies the
+      // garbage itself.
+      //
+      // A property unfalsifiable from outside gets a white-box fence that
+      // plants the impossible input itself, or it gets no fence at all. It
+      // exists because the extractor's contract is "return the extension",
+      // and one returning garbage is a latent bug the moment it acquires a
+      // second caller.
+      //
+      // The entries are LOWERCASE because the reader lowercases what it
+      // extracts — spelled `dmg/README`, this fence passes against the broken
+      // reader too and holds nothing (drill story: `CLAUDE.md`, "The worked
+      // split").
+      expect(isBlockedExtension('dir.dmg/README', ['dmg/readme'])).toBe(false);
+      expect(isBlockedExtension('dir.dmg\\README', ['dmg\\readme'])).toBe(false);
+    });
+
+    it('treats a leading dot as the name, not an extension', () => {
+      // `.gitignore` is a dotfile called "gitignore", not a "gitignore" file.
+      expect(isBlockedExtension('.exe', BLOCKED)).toBe(false);
+      expect(isBlockedExtension('dir/.exe', BLOCKED)).toBe(false);
+      // …but a dotfile CAN carry one.
+      expect(isBlockedExtension('.env.exe', BLOCKED)).toBe(true);
+    });
+
+    it('reads no extension off a trailing dot or an empty name', () => {
+      expect(isBlockedExtension('virus.exe.', BLOCKED)).toBe(false);
+      expect(isBlockedExtension('', BLOCKED)).toBe(false);
     });
   });
 
@@ -331,7 +289,7 @@ describe('Validation Constants - @shipstatic/types', () => {
   });
 
   describe('PlatformLimits', () => {
-    it('should have correct shape with 3 fields', () => {
+    it('carries the three caps as numbers', () => {
       const config: PlatformLimits = {
         maxFileSize: 20 * 1024 * 1024,
         maxFilesCount: 500,
@@ -343,14 +301,28 @@ describe('Validation Constants - @shipstatic/types', () => {
       expect(typeof config.maxTotalSize).toBe('number');
     });
 
-    it('should only contain numeric limit fields', () => {
+    it('carries the blocklist the API owns', () => {
+      const config: PlatformLimits = {
+        maxFileSize: 20 * 1024 * 1024,
+        maxFilesCount: 500,
+        maxTotalSize: 50 * 1024 * 1024,
+        blockedExtensions: ['exe', 'dmg'],
+      };
+
+      expect(isBlockedExtension('virus.exe', config.blockedExtensions ?? [])).toBe(true);
+    });
+
+    it('is valid without the blocklist — an older API sends none', () => {
+      // Compile-time half of the fail-open contract: the field is optional, so
+      // a client cannot be written to assume it is there.
       const config: PlatformLimits = {
         maxFileSize: 20 * 1024 * 1024,
         maxFilesCount: 500,
         maxTotalSize: 50 * 1024 * 1024,
       };
 
-      expect(Object.keys(config)).toEqual(['maxFileSize', 'maxFilesCount', 'maxTotalSize']);
+      expect(config.blockedExtensions).toBeUndefined();
+      expect(isBlockedExtension('virus.exe', config.blockedExtensions ?? [])).toBe(false);
     });
   });
 

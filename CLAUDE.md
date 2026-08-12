@@ -19,9 +19,9 @@ Single file: `src/index.ts`, organized into named sections in this order:
 | Core Entities | Deployment (+ `DeploymentVia` — the origin vocabulary, closed here so the seven clients that name themselves are compiler-checked; `Deployment.via` stays `string \| null` because stored rows predate it), Domain (+ `DomainSetResult`), Token, Account (+ `AccountGetResponse` — request-scoped `authMethod` lives on the response, not the entity; `AccountUsage`, `AccountOverrides`) — status consts, interfaces, list responses (+ `ListResponse`, `ListOptions`), request shapes (`DeploymentSetOptions`, `DomainSetOptions`, `TokenCreateOptions`), DNS/domain response shapes (`DnsRecord`, `DnsProvider`, `DnsLookup`, `DomainDnsResponse`, `DomainRecordsResponse`, `DomainShareResponse`, `DomainValidateResponse`), the aggregate responses (`LabelsResponse`, `SetupInstructionsResponse`), and the mutation acknowledgements (`DeploymentDeleteResponse` — where the law is written — `DomainDeleteResponse`, `DomainVerifyResponse`, `TokenDeleteResponse`, `AccountDeleteResponse`, `AccountKeyResponse`) |
 | Wire Surface | `API_PATHS` — every public path declared once, mounted by the API and requested by the SDK and dashboard (`/admin/*` deliberately absent; see "Admin types") — and `DEPLOY_FIELDS`, the deploy multipart body's field names: the paths and the fields are the two halves of one wire surface, which is why they share a section |
 | Error System | `ErrorType` (`as const` + type), `ShipError` class, `isShipError` guard |
-| Platform Limits | `PlatformLimits` (plan-based caps from the `/limits` endpoint — file size, file count, total size) |
-| Extension Blocklist | `BLOCKED_EXTENSIONS`, `isBlockedExtension()` |
-| Picker Accept Hint | `WEB_FILE_ACCEPT` — the `accept` value for a browser file picker. A **hint, never a rule**: `accept` can express only an allowlist while the platform's rule is a blocklist, so this list is necessarily narrower than what the platform hosts and must never decide whether a file may be deployed. It sits beside the blocklist so one file holds both, which is what lets `tests/validation-constants.test.ts` fence the invariant that matters — the picker never offers what the platform will refuse. |
+| Platform Limits | `PlatformLimits` — what the platform will refuse, from the `/limits` endpoint: the three plan-based caps (file size, count, total size) plus `blockedExtensions`, the API-owned hosting blocklist. The blocklist field is OPTIONAL and its absence means "no client-side check", never "an empty policy" — see "Validation: format vs policy" |
+| Extension Matching | `isBlockedExtension(filename, blocked)` — the matching RULE only, and the one exported symbol; the extraction helper behind it stays private until a caller exists (adding an export is free, removing one is a major). The LIST belongs to `cloudflare/api` and arrives as data; see "Validation: format vs policy" for why the two split |
+| Picker Accept Hint | `WEB_FILE_ACCEPT` — the `accept` value for a browser file picker. A **hint, never a rule**: `accept` can express only an allowlist while the platform's rule is a blocklist, so this list is necessarily narrower than what the platform hosts and must never decide whether a file may be deployed. The invariant that matters — the picker never offers what the platform will refuse — is fenced in `cloudflare/api/tests/lib/blocklist.test.ts`, which holds this published string against the list it owns. |
 | Filename Character Validation | `UNSAFE_FILENAME_CHARS`, `hasUnsafeChars()` |
 | Unbuilt Project Markers | `UNBUILT_PROJECT_MARKERS`, `hasUnbuiltMarker()` |
 | Common Responses | `PingResponse` (`timestamp` in unix seconds) |
@@ -493,9 +493,71 @@ Examples that do **not** belong here (keep in the API):
 
 - Password strength rules (no breach lists, complexity heuristics) — security policy, evolves on the server.
 - Plan-based caps (file size, file count) — already correctly delivered via `/limits`, not hard-coded.
+- The extension blocklist — hosting policy; see the worked split below.
 - Domain availability, account state, billing rules — server-only state.
 
 Rule of thumb: if a client could compute the answer offline from the input alone *and* the API would always reject the same input the same way, it's format → ship the validator here. Otherwise it's policy → keep it server-side.
+
+#### The worked split: the blocklist left, the matcher stayed
+
+`BLOCKED_EXTENSIONS` lived here until 2026-08-12, and it is the sharpest case
+this package has of one "fact" that was really two — so the reasoning is
+recorded rather than the outcome.
+
+**The list failed the test.** `virus.exe` is a perfectly well-formed filename;
+nothing about it breaks the upload→serve round-trip, and the platform would
+serve it happily as `application/octet-stream` with `nosniff`. What refuses it
+is a decision not to be a malware CDN — policy, enforced at one security
+boundary, and policy that must be changeable the day someone uploads a `.msix`.
+Shipped as a published constant it was the opposite: a semver-governed export
+whose tightening required a types release, a ship release, a convoy of pin
+bumps, and users upgrading — while every client enforced whatever version it
+had pinned.
+
+**The stopping rule refuses it too, and by the cheaper clause.** Promotion needs
+drift that is silent or slow to surface. A stale client's drift is loud: the
+file uploads and the API refuses it by name, on the first try.
+
+**The matcher passed, on the direction of drift.** With the list delivered as
+data, two implementations would read the extension off a name — the API's and
+each client's. That drift is silent in exactly the direction that hurts: a
+client stricter than the server (matching every dot-segment, say, or reading
+`dir.v1/README` as a `v1/README` file) refuses a legal file *without the server
+ever being asked*, so no error names it and nothing on the platform can see it.
+Two holders, silent drift, one owner — the law's own test, satisfied.
+
+**So the answer was not "move it" or "keep it" but a cut**:
+`isBlockedExtension(filename, blocked)` here, the list in
+`cloudflare/api/src/lib/blocklist.ts`, and `PlatformLimits.blockedExtensions`
+as the derivation channel that already existed for plan caps. The constellation
+law permits exactly this — *"it flows DOWN as an import or a derivation — never
+as a restatement"* — and `/limits` is the derivation.
+
+**One export, not two.** The extraction helper behind the predicate stays
+private, and the reason generalizes: "would exporting this be dangerous?" is
+the wrong test and it is the one that talks a published package into surface it
+has not earned. The right test is the estate's own — has it earned a place? —
+decided by an asymmetry, since adding an export later is free under the
+additive law while removing one is a major. With zero callers, the reversible
+choice is to keep it in. (That is a different reason from
+`WEB_FILE_EXTENSIONS`, which is private because publishing it would invite a
+wrong question. Both private; only one a hazard.)
+
+**The matcher's fences were bought, not written.** The segment rule's first
+two fences asserted nothing, consecutively (2026-08-12): a black-box test
+reached the identical verdict through a deliberately broken reader — the
+garbage a naive `lastIndexOf` extracts contains a slash and matches no real
+entry — and the white-box rewrite still passed, because its planted entry was
+spelled uppercase against a lowercasing reader. Both now fail against the
+broken implementation, and the general form joined the fence taxonomy (root
+`CLAUDE.md`, the constellation law): a property unfalsifiable from outside
+gets a white-box fence that plants the impossible input itself, or it gets no
+fence at all.
+
+**The generalizable question is which half of a rule is which.** A rule that
+says *what a value IS* and a table of *which values are allowed* look like one
+fact and are not. When they split, the shape is almost always: predicate here,
+table on the server, delivered.
 
 ## Design Principles
 
