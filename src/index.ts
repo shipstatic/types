@@ -968,9 +968,24 @@ const MAX_FOREIGN_MESSAGE_LENGTH = 200;
  * that runtime (`cloudflare/mcp`) reaches the API through a service BINDING,
  * which is in-process and does not produce transport rejections at all.
  *
- * The accepted trade is unchanged: a caller's `TokenProvider` that throws a
- * coded error (`ENOENT` from a keychain read) is typed `Network` rather than
- * `Api`. Both are wrong for it; `Network` is the cheaper wrong.
+ * **The `TokenProvider` case stopped being a trade when clients gained
+ * retries.** A caller's provider that throws a coded error is typed `Network`
+ * here, which was recorded as "both are wrong for it; `Network` is the cheaper
+ * wrong" — written when the classification decided only what a surface would
+ * SAY. It now also decides whether the call is retried, and that turns the
+ * cheaper wrong into the right answer: a `TokenProvider` is where minting and
+ * refresh live, so the common one is an OAuth refresh over the network, and a
+ * transient failure there is precisely what another attempt repairs.
+ *
+ * The residual cost is a deterministic provider fault — a genuinely missing
+ * keychain entry — invoking the provider three times over a few hundred
+ * milliseconds before failing with the same error. No request leaves the
+ * process on any of them. That is the cheap direction of a bet whose other
+ * side is a refused deploy, and suppressing it would need a way to mark
+ * credential faults non-retryable: machinery with one holder, refused by the
+ * estate's stopping rule. Provider failures that carry no code are `Api` and
+ * are not retried at all, and a provider yielding nothing is `Authentication`
+ * by the fail-closed invariant, which is likewise terminal.
  */
 function isTransportFailure(cause: Error): boolean {
   const code = (cause as { code?: unknown }).code;
