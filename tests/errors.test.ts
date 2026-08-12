@@ -97,6 +97,17 @@ describe('ShipError factories', () => {
     expect((err.details as { cause?: Error } | undefined)?.cause).toBe(cause);
   });
 
+  it('timeout → type=Timeout, no status, and inside the network category', () => {
+    const cause = new Error('The operation was aborted due to timeout');
+    const err = ShipError.timeout('Deploy timed out', { cause });
+    expect(err.type).toBe(ErrorType.Timeout);
+    expect(err.message).toBe('Deploy timed out');
+    expect(err.status).toBeUndefined();
+    // Distinct type, shared category — the two halves of the decision.
+    expect(err.isNetworkError()).toBe(true);
+    expect((err.details as { cause?: Error } | undefined)?.cause).toBe(cause);
+  });
+
   it('cancelled → type=Cancelled with no status', () => {
     const err = ShipError.cancelled('Operation was cancelled');
     expect(err.type).toBe(ErrorType.Cancelled);
@@ -431,6 +442,16 @@ describe('ShipError.fromHttpResponse', () => {
       // as an offline situation in the UI.
       const err = await ShipError.fromHttpResponse(
         jsonResponse({ error: ErrorType.Network, message: 'misbehaving server', status: 500 }, 500),
+      );
+      expect(err.type).toBe(ErrorType.Api);
+      expect(err.isNetworkError()).toBe(false);
+    });
+
+    it('does NOT trust body.error when it claims a client-only type (Timeout)', async () => {
+      // A deadline is measured by the caller's own clock. A server claiming
+      // one would be reporting on a request it demonstrably answered.
+      const err = await ShipError.fromHttpResponse(
+        jsonResponse({ error: ErrorType.Timeout, message: 'misbehaving server', status: 504 }, 504),
       );
       expect(err.type).toBe(ErrorType.Api);
       expect(err.isNetworkError()).toBe(false);
@@ -798,10 +819,18 @@ describe('ShipError.fromFetchError', () => {
       expect(err.message).toBe('Ping was cancelled');
     });
 
-    it('a deadline is Network, and the sentence says so', () => {
-      // Not `Api`: no server answered. Not `Cancelled`: nobody cancelled. What
-      // is true is that nothing was exchanged, which is what Network claims —
-      // and it is what makes a timeout retryable beside a refused connection.
+    it('a deadline is Timeout, in the network category, and the sentence says so', () => {
+      // The argument is unchanged and still decides the CATEGORY: not `Api`
+      // (no server answered), not `Cancelled` (nobody cancelled) — what is
+      // true is that nothing was exchanged, which is what `isNetworkError`
+      // claims, and it is what makes a timeout retryable beside a refused
+      // connection.
+      //
+      // What changed on 2026-08-12 is the TYPE. One category could not carry
+      // both verdicts a surface needs: every consumer that retries or
+      // declines to report was right about a deadline, while every consumer
+      // that rendered the category said "check your internet connection"
+      // about a five-minute deploy ceiling.
       const err = ShipError.fromFetchError(
         Object.assign(new Error('The operation was aborted due to timeout'), {
           name: 'TimeoutError',
@@ -809,8 +838,23 @@ describe('ShipError.fromFetchError', () => {
         }),
         'Ping',
       );
-      expect(err.type).toBe(ErrorType.Network);
+      expect(err.type).toBe(ErrorType.Timeout);
+      expect(err.isNetworkError()).toBe(true);
       expect(err.message).toBe('Ping timed out');
+    });
+
+    it('a deadline is not the caller at fault, so it stays out of isClientError', () => {
+      // The membership that keeps a retry predicate honest: every consumer
+      // whose "do not retry" rule is `isClientError()` — `web/my`'s query
+      // client, this platform's own retry loop — must still see a deadline as
+      // worth another attempt. Reading it as client-attributable would say
+      // the caller erred, when what exhausted the ceiling was the network or
+      // the server.
+      const err = ShipError.timeout('Deploy timed out');
+      expect(err.isClientError()).toBe(false);
+      expect(err.isAuthError()).toBe(false);
+      // Statusless, like every fault with no server rule to mirror.
+      expect(err.status).toBeUndefined();
     });
 
     it('classifies by name even when the rejection is not an Error at all', () => {
@@ -824,7 +868,7 @@ describe('ShipError.fromFetchError', () => {
       expect(ShipError.fromFetchError(notAnError, 'Ping').type).toBe(ErrorType.Cancelled);
 
       const timedOut = { name: 'TimeoutError', message: 'The operation timed out.' };
-      expect(ShipError.fromFetchError(timedOut, 'Ping').type).toBe(ErrorType.Network);
+      expect(ShipError.fromFetchError(timedOut, 'Ping').type).toBe(ErrorType.Timeout);
     });
 
     it('a coded Error is transport evidence; an uncoded plain one is not', () => {

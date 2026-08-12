@@ -815,6 +815,23 @@ export const ErrorType = {
   Maintenance: 'maintenance',
   /** Network/connection error. Client-side only — set by HTTP clients on fetch failure; never produced server-side. */
   Network: 'network_error',
+  /**
+   * A deadline expired before the exchange completed. Client-side only — set
+   * by HTTP clients when a timeout signal fires; never produced server-side.
+   *
+   * A member of the NETWORK category rather than a sibling of it:
+   * `isNetworkError()` answers "nothing was exchanged", which is true of a
+   * deadline exactly as it is of a refused connection, so every consumer that
+   * retries, declines to report, or declines to relay a wire message on that
+   * category is already right about a timeout. The distinct TYPE exists for
+   * the one decision the category cannot make — what to SAY. "Check your
+   * internet connection" is the wrong sentence for a five-minute deploy
+   * ceiling, and a surface can only tell the two apart by type.
+   *
+   * The same relationship every comparable SDK ships:
+   * `APIConnectionTimeoutError extends APIConnectionError`.
+   */
+  Timeout: 'timeout_error',
   /** Operation was cancelled. Client-side only — set on `AbortSignal` abort; never produced server-side. */
   Cancelled: 'operation_cancelled',
   /** File operation error. Client-side only — set by SDK during local file processing; never produced server-side. */
@@ -833,6 +850,7 @@ export type ErrorType = (typeof ErrorType)[keyof typeof ErrorType];
  */
 const CLIENT_ONLY_ERROR_TYPES = new Set<string>([
   ErrorType.Network,
+  ErrorType.Timeout,
   ErrorType.Cancelled,
   ErrorType.File,
   ErrorType.Config,
@@ -849,12 +867,20 @@ const ERROR_CATEGORIES = {
    * over the statusless ones too — those are raised locally and have no
    * status for `isClientError`'s second arm to read, so omitting one makes it
    * read as a server fault. The rule is the membership test: every type in
-   * `CLIENT_ONLY_ERROR_TYPES` except `Network` (which `isNetworkError` owns)
-   * belongs here.
+   * `CLIENT_ONLY_ERROR_TYPES` except the two `isNetworkError` owns belongs
+   * here.
    *
    * `Cancelled` was missing until 2026-07-29, which is exactly that failure:
    * a caller who aborted their own deploy was told "server error: please try
    * again" — the CLI's fallback for everything this set does not claim.
+   *
+   * `Timeout` is deliberately NOT here, and it is the sharper case, because
+   * it is the one client-only type that is not the client's fault: the
+   * caller set a ceiling, but what exhausted it was the network or the
+   * server. Reading it as client-attributable would say the caller erred,
+   * and it would silently disarm every consumer whose retry predicate
+   * declines `isClientError()` — a deadline is precisely the failure worth
+   * a second attempt.
    */
   client: new Set<ErrorType>([
     ErrorType.Business,
@@ -866,7 +892,14 @@ const ERROR_CATEGORIES = {
     ErrorType.RateLimit,
     ErrorType.Validation,
   ]),
-  network: new Set<ErrorType>([ErrorType.Network]),
+  /**
+   * The exchange never happened. Two types, one category: a refused
+   * connection and an expired deadline differ in what a surface should SAY
+   * and in nothing else a consumer decides on — both are retryable, neither
+   * carries a wire message to relay, neither is worth reporting as an
+   * incident. See `ErrorType.Timeout` for why the type is distinct anyway.
+   */
+  network: new Set<ErrorType>([ErrorType.Network, ErrorType.Timeout]),
   auth: new Set<ErrorType>([ErrorType.Authentication]),
 } as const;
 
@@ -1019,7 +1052,7 @@ export class ShipError extends Error {
    * on the client). Falls back to status-derived (401 → Authentication,
    * 403 → Forbidden, 429 → RateLimit, else → Api) for non-API responses
    * (CDN errors, intermediaries) or malformed bodies. Client-only types
-   * (`Network`, `Cancelled`, `File`, `Config`) are filtered out of the
+   * (`Network`, `Timeout`, `Cancelled`, `File`, `Config`) are filtered out of the
    * trusted set — a misbehaving server claiming one of those is ignored.
    *
    * `operationName` (e.g. `"Get account"`) is used to compose the fallback
@@ -1107,8 +1140,9 @@ export class ShipError extends Error {
    * Routing:
    * - Already a `ShipError` → returned as-is (caller's intent preserved)
    * - `AbortError` → `ShipError.cancelled(...)` — someone stopped it on purpose
-   * - `TimeoutError` → `ShipError.network(...)` — a deadline expired, so
-   *   nothing was exchanged; the message names the timeout
+   * - `TimeoutError` → `ShipError.timeout(...)` — a deadline expired; the
+   *   message names the timeout, and the type is in the network CATEGORY
+   *   because nothing was exchanged
    * - A transport failure → `ShipError.network(...)` — see `isTransportFailure`
    *   for what each runtime offers as evidence
    * - Any other `Error` → `ShipError(Api, ...)` (no HTTP status — fetch never reached the server)
@@ -1145,11 +1179,14 @@ export class ShipError extends Error {
       return ShipError.cancelled(`${op} was cancelled`);
     }
     if (name === 'TimeoutError') {
-      // A deadline, not a fault and not a cancellation: nothing was exchanged,
-      // which is exactly what `Network` claims. The runtime's own sentence is
-      // dropped here rather than relayed — "The operation was aborted due to
-      // timeout" is the mechanism, not the news.
-      return ShipError.network(`${op} timed out`, { cause });
+      // A deadline: not a fault, not a cancellation, and — since it has its
+      // own type — no longer merely "network". Nothing was exchanged, which
+      // is what keeps it in the network CATEGORY and therefore retryable; the
+      // type is what lets a surface say "timed out" instead of sending
+      // someone to check their Wi-Fi. The runtime's own sentence is dropped
+      // rather than relayed: "The operation was aborted due to timeout" is
+      // the mechanism, not the news.
+      return ShipError.timeout(`${op} timed out`, { cause });
     }
 
     if (cause instanceof Error) {
@@ -1207,6 +1244,17 @@ export class ShipError extends Error {
 
   static network(message: string, details?: unknown): ShipError {
     return new ShipError(ErrorType.Network, message, undefined, details);
+  }
+
+  /**
+   * A deadline expired before the exchange completed.
+   *
+   * Statusless like its four client-only siblings: no exchange completed, so
+   * there is no HTTP status to report. `isNetworkError()` is true — see
+   * `ErrorType.Timeout` for why the category is shared and the type is not.
+   */
+  static timeout(message: string, details?: unknown): ShipError {
+    return new ShipError(ErrorType.Timeout, message, undefined, details);
   }
 
   static cancelled(message: string, details?: unknown): ShipError {

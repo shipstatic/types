@@ -64,14 +64,15 @@ ShipError.authentication(message?, details?)  // see "internal: telemetry" patte
 ShipError.rateLimit(message?, details?)
 ShipError.business(message, status?, details?)  // status defaults to 400
 ShipError.network(message, details?)            // pass `{ cause }` for the underlying Error
+ShipError.timeout(message, details?)            // a deadline expired — `isNetworkError()` is true
 ShipError.cancelled(message, details?)
 ShipError.file(message, details?)               // pass `{ filePath }` for the path
 ShipError.config(message, details?)
 ShipError.api(message, status?, details?)       // status defaults to 500
 ShipError.maintenance(message, details?)        // status FIXED at 503; message required
 
-// The four CLIENT-ONLY factories above (`network`, `cancelled`, `file`,
-// `config`) are exactly the statusless ones, and that pairing is load-bearing:
+// The five CLIENT-ONLY factories above (`network`, `timeout`, `cancelled`,
+// `file`, `config`) are exactly the statusless ones, and that pairing is load-bearing:
 // `ErrorResponse.status` is documented "(API contexts)", so it answers "what
 // would the wire say?" — not "is this a 4xx-ish sort of problem?". A local
 // pre-check that MIRRORS a server rule (blocked extension, label shape, token
@@ -187,7 +188,7 @@ Errors flow through the platform along a single, symmetric path. Every HTTP clie
 │    catch (cause) {                                                     │
 │      throw ShipError.fromFetchError(cause, operationName)              │
 │      // ShipError pass-through · AbortError→Cancelled                  │
-│      // TimeoutError→Network · transport→Network (see below)           │
+│      // TimeoutError→Timeout · transport→Network (see below)           │
 │      // other Error→Api · unknown→Api                                  │
 │    }                                                                   │
 │                                                                        │
@@ -205,7 +206,7 @@ Errors flow through the platform along a single, symmetric path. Every HTTP clie
 - **Wire-format type round-trips.** Server's `ShipError.validation(...)` reaches the client as `ErrorType.Validation`. Type guards (`isClientError()`, etc.) and direct comparisons (`error.type === ErrorType.Validation`) both work for received errors.
 - **Status drives type for non-API responses** (CDN errors, intermediaries with no body) — 401→Authentication, 403→Forbidden, 429→RateLimit, else→Api.
 - **Type and status are independent axes, and `isClientError()` reads both.** The line above is exactly why: a non-OK response whose body names no server-producible type is status-derived, so a CDN 404 or a misrouted request arrives as `Api` — a server-fault *type* carrying a client *status*. A type-only guard would report it as a platform failure and bury the server's message, so consumers would each have to re-add a status-range check beside every call. The guard owns that instead: client-fault type **or** 4xx status. The type set still carries the statusless local faults (`Config`, `File`), where there is no status to read.
-- **Client-only types stay client-only.** `Network`, `Cancelled`, `File`, and `Config` originate on the client (fetch failure, AbortSignal, SDK file processing, SDK config parsing). Even if a misbehaving server claimed one of these in `body.error`, `fromHttpResponse` ignores it — they're filtered out of the wire-trust set via `CLIENT_ONLY_ERROR_TYPES`.
+- **Client-only types stay client-only.** `Network`, `Timeout`, `Cancelled`, `File`, and `Config` originate on the client (fetch failure, an expired deadline, AbortSignal, SDK file processing, SDK config parsing). Even if a misbehaving server claimed one of these in `body.error`, `fromHttpResponse` ignores it — they're filtered out of the wire-trust set via `CLIENT_ONLY_ERROR_TYPES`.
 - **No HTTP error logic outside these two helpers.** SDK and web console are pure transport — `executeRequest` / `lib/api.ts` call the helpers directly; there are no private wrappers, no duplicated parsing, no drift surface.
 - **A non-JSON body is a foreign responder's, and is trusted only as far as it reads like a message.** Every API error is `ErrorResponse` JSON, so a non-JSON body came from an intermediary — and the two kinds it produces need opposite treatment. A CDN's `error code: 1015` is the most useful thing there is to say; a proxy's HTML error page is a *document*. Adopting one verbatim made a misconfigured `apiUrl` print 2,059 characters of markup as the error message on every surface. `fromHttpResponse` therefore takes a non-JSON body as `message` only when it does not open as markup and is at most `MAX_FOREIGN_MESSAGE_LENGTH` (200) characters; otherwise the `operationName`-derived fallback wins. **JSON bodies are never measured against it** — those are the API's own contract, and truncating a long validation message would be the bug.
 
@@ -249,10 +250,27 @@ which is the fence taxonomy's recorded answer for exactly this case. The
 classifications:
 
 - `AbortError` → `Cancelled`. Someone stopped it on purpose.
-- `TimeoutError` → **`Network`**, message `"<op> timed out"`. Not `Api` (no
-  server answered) and not `Cancelled` (nobody cancelled); what is true is that
-  nothing was exchanged, which is what `Network` states — and it is what puts a
-  timeout in the same retryable class as a refused connection.
+- `TimeoutError` → **`Timeout`**, message `"<op> timed out"`, and
+  `isNetworkError()` is **true**. Not `Api` (no server answered) and not
+  `Cancelled` (nobody cancelled); what is true is that nothing was exchanged,
+  which is what the network CATEGORY states — and it is what puts a timeout in
+  the same retryable class as a refused connection.
+
+  **The type is distinct and the category is shared, which is the whole
+  design.** It was plain `Network` until 2026-08-12, and one category could
+  not carry both verdicts a surface needs. Every consumer that *decides*
+  something on the category was already right — retry it, do not report it as
+  an incident, expect no wire message to relay — while every consumer that
+  *renders* it said "check your internet connection" about a five-minute
+  deploy ceiling. So the members of that category diverge on exactly one
+  question, what to SAY, and only a distinct type can answer it. The same
+  relationship every comparable SDK ships:
+  `APIConnectionTimeoutError extends APIConnectionError`.
+
+  `Timeout` is therefore the one client-only type outside `isClientError()`:
+  the caller set the ceiling, but what exhausted it was the network or the
+  server, so calling it client-attributable would both misname the fault and
+  disarm every retry predicate that declines a client error.
 - **WebKit reports a fired `AbortSignal.timeout()` as `AbortError`**, so on
   Safari a deadline is indistinguishable from a cancellation and lands on
   `Cancelled`. Recorded rather than worked around: the caller's signal is what

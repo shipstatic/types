@@ -78,9 +78,9 @@ try { response = await fetch(url); }
 catch (cause) { throw ShipError.fromFetchError(cause, 'Get account'); }
 ```
 
-`fromHttpResponse` trusts the body's `error` field when it's a known server-producible `ErrorType` — so a server's `ShipError.validation(...)` round-trips back to `ErrorType.Validation` on the client. For non-API responses (CDN errors, intermediaries) or malformed bodies it falls back to status-derived (401 → `Authentication`, 403 → `Forbidden`, 429 → `RateLimit`, else → `Api`). Client-only types (`Network`, `Cancelled`, `File`, `Config`) are filtered out of the trusted set. Body's `message` and `details` are preserved best-effort.
+`fromHttpResponse` trusts the body's `error` field when it's a known server-producible `ErrorType` — so a server's `ShipError.validation(...)` round-trips back to `ErrorType.Validation` on the client. For non-API responses (CDN errors, intermediaries) or malformed bodies it falls back to status-derived (401 → `Authentication`, 403 → `Forbidden`, 429 → `RateLimit`, else → `Api`). Client-only types (`Network`, `Timeout`, `Cancelled`, `File`, `Config`) are filtered out of the trusted set. Body's `message` and `details` are preserved best-effort.
 
-`fromFetchError` routes by the thrown cause: an existing `ShipError` is returned unchanged, `AbortError` becomes `Cancelled`, a fetch `TypeError` becomes `Network`, anything else becomes `Api` (with no HTTP status — the request never reached the server).
+`fromFetchError` routes by the thrown cause: an existing `ShipError` is returned unchanged, `AbortError` becomes `Cancelled`, `TimeoutError` becomes `Timeout`, a fetch `TypeError` becomes `Network`, anything else becomes `Api` (with no HTTP status — the request never reached the server). `Timeout` is a distinct type inside the network category — `isNetworkError()` is true for it — so a surface can retry it like any transport failure while still saying "timed out" rather than "check your connection".
 
 Both helpers accept an optional operation-name string for contextual messages (`"Get account was cancelled"`, `"Get account failed: ..."`).
 
