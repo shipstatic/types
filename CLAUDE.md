@@ -187,7 +187,8 @@ Errors flow through the platform along a single, symmetric path. Every HTTP clie
 │    catch (cause) {                                                     │
 │      throw ShipError.fromFetchError(cause, operationName)              │
 │      // ShipError pass-through · AbortError→Cancelled                  │
-│      // TypeError fetch→Network · other Error→Api · unknown→Api        │
+│      // TimeoutError→Network · transport→Network (see below)           │
+│      // other Error→Api · unknown→Api                                  │
 │    }                                                                   │
 │                                                                        │
 │  Either way, consumer code sees a typed ShipError:                     │
@@ -207,6 +208,55 @@ Errors flow through the platform along a single, symmetric path. Every HTTP clie
 - **Client-only types stay client-only.** `Network`, `Cancelled`, `File`, and `Config` originate on the client (fetch failure, AbortSignal, SDK file processing, SDK config parsing). Even if a misbehaving server claimed one of these in `body.error`, `fromHttpResponse` ignores it — they're filtered out of the wire-trust set via `CLIENT_ONLY_ERROR_TYPES`.
 - **No HTTP error logic outside these two helpers.** SDK and web console are pure transport — `executeRequest` / `lib/api.ts` call the helpers directly; there are no private wrappers, no duplicated parsing, no drift surface.
 - **A non-JSON body is a foreign responder's, and is trusted only as far as it reads like a message.** Every API error is `ErrorResponse` JSON, so a non-JSON body came from an intermediary — and the two kinds it produces need opposite treatment. A CDN's `error code: 1015` is the most useful thing there is to say; a proxy's HTML error page is a *document*. Adopting one verbatim made a misconfigured `apiUrl` print 2,059 characters of markup as the error message on every surface. `fromHttpResponse` therefore takes a non-JSON body as `message` only when it does not open as markup and is at most `MAX_FOREIGN_MESSAGE_LENGTH` (200) characters; otherwise the `operationName`-derived fallback wins. **JSON bodies are never measured against it** — those are the API's own contract, and truncating a long validation message would be the bug.
+
+### Transport truth: the shape table, and which side of it is bounded
+
+`fromFetchError` answers one question — *did the exchange happen?* — and gets
+it wrong in the expensive direction if it guesses. `Api` claims a server
+answered; a caller who retries on `Network` will not retry it. Six runtimes
+were captured on 2026-08-12 (Node and Bun by direct run, the three engines by a
+one-off playwright probe, workerd through miniflare) and the table lives in the
+`isTransportFailure` JSDoc with its capture scripts in `tests/errors.test.ts`.
+
+**The rule reads that table backwards, and that is the design.** The transport
+class is unbounded — every OS, TLS and DNS failure any engine will ever name —
+while the class fetch raises about its own ARGUMENTS is small, and every
+runtime names the URL when it complains about one. So the bounded side is what
+gets tested, and the residual risk points the safe way: an unrecognised
+sentence lands on `Network`, which claims only that nothing was exchanged.
+
+Two defects it closed, both live:
+
+- **WebKit's `Load failed`** carries no code and no "fetch", so the previous
+  message test read it as `Api` — every browser-SDK and `@shipstatic/drop`
+  user on Safari was told a server had answered.
+- **A malformed URL disagreed across engines.** The old test looked for
+  "fetch" in the message, and Chromium's and Firefox's URL complaints both
+  contain it, so one mistake was `Network` on three engines and `Api` on
+  three. All six now agree on `Api`.
+
+**workerd is a recorded gap, not an oversight.** It rejects with a plain
+`Error`, no code, and two unrelated sentences for its two failure modes, so
+nothing can classify it honestly and it lands on `Api`. Not patched with a
+dialect string, because the one consumer running ship there
+(`cloudflare/mcp`) reaches the API through a service BINDING — in-process, and
+therefore not a source of transport rejections at all.
+
+**Abort and timeout are read from `name` before the `instanceof Error` gate.**
+A `DOMException` satisfies that gate in all six runtimes measured, so the arm
+is unfalsifiable from outside; the suite plants a non-`Error` shape to hold it,
+which is the fence taxonomy's recorded answer for exactly this case. The
+classifications:
+
+- `AbortError` → `Cancelled`. Someone stopped it on purpose.
+- `TimeoutError` → **`Network`**, message `"<op> timed out"`. Not `Api` (no
+  server answered) and not `Cancelled` (nobody cancelled); what is true is that
+  nothing was exchanged, which is what `Network` states — and it is what puts a
+  timeout in the same retryable class as a refused connection.
+- **WebKit reports a fired `AbortSignal.timeout()` as `AbortError`**, so on
+  Safari a deadline is indistinguishable from a cancellation and lands on
+  `Cancelled`. Recorded rather than worked around: the caller's signal is what
+  stopped it, so `Cancelled` is honest there.
 
 ### Resource Contracts
 
