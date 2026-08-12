@@ -671,34 +671,54 @@ describe('ShipError.fromFetchError', () => {
   /**
    * Runtime failure shapes — CAPTURED, not guessed.
    *
-   * `ship` ships as a Bun-compiled binary as well as an npm package, so one
-   * program runs on two engines and a failure must carry the same `ErrorType`
-   * on both. Clients branch on that type and never on message strings, so a
-   * refused connection typed `internal_server_error` under Bun means an agent
-   * that retries on `network_error` silently does not.
+   * `ship` runs on more engines than any one developer tests: an npm package on
+   * Node, a Bun-compiled binary, a browser SDK (and `@shipstatic/drop`) on
+   * whatever the visitor has, and inside a Worker via `cloudflare/mcp`. A
+   * failure must carry the same `ErrorType` on all of them, because clients
+   * branch on that type and never on message strings — a refused connection
+   * typed `internal_server_error` means an agent that retries on
+   * `network_error` silently does not.
    *
-   * Every fixture below is a transcript. To re-capture after a Bun upgrade,
-   * write this to a file and run it under `bun` and under `node`:
+   * **Every fixture below is a transcript**, captured 2026-08-12. Re-capture
+   * with these three scripts:
    *
+   * Node and Bun — run the same file under each:
    * ```js
-   * for (const [label, url] of [
-   *   ['refused', 'http://127.0.0.1:45999/'],
-   *   ['dns', 'http://no-such-host.invalid/'],
-   *   ['tls', 'https://127.0.0.1:45999/'],
-   * ]) {
+   * for (const [label, url] of [['refused','http://127.0.0.1:1/'],
+   *                             ['dns','http://no-such-host.invalid/'],
+   *                             ['badUrl','ship']]) {
    *   try { await fetch(url); } catch (e) {
    *     console.log(label, e.constructor.name, e.name, e.code, JSON.stringify(e.message));
    *   }
    * }
    * ```
    *
+   * The three engines — from `npm/ship` (playwright is already its browser
+   * tier's dependency), serving a real origin so the failure is a genuine
+   * transport failure rather than an `about:blank` artefact:
+   * ```js
+   * import { chromium, firefox, webkit } from 'playwright';
+   * // launch each, page.goto(localOrigin), then page.evaluate the loop above.
+   * // Aborts must target a HANGING endpoint: the first capture aborted a fetch
+   * // to a refused port and the refusal won the race in webkit and firefox.
+   * ```
+   *
+   * workerd — from `cloudflare`, `new Miniflare({ script })` running the same
+   * loop and returning it as JSON.
+   *
    * A `reset` row needs a server that destroys the socket on connect; it was
    * captured the same way and yields Bun `code: 'ECONNRESET'`.
    */
   describe('runtime failure shapes', () => {
-    /** Bun rejects with a plain `Error` carrying a system code — not the spec's TypeError. */
-    const bun = (code: string, message: string): Error =>
-      Object.assign(new Error(message), { code });
+    /**
+     * The shape runner: an object carrying exactly what the runtime carried.
+     * `Object.assign(new Error(...), { name, code })` reproduces a
+     * `DOMException` closely enough for classification, which reads `name`.
+     */
+    const shape = (ctor: 'Error' | 'TypeError', message: string, code?: string): Error => {
+      const e = ctor === 'TypeError' ? new TypeError(message) : new Error(message);
+      return code === undefined ? e : Object.assign(e, { code });
+    };
 
     /** undici rejects with the spec's TypeError and hangs the detail off `cause`. */
     const undici = (code: string, causeMessage: string): TypeError =>
@@ -708,20 +728,37 @@ describe('ShipError.fromFetchError', () => {
 
     const UNABLE = 'Unable to connect. Is the computer able to access the url?';
 
+    // ── transport failures: every engine, one type ───────────────────────────
     it.each([
-      ['bun 1.3.14 · refused', bun('ConnectionRefused', UNABLE)],
-      // Bun collapses DNS failure into the same shape as a refused connection.
-      ['bun 1.3.14 · dns', bun('ConnectionRefused', UNABLE)],
-      ['bun 1.3.14 · reset', bun('ECONNRESET', 'The socket connection was closed unexpectedly.')],
-      // The row that rules out an allowlist: covering it by code would mean
-      // enumerating BoringSSL's certificate table.
-      [
-        'bun 1.3.14 · tls',
-        bun('UNKNOWN_CERTIFICATE_VERIFICATION_ERROR', 'unknown certificate verification error'),
-      ],
       ['node 22 · refused', undici('ECONNREFUSED', 'connect ECONNREFUSED 127.0.0.1:45999')],
       ['node 22 · dns', undici('ENOTFOUND', 'getaddrinfo ENOTFOUND no-such-host.invalid')],
       ['node 22 · reset', undici('ECONNRESET', 'read ECONNRESET')],
+      // Bun rejects with a plain Error carrying a system code — not the spec's
+      // TypeError — and collapses DNS failure into the refused shape.
+      ['bun 1.3.14 · refused', shape('Error', UNABLE, 'ConnectionRefused')],
+      ['bun 1.3.14 · dns', shape('Error', UNABLE, 'ConnectionRefused')],
+      [
+        'bun 1.3.14 · reset',
+        shape('Error', 'The socket connection was closed unexpectedly.', 'ECONNRESET'),
+      ],
+      // The row that rules out an allowlist of codes: covering it that way
+      // would mean enumerating BoringSSL's certificate table.
+      [
+        'bun 1.3.14 · tls',
+        shape('Error', 'unknown certificate verification error', 'UNKNOWN_CERTIFICATE_ERROR'),
+      ],
+      ['chromium 151 · refused', shape('TypeError', 'Failed to fetch')],
+      ['chromium 151 · dns', shape('TypeError', 'Failed to fetch')],
+      [
+        'firefox 153 · refused',
+        shape('TypeError', 'NetworkError when attempting to fetch resource.'),
+      ],
+      // WebKit is why this table exists. `Load failed` carries no code and no
+      // "fetch", so the previous message test read it as `Api` — every browser
+      // SDK and `@shipstatic/drop` user on Safari was told a server answered
+      // when nothing was exchanged.
+      ['webkit 26.5 · refused', shape('TypeError', 'Load failed')],
+      ['webkit 26.5 · dns', shape('TypeError', 'Load failed')],
     ])('%s → ErrorType.Network', (_label, thrown) => {
       const err = ShipError.fromFetchError(thrown, 'Ping');
       expect(err.type).toBe(ErrorType.Network);
@@ -732,28 +769,81 @@ describe('ShipError.fromFetchError', () => {
       expect((err.details as { cause?: Error })?.cause).toBe(thrown);
     });
 
-    // Both runtimes agree here, and the agreement is what these pin: a
-    // DOMException's `code` is a NUMBER, so the transport test must not claim
-    // it. `ship`'s own timeout is an AbortController, so it lands on the first
-    // row; `AbortSignal.timeout()` from a caller's `signal` lands on the second.
+    // ── argument errors: fetch judging its own input, not the network ────────
     it.each([
-      ['abort', 'AbortError', 20, 'The operation was aborted.'],
-      ['timeout', 'TimeoutError', 23, 'The operation timed out.'],
-    ])('%s stays out of the Network arm (DOMException code is numeric)', (_l, name, code, msg) => {
-      const err = ShipError.fromFetchError(Object.assign(new Error(msg), { name, code }), 'Ping');
-      expect(err.type).not.toBe(ErrorType.Network);
+      ['node 22', shape('TypeError', 'Failed to parse URL from ship')],
+      ['bun 1.3.14', shape('TypeError', 'fetch() URL is invalid', 'ERR_INVALID_URL')],
+      [
+        'chromium 151',
+        shape('TypeError', "Failed to execute 'fetch' on 'Window': Failed to parse URL from ship"),
+      ],
+      ['firefox 153', shape('TypeError', 'Window.fetch: ship is not a valid URL.')],
+      ['webkit 26.5', shape('TypeError', 'URL is not valid or contains user credentials.')],
+      ['workerd', shape('TypeError', 'Invalid URL: ship')],
+    ])('%s · malformed URL → ErrorType.Api, on every engine', (_label, thrown) => {
+      // These SIX AGREEING is the point. The previous rule tested the message
+      // for "fetch", and chromium's and firefox's URL complaints both contain
+      // it — so one mistake was `Network` on three engines and `Api` on three.
+      const err = ShipError.fromFetchError(thrown, 'Ping');
+      expect(err.type).toBe(ErrorType.Api);
     });
 
-    it('a coded Error is transport evidence; an uncoded one is not', () => {
-      expect(ShipError.fromFetchError(bun('ConnectionRefused', 'x')).type).toBe(ErrorType.Network);
+    // ── abort and timeout: classified by NAME, ahead of the Error gate ───────
+    it('a user abort is Cancelled', () => {
+      const err = ShipError.fromFetchError(
+        Object.assign(new Error('This operation was aborted'), { name: 'AbortError', code: 20 }),
+        'Ping',
+      );
+      expect(err.type).toBe(ErrorType.Cancelled);
+      expect(err.message).toBe('Ping was cancelled');
+    });
+
+    it('a deadline is Network, and the sentence says so', () => {
+      // Not `Api`: no server answered. Not `Cancelled`: nobody cancelled. What
+      // is true is that nothing was exchanged, which is what Network claims —
+      // and it is what makes a timeout retryable beside a refused connection.
+      const err = ShipError.fromFetchError(
+        Object.assign(new Error('The operation was aborted due to timeout'), {
+          name: 'TimeoutError',
+          code: 23,
+        }),
+        'Ping',
+      );
+      expect(err.type).toBe(ErrorType.Network);
+      expect(err.message).toBe('Ping timed out');
+    });
+
+    it('classifies by name even when the rejection is not an Error at all', () => {
+      // A WHITE-BOX fence: every runtime on the table above has
+      // `DOMException instanceof Error`, so this input cannot be produced by
+      // any of them and the arm is unfalsifiable from outside. Planting the
+      // impossible input is the recorded answer for that (root CLAUDE.md, the
+      // constellation law's fence taxonomy) — without it, moving the name
+      // check back inside the `instanceof Error` gate would go unnoticed.
+      const notAnError = { name: 'AbortError', message: 'The operation was aborted.' };
+      expect(ShipError.fromFetchError(notAnError, 'Ping').type).toBe(ErrorType.Cancelled);
+
+      const timedOut = { name: 'TimeoutError', message: 'The operation timed out.' };
+      expect(ShipError.fromFetchError(timedOut, 'Ping').type).toBe(ErrorType.Network);
+    });
+
+    it('a coded Error is transport evidence; an uncoded plain one is not', () => {
+      expect(ShipError.fromFetchError(shape('Error', 'x', 'ConnectionRefused')).type).toBe(
+        ErrorType.Network,
+      );
       expect(ShipError.fromFetchError(new Error('x')).type).toBe(ErrorType.Api);
     });
 
-    it("fetch's own argument errors are not transport failures", () => {
-      // A malformed `apiUrl`, not an unreachable one — no exchange was
-      // attempted, and nothing about the network is wrong.
-      const err = ShipError.fromFetchError(new TypeError('Failed to parse URL from ship'), 'Ping');
-      expect(err.type).toBe(ErrorType.Api);
+    it('workerd is the recorded gap: a plain Error with no code and no shared sentence', () => {
+      // Captured, not assumed — and deliberately NOT patched with a dialect
+      // string. workerd's two failure modes produce two unrelated sentences,
+      // so no message test could cover it honestly, and the one consumer that
+      // runs ship there (`cloudflare/mcp`) reaches the API through a service
+      // BINDING, which is in-process and produces no transport rejection.
+      // This test states the limitation so it is a known price, not a surprise.
+      expect(
+        ShipError.fromFetchError(shape('Error', 'Network connection lost.'), 'Ping').type,
+      ).toBe(ErrorType.Api);
     });
   });
 });

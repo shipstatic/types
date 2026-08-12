@@ -893,37 +893,72 @@ const MAX_FOREIGN_MESSAGE_LENGTH = 200;
 /**
  * Did the runtime say the exchange never completed?
  *
- * WHATWG has `fetch` reject with a **TypeError** on network error, and undici,
- * Chromium and Firefox comply. Bun does not: it rejects with a plain `Error`
- * carrying a system `code` string. Captured 2026-08-05 (the capture script is
- * in `tests/errors.test.ts`, "runtime failure shapes"):
+ * Clients branch on the TYPE, never on message strings, so a misclassified
+ * transport failure is a lie every consumer inherits — and the one that costs
+ * most: `Api` claims a server answered when nothing was exchanged, and a
+ * retrying caller will not retry it.
  *
- * | failure       | Node 22 / undici          | Bun 1.3.14                                   |
- * |---------------|---------------------------|----------------------------------------------|
- * | refused       | `TypeError: fetch failed` | `Error` `code: 'ConnectionRefused'`          |
- * | DNS failure   | `TypeError: fetch failed` | `Error` `code: 'ConnectionRefused'`          |
- * | reset         | `TypeError: fetch failed` | `Error` `code: 'ECONNRESET'`                 |
- * | TLS rejected  | `TypeError: fetch failed` | `Error` `code: 'UNKNOWN_CERTIFICATE_…ERROR'` |
+ * **Every row below is a transcript, not a belief.** Captured 2026-08-12
+ * against real runtimes — Node and Bun by direct run, the three engines by a
+ * one-off playwright probe, workerd through miniflare. The capture scripts are
+ * in `tests/errors.test.ts`, "runtime failure shapes".
  *
- * So the test is the **evidence, not a list of dialect strings**: a string
- * `code` is a runtime naming a transport-level failure. An allowlist of codes
- * was written first and rejected — the TLS row alone would mean enumerating
- * BoringSSL's certificate table, and a code nobody guessed is precisely the bug
- * this closes. Two kinds of error are deliberately NOT caught: ordinary JS
- * faults carry no `code` at all, and a `DOMException`'s is a **number**, so
- * aborts and timeouts fall through to their own arms.
+ * | runtime          | connection refused / DNS failure                     | malformed URL                                    |
+ * |------------------|------------------------------------------------------|--------------------------------------------------|
+ * | Node 22 / undici | `TypeError: fetch failed`                             | `TypeError: Failed to parse URL from …`          |
+ * | Bun 1.3.14       | `Error` `code:'ConnectionRefused'`                    | `TypeError` `code:'ERR_INVALID_URL'`             |
+ * | Chromium 151     | `TypeError: Failed to fetch`                          | `TypeError: …Failed to parse URL from …`         |
+ * | Firefox 153      | `TypeError: NetworkError when attempting to fetch …`  | `TypeError: … is not a valid URL.`               |
+ * | WebKit 26.5      | `TypeError: Load failed`                              | `TypeError: URL is not valid or contains user …` |
+ * | workerd          | `Error: Network connection lost.` (DNS: `internal error; reference = …`) | `TypeError: Invalid URL: …`   |
  *
- * The accepted trade: a caller's `TokenProvider` that throws a coded error
- * (`ENOENT` from a keychain read) is typed `Network` rather than `Api`. Both
- * are wrong for it, `Network` is the cheaper wrong — it says "nothing was
- * exchanged", which is true, where `Api` claims a server answered.
+ * Reading that table gives the rule, and it is the INVERSE of the obvious one.
+ * The transport class is unbounded — every OS, TLS and DNS failure any engine
+ * will ever name — while the class fetch raises for its own ARGUMENTS is
+ * small, and every runtime names the URL when it complains about one. So the
+ * bounded side is the one worth testing, and the residual risk points the safe
+ * way: an unrecognised sentence lands on `Network`, which says only that
+ * nothing was exchanged.
+ *
+ * That inversion is what fixes **WebKit**, whose `Load failed` carries no code
+ * and no "fetch", and which every browser-SDK and `@shipstatic/drop` user on
+ * Safari was hitting as `Api`. It also makes the six runtimes AGREE about a
+ * malformed URL, which they did not before: the previous rule tested the
+ * message for "fetch", and Chromium's and Firefox's URL complaints both
+ * contain it, so the same mistake was `Network` on three engines and `Api` on
+ * three.
+ *
+ * **workerd is the recorded gap.** It rejects with a plain `Error`, no code
+ * and no shared sentence — and its two failure modes produce two unrelated
+ * ones — so nothing here can classify it and it lands on `Api`. Left alone
+ * rather than patched with a dialect string: the one consumer running ship in
+ * that runtime (`cloudflare/mcp`) reaches the API through a service BINDING,
+ * which is in-process and does not produce transport rejections at all.
+ *
+ * The accepted trade is unchanged: a caller's `TokenProvider` that throws a
+ * coded error (`ENOENT` from a keychain read) is typed `Network` rather than
+ * `Api`. Both are wrong for it; `Network` is the cheaper wrong.
  */
 function isTransportFailure(cause: Error): boolean {
-  if (typeof (cause as { code?: unknown }).code === 'string') return true;
-  // Spec runtimes put no code on the rejection itself. The message test is what
-  // keeps fetch's ARGUMENT errors out — `Failed to parse URL from …` is a
-  // caller's config mistake, not a transport failure.
-  return cause instanceof TypeError && cause.message.includes('fetch');
+  const code = (cause as { code?: unknown }).code;
+
+  // Bun is the one runtime that puts a CODE on an argument error, so it is
+  // excluded before the code arm can claim it.
+  if (code === 'ERR_INVALID_URL') return false;
+
+  // A string `code` is a runtime naming a transport-level failure. An
+  // allowlist of codes was written first and rejected — the TLS row alone
+  // would mean enumerating BoringSSL's certificate table, and a code nobody
+  // guessed is precisely the bug this closes. A `DOMException`'s code is a
+  // NUMBER, so aborts and timeouts never reach here.
+  if (typeof code === 'string') return true;
+
+  // WHATWG has fetch reject with a TypeError for BOTH halves — network error
+  // and argument error — so among TypeErrors the URL is the discriminator.
+  if (cause instanceof TypeError) return !/\burl\b/i.test(cause.message);
+
+  // Anything else — an ordinary JS fault, or workerd — is not evidence.
+  return false;
 }
 
 /**
@@ -1071,11 +1106,29 @@ export class ShipError extends Error {
    *
    * Routing:
    * - Already a `ShipError` → returned as-is (caller's intent preserved)
-   * - `AbortError` → `ShipError.cancelled(...)`
+   * - `AbortError` → `ShipError.cancelled(...)` — someone stopped it on purpose
+   * - `TimeoutError` → `ShipError.network(...)` — a deadline expired, so
+   *   nothing was exchanged; the message names the timeout
    * - A transport failure → `ShipError.network(...)` — see `isTransportFailure`
    *   for what each runtime offers as evidence
    * - Any other `Error` → `ShipError(Api, ...)` (no HTTP status — fetch never reached the server)
    * - Anything else (string, undefined, etc.) → `ShipError(Api, ...)`
+   *
+   * **Abort and timeout are read from `name` BEFORE any `instanceof Error`
+   * gate.** A `DOMException` satisfies that gate in every runtime measured
+   * (Node, Bun, Chromium, Firefox, WebKit, workerd — all six), but the
+   * inheritance is a comparatively recent spec change and this classification
+   * has no reason to depend on it: `name` is where the meaning lives, and
+   * reading it first costs nothing. The suite plants a non-`Error`
+   * `DOMException` shape to hold the arm, since no runtime on the table
+   * produces one.
+   *
+   * A caller's own `AbortSignal.timeout()` is the reachable source of
+   * `TimeoutError` — and the two are NOT interchangeable per runtime: WebKit
+   * reports a fired `AbortSignal.timeout()` as `AbortError`, so on Safari a
+   * deadline is indistinguishable from a cancellation and lands on
+   * `Cancelled`. Recorded rather than worked around; `Cancelled` is honest
+   * there, since the caller's signal is what stopped it.
    *
    * The optional `operationName` is composed into the message for context:
    * `"Get account was cancelled"`, `"Get account failed: ..."`. Defaults to
@@ -1086,10 +1139,20 @@ export class ShipError extends Error {
 
     const op = operationName || 'Request';
 
+    // Read by NAME, ahead of the Error gate — see the note above.
+    const name = (cause as { name?: unknown } | null | undefined)?.name;
+    if (name === 'AbortError') {
+      return ShipError.cancelled(`${op} was cancelled`);
+    }
+    if (name === 'TimeoutError') {
+      // A deadline, not a fault and not a cancellation: nothing was exchanged,
+      // which is exactly what `Network` claims. The runtime's own sentence is
+      // dropped here rather than relayed — "The operation was aborted due to
+      // timeout" is the mechanism, not the news.
+      return ShipError.network(`${op} timed out`, { cause });
+    }
+
     if (cause instanceof Error) {
-      if (cause.name === 'AbortError') {
-        return ShipError.cancelled(`${op} was cancelled`);
-      }
       if (isTransportFailure(cause)) {
         return ShipError.network(`${op} failed: ${cause.message}`, { cause });
       }
