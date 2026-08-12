@@ -756,6 +756,12 @@ export const DEPLOY_FIELDS = {
   VIA: 'via',
   /** Plaintext password — the API hashes it server-side. */
   PASSWORD: 'password',
+  /**
+   * Requested lifetime in SECONDS — a duration, never an instant. The API
+   * computes and stores the expiry, so the wire carries no client clock.
+   * See {@link validateTtl}.
+   */
+  TTL: 'ttl',
   /** @internal Server-processing flag — first-party `/upload` only. */
   BUILD: 'build',
   /** @internal Server-processing flag — first-party `/upload` only. */
@@ -2048,6 +2054,63 @@ export function isDeployment(input: string): boolean {
   return /^[a-z]+-[a-z]+-[a-z0-9]{7}(\.[a-z0-9.-]+)?$/i.test(input);
 }
 
+/**
+ * The envelope a requested lifetime must fit — one word, one grammar, wherever
+ * the platform lets a caller choose how long something lives.
+ *
+ * Two resources wear it: `TokenCreateOptions.ttl` and
+ * `DeploymentUploadOptions.ttl`. It lives here rather than on the server by
+ * the format-vs-policy rule — a client can decide offline whether a duration
+ * is well-formed, and the API rejects the same value the same way. What is
+ * NOT here is any per-plan ceiling: no such policy exists, and one delivered
+ * speculatively through `/limits` would be an owner for a decision nobody has
+ * made.
+ */
+export const TTL_CONSTRAINTS = {
+  /**
+   * Shortest requestable lifetime, in seconds. One rather than zero: a
+   * deployment that expires the instant it is created is not a shorter lease,
+   * it is a deploy that was never live, and `0` is how an unset variable
+   * arrives.
+   */
+  MIN_SECONDS: 1,
+  /** Longest requestable lifetime, in seconds — one year. */
+  MAX_SECONDS: 365 * 24 * 60 * 60,
+} as const;
+
+/**
+ * Validate a requested lifetime in SECONDS and return it, or `undefined` when
+ * none was asked for.
+ *
+ * **A duration, never an instant.** The caller says how long; the server owns
+ * what time it is and stamps the expiry — so a client's clock, however wrong,
+ * cannot shorten or extend a lease. That is the tokens precedent, and it is
+ * why this rule measures a count of seconds rather than checking a timestamp
+ * against `now`.
+ *
+ * Fractions are refused rather than rounded: a caller who wrote `1.5` meant
+ * something the wire cannot carry, and silently choosing `1` or `2` for them
+ * is a decision the platform has no standing to make.
+ *
+ * Single source of truth shared by the API (the tokens route and the deploy
+ * schema), the SDK's request boundary, and the CLI's parser.
+ */
+export function validateTtl(value: unknown): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw ShipError.validation('TTL must be a number of seconds');
+  }
+  if (!Number.isInteger(value)) {
+    throw ShipError.validation('TTL must be a whole number of seconds');
+  }
+  if (value < TTL_CONSTRAINTS.MIN_SECONDS || value > TTL_CONSTRAINTS.MAX_SECONDS) {
+    throw ShipError.validation(
+      `TTL must be between ${TTL_CONSTRAINTS.MIN_SECONDS} and ${TTL_CONSTRAINTS.MAX_SECONDS} seconds`,
+    );
+  }
+  return value;
+}
+
 // =============================================================================
 // SPA CHECK TYPES
 // =============================================================================
@@ -2205,6 +2268,27 @@ export interface DeploymentUploadOptions {
    * into missing analytics rather than an error. See {@link DeploymentVia}.
    */
   via?: DeploymentViaType;
+  /**
+   * Seconds until this deployment expires; omit for one that never does.
+   *
+   * The platform reclaims it when the time is up — an ephemeral deployment,
+   * chosen by the deployer rather than by the identity. The same word and the
+   * same grammar as {@link TokenCreateOptions.ttl}, bounded by
+   * {@link TTL_CONSTRAINTS}.
+   *
+   * **Requires a credential.** An anonymous deploy has no deployer, and the
+   * platform owns anonymous lifetime as policy
+   * ({@link PUBLIC_DEPLOYMENT_TTL_SECONDS}) — so a ttl on one is refused
+   * rather than honoured or ignored.
+   *
+   * **A deployment carrying one cannot be linked to a domain.** A domain is a
+   * commitment and a deadline is its opposite; the API refuses the link, which
+   * is what keeps the reaper from tearing a live domain's target away.
+   *
+   * Immutable, like every other field of a deployment: to keep something
+   * longer, redeploy.
+   */
+  ttl?: number;
   /**
    * Optional password that protects this deployment.
    *
