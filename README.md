@@ -131,8 +131,18 @@ import {
   validateApiUrl,
   isDeployment,
   isBlockedExtension,
-  BLOCKED_EXTENSIONS,
 } from '@shipstatic/types';
+```
+
+`isBlockedExtension(filename, blocked)` takes the blocklist rather than owning
+one — the platform's list is hosting policy that the API owns and evolves, and
+it reaches clients as `PlatformLimits.blockedExtensions` from `GET /limits`.
+The field is optional: an API that predates it sends nothing, which means "no
+client-side check", never "an empty policy".
+
+```typescript
+const limits = await ship.getLimits();
+isBlockedExtension('virus.exe', limits.blockedExtensions ?? []);
 ```
 
 ### File Upload Types

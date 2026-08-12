@@ -1234,14 +1234,17 @@ export function isShipError(error: unknown): error is ShipError {
 // =============================================================================
 
 /**
- * Plan-based platform limits returned by the `/limits` endpoint.
+ * What the platform will refuse, returned by the `/limits` endpoint.
  *
- * The SDK fetches these once on first API call to drive client-side
- * file-size / file-count / total-size validation that mirrors what the API
- * would enforce server-side. Limits vary by account plan.
+ * The SDK fetches this once on first API call to drive client-side validation
+ * that mirrors what the API would enforce server-side. The caps vary by
+ * account plan; the blocklist does not.
  *
- * These are the *platform's* posted caps for the current account — server
- * truth delivered at runtime, never hard-coded on the client.
+ * These are the *platform's* posted rules for the current account — server
+ * truth delivered at runtime, never hard-coded on the client. That is the
+ * whole point of the shape: a rule the server owns and may change reaches the
+ * client as data, so a pinned client cannot enforce a policy the platform has
+ * moved on from (`npm/types/CLAUDE.md`, "Validation: format vs policy").
  *
  * A report: it answers a question and carries only the answer (`CLAUDE.md`,
  * "A report answers a question").
@@ -1253,84 +1256,105 @@ export interface PlatformLimits {
   maxFilesCount: number;
   /** Maximum total size in bytes across all files in a deployment. */
   maxTotalSize: number;
+  /**
+   * Lowercase extensions, without the dot, that the platform refuses to host
+   * (`exe`, `dmg`, …). Owned and evolved by the API — see
+   * `cloudflare/api/src/lib/blocklist.ts`.
+   *
+   * **Optional, and the absence is load-bearing.** An API deployed before this
+   * field existed sends nothing, so a client MUST read absence as "no
+   * client-side check" rather than as an empty policy. The hint fails open,
+   * the boundary fails closed: the server refuses the file either way, and a
+   * client that guessed would only ever be wrong in the direction that refuses
+   * a file the platform accepts.
+   *
+   * The optionality follows the additive-evolution law and retires with its
+   * reason: once every environment serves the field, it hardens to required at
+   * the entity's next natural break, and the clients' fail-open spellings
+   * retire with it (tracked in root `backlog.md`).
+   */
+  readonly blockedExtensions?: readonly string[];
 }
 
 // =============================================================================
-// EXTENSION BLOCKLIST
+// EXTENSION MATCHING
 // =============================================================================
 
 /**
- * Blocked file extensions — files that cannot be uploaded.
+ * The rule for reading a file's extension: lowercase, after the last dot of
+ * the last path segment. `null` when there is no extension to read.
  *
- * We accept any file type by default and derive Content-Type from the
- * extension at serve time (via mime-db in the API worker). Unknown extensions
- * are served as `application/octet-stream` with `X-Content-Type-Options: nosniff`.
+ * A leading dot names the file rather than its type, so `.gitignore` and
+ * `.htaccess` have no extension — but `.env.exe` has `exe`.
  *
- * The blocklist targets file types that pose direct security risks when hosted:
- * executables, disk images, malware vectors, dangerous scripts, and shortcuts.
- */
-export const BLOCKED_EXTENSIONS: ReadonlySet<string> = new Set([
-  // Executables
-  'exe',
-  'msi',
-  'dll',
-  'scr',
-  'bat',
-  'cmd',
-  'com',
-  'pif',
-  'app',
-  'deb',
-  'rpm',
-  // Installers
-  'pkg',
-  'mpkg',
-  // Disk images
-  'dmg',
-  'iso',
-  'img',
-  // Malware vectors
-  'cab',
-  'cpl',
-  'chm',
-  // Dangerous scripts
-  'ps1',
-  'vbs',
-  'vbe',
-  'ws',
-  'wsf',
-  'wsc',
-  'wsh',
-  'reg',
-  // Java
-  'jar',
-  'jnlp',
-  // Mobile/browser packages
-  'apk',
-  'crx',
-  // Shortcut/link
-  'lnk',
-  'inf',
-  'hta',
-]);
-
-/**
- * Check if a filename has a blocked extension.
- * Extracts the extension from the filename and checks against the blocklist.
- * Case-insensitive. Returns false for files without extensions.
+ * Segment-aware on purpose: the callers pass deploy PATHS, not basenames, and
+ * a naive `lastIndexOf('.')` over `dir.v1/README` reads the extension
+ * `v1/README` — safe only by accident, since no entry in a real blocklist
+ * contains a slash, which is the kind of correctness nobody should have to
+ * re-derive.
+ *
+ * **Private, and the reason is the asymmetry rather than any hazard.** Nothing
+ * outside this file reads it: `isBlockedExtension` is the only question anyone
+ * asks, and the API's refusal names the FILE, not its extension. Exporting a
+ * pure function is harmless, which is exactly the argument that talks a
+ * published package into surface it has not earned — and the costs do not
+ * match, since adding an export later is free under the additive law while
+ * removing one is a major. So it stays private until a caller exists. Its
+ * behaviour is fenced through `isBlockedExtension`, which is where it is
+ * observable.
+ *
+ * (`WEB_FILE_EXTENSIONS` above is private for a different reason — publishing
+ * it would invite a wrong question. Both are private; only one is a hazard.)
  *
  * @example
- * isBlockedExtension('virus.exe')     // true
- * isBlockedExtension('app.dmg')       // true
- * isBlockedExtension('style.css')     // false
- * isBlockedExtension('data.custom')   // false
- * isBlockedExtension('README')        // false
+ * fileExtension('virus.exe')          // 'exe'
+ * fileExtension('assets/style.CSS')   // 'css'
+ * fileExtension('dir.v1/README')      // null
+ * fileExtension('.gitignore')         // null
+ * fileExtension('file.')              // null
  */
-export function isBlockedExtension(filename: string): boolean {
-  const dotIndex = filename.lastIndexOf('.');
-  if (dotIndex === -1 || dotIndex === filename.length - 1) return false;
-  const ext = filename.slice(dotIndex + 1).toLowerCase();
-  return BLOCKED_EXTENSIONS.has(ext);
+function fileExtension(filename: string): string | null {
+  const basename = filename.replace(/\\/g, '/').split('/').pop() ?? '';
+  const dotIndex = basename.lastIndexOf('.');
+  if (dotIndex <= 0 || dotIndex === basename.length - 1) return null;
+  return basename.slice(dotIndex + 1).toLowerCase();
+}
+
+/**
+ * Whether a file is one the platform refuses to host.
+ *
+ * **The list is not this package's, and that separation is the point.** What
+ * counts as a blocked extension is hosting POLICY — it evolves, it is enforced
+ * at one security boundary, and `virus.exe` is a perfectly well-formed
+ * filename that breaks nothing about the upload→serve round-trip. So the API
+ * owns the list (`cloudflare/api/src/lib/blocklist.ts`) and delivers it as
+ * `PlatformLimits.blockedExtensions`; a client passes what it was given.
+ *
+ * What lives here is the MATCHING RULE, and it earns its place by the
+ * constellation law's own test. The list's drift is loud in both directions —
+ * a stale client uploads a file the API refuses by name, on the first try.
+ * A second *matcher* drifts SILENTLY in the one direction that matters: a
+ * client stricter than the server refuses a legal file without the server ever
+ * being asked, and no error names it. Two holders, silent drift, one owner.
+ *
+ * The `blocked` collection is required rather than defaulted: this predicate
+ * guards a security boundary in the API, and a defaulted-empty argument there
+ * would block nothing while reading as though it did. Callers holding a
+ * possibly-absent wire field spell the fail-open themselves.
+ *
+ * @example
+ * isBlockedExtension('virus.exe', ['exe'])   // true
+ * isBlockedExtension('virus.EXE', ['exe'])   // true — case-insensitive
+ * isBlockedExtension('style.css', ['exe'])   // false
+ * isBlockedExtension('README', ['exe'])      // false — no extension
+ */
+export function isBlockedExtension(
+  filename: string,
+  blocked: ReadonlySet<string> | readonly string[],
+): boolean {
+  const ext = fileExtension(filename);
+  if (ext === null) return false;
+  return Array.isArray(blocked) ? blocked.includes(ext) : (blocked as ReadonlySet<string>).has(ext);
 }
 
 // =============================================================================
@@ -1435,10 +1459,10 @@ const WEB_FILE_EXTENSIONS = [
 /**
  * The `accept` attribute value for a browser file picker offering web files.
  *
- * **This is a hint, never a rule.** `BLOCKED_EXTENSIONS` is the platform's
- * gate and the only thing that decides what may be hosted; this constant
- * decides what a *file dialog* shows first. The two are not two halves of one
- * policy, and this one must never be consulted to accept or reject a file.
+ * **This is a hint, never a rule.** The API's blocklist is the platform's gate
+ * and the only thing that decides what may be hosted; this constant decides
+ * what a *file dialog* shows first. The two are not two halves of one policy,
+ * and this one must never be consulted to accept or reject a file.
  *
  * The distinction is structural, not stylistic. `accept` can express only an
  * allowlist, while the platform's rule is a blocklist — so this list is
@@ -1449,9 +1473,12 @@ const WEB_FILE_EXTENSIONS = [
  * dropzone and the picker must reach the same verdict on the same files, and
  * they do — because the verdict is `validateFiles`, downstream of both.
  *
- * Kept beside `BLOCKED_EXTENSIONS` so one file holds both, which is what lets
- * `tests/validation-constants.test.ts` fence the invariant that matters: the
- * picker must never offer a file the platform will refuse.
+ * The invariant that matters — the picker must never offer a file the platform
+ * will refuse — is fenced where the authority lives, in the API's own suite
+ * (`cloudflare/api/tests/lib/blocklist.test.ts`), which reads this published
+ * string and holds it against the list it owns. It sat here until the
+ * blocklist became the API's, and moving it was the price of that: a fence
+ * belongs with whichever side can change and break it.
  */
 export const WEB_FILE_ACCEPT: string = WEB_FILE_EXTENSIONS.map((ext) => `.${ext}`).join(',');
 
