@@ -27,7 +27,7 @@ Single file: `src/index.ts`, organized into named sections in this order:
 | Common Responses | `PingResponse` (`timestamp` in unix seconds) |
 | Credential Shapes | The one address for credential vocabulary: `AUTH_BASE_PATH` (the identity mount — API server and web auth client read the same path), `AuthMethod`, `API_KEY` / `DEPLOY_TOKEN` / `CALLER` (namespaced shape constants), `TokenKind` (structurally derived from `AuthMethod`) + `classifyToken` (the single token dispatch, both sides of the wire), `OAuthScope` |
 | Deployment Config Constants | `DEPLOYMENT_CONFIG_FILENAME`, `SPA_DEFAULT_CONFIG`, `SPA_CHECK_CONSTRAINTS` (the `/spa-check` pre-flight's envelope — the index-file selection rule + the skip cap; NOT a validation boundary, the server answers an oversized index `isSPA: false`) |
-| Validation Utilities | `validateIdempotencyKey` (+ `IDEMPOTENCY_KEY_CONSTRAINTS`, which owns the header NAME as well as the format — see `CALLER.HEADER` for the same reasoning), `normalizeVia` (moved from the API 2026-08-06: a client reaches the same verdict offline, which is this file's own test for a format rule), `validateToken` (classify, then apply the population's format rules via one shared prefixed-credential helper), `validateApiKey`, `validateDeployToken`, `validateCaller`, `validateApiUrl`, `isDeployment` |
+| Validation Utilities | `validateIdempotencyKey` (+ `IDEMPOTENCY_KEY_CONSTRAINTS`, which owns the header NAME as well as the format — see `CALLER.HEADER` for the same reasoning), `normalizeVia` (moved from the API 2026-08-06: a client reaches the same verdict offline, which is this file's own test for a format rule), `validateToken` (classify, then apply the population's format rules via one shared prefixed-credential helper), `validateApiKey`, `validateDeployToken`, `validateCaller`, `validateApiUrl`, `isDeployment`, `validateTtl` (+ `TTL_CONSTRAINTS` — see "One lifetime grammar") |
 | SPA Check Types | `SPACheckRequest`, `SPACheckResponse` |
 | Static File | `StaticFile` (cross-environment file representation) |
 | Platform Constants | `DEFAULT_API`, `PUBLIC_DEPLOYMENT_TTL_SECONDS` (the anonymous-deploy lifetime — the API stamps `expires` and the claim window from it, and both MCP transports derive the duration they quote to agents; it was four restatements until 2026-08-06), `SHIP_ENV` (the Node SDK's ambient pair `SHIP_TOKEN`/`SHIP_API_URL` — the COMPLETE scrub list for embedding hosts; CLI-only vars deliberately excluded), `MY_API_KEY_URL` (the console deep link every authentication-teaching surface quotes — five files, three repos, until 2.5.0-beta.21) |
@@ -565,6 +565,38 @@ Examples that do **not** belong here (keep in the API):
 - Domain availability, account state, billing rules — server-only state.
 
 Rule of thumb: if a client could compute the answer offline from the input alone *and* the API would always reject the same input the same way, it's format → ship the validator here. Otherwise it's policy → keep it server-side.
+
+#### One lifetime grammar: `validateTtl`
+
+`ttl` was the platform's word for "how long does this live" before this rule
+existed — `tokens.create({ ttl })` has meant seconds-until-expiry, omit for
+permanent, since tokens shipped. When the deploy learned to answer the same
+question, the rule was hoisted here rather than written a second time.
+
+**It qualifies under the stopping rule on both clauses.** Two independent
+holders: the tokens route's inline
+`z.number().int().positive().max(31536000)` and the deploy schema that now
+needs the same envelope. And the drift is silent in the direction that
+matters — two ceilings that disagree by a day are invisible until someone
+requests a duration one accepts and the other refuses, on a surface where
+nothing prints either number.
+
+It also gave `tokens create` the client-side half of dual validation it never
+had: the rule lived only on the server, so the SDK sent whatever it was given
+and a bad duration cost a round trip.
+
+**What is deliberately NOT here is a per-plan ceiling.** The authenticated
+entitlement is ∞, so the format rule's one-year bound is the only limit that
+exists. Delivering a tiered cap through `/limits` speculatively would be an
+owner for a product decision nobody has made — the zeroth option applies:
+a policy that does not exist needs no owner.
+
+Two edges are decisions rather than arithmetic. **The floor is 1, not 0** —
+a deployment expiring the instant it is created was never live, and `0` is
+what an unset shell variable coerces to, so accepting it would turn a CI
+misconfiguration into a vanished deploy. **A fraction is refused, not
+rounded** — choosing `1` or `2` for someone who wrote `1.5` is a decision the
+platform has no standing to make.
 
 #### The worked split: the blocklist left, the matcher stayed
 

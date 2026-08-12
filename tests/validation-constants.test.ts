@@ -6,6 +6,7 @@ import {
   AuthMethod,
   CALLER,
   classifyToken,
+  DEPLOY_FIELDS,
   DEPLOY_TOKEN,
   type DeploymentListResponse,
   type DeploymentResource,
@@ -29,11 +30,13 @@ import {
   TokenKind,
   type TokenListResponse,
   type TokenResource,
+  TTL_CONSTRAINTS,
   UNBUILT_PROJECT_MARKERS,
   UNSAFE_FILENAME_CHARS,
   validateCaller,
   validatePassword,
   validateToken,
+  validateTtl,
   WEB_FILE_ACCEPT,
 } from '../src/index';
 
@@ -759,5 +762,65 @@ describe('IDEMPOTENCY_KEY_CONSTRAINTS', () => {
     // Both ends of one wire header read the name from here; it was a literal
     // in the API middleware, the SDK, and two CORS allow-lists.
     expect(IDEMPOTENCY_KEY_CONSTRAINTS.HEADER).toBe('Idempotency-Key');
+  });
+});
+
+describe('validateTtl — one lifetime grammar, two resources', () => {
+  it('accepts a whole number of seconds inside the envelope', () => {
+    expect(validateTtl(3600)).toBe(3600);
+    expect(validateTtl(TTL_CONSTRAINTS.MIN_SECONDS)).toBe(1);
+    expect(validateTtl(TTL_CONSTRAINTS.MAX_SECONDS)).toBe(TTL_CONSTRAINTS.MAX_SECONDS);
+  });
+
+  it('reads absence as "no ttl", never as zero', () => {
+    // The absent case is the DEFAULT case — every deployment and every token
+    // that never expires arrives here — so it must be cheap and total.
+    expect(validateTtl(undefined)).toBeUndefined();
+    expect(validateTtl(null)).toBeUndefined();
+  });
+
+  it('refuses zero, which is how an unset variable arrives', () => {
+    // Not merely out of range: a deployment that expires the instant it is
+    // created was never live, and `0` is what an empty shell variable
+    // coerces to. The floor is 1 for that reason rather than for symmetry.
+    expect(() => validateTtl(0)).toThrow(/between/);
+  });
+
+  it('refuses a negative duration', () => {
+    expect(() => validateTtl(-1)).toThrow(/between/);
+    expect(() => validateTtl(-TTL_CONSTRAINTS.MAX_SECONDS)).toThrow(/between/);
+  });
+
+  it('refuses a fraction rather than rounding it', () => {
+    // Silently choosing 1 or 2 for someone who wrote 1.5 is a decision the
+    // platform has no standing to make, and the wire carries integers.
+    expect(() => validateTtl(1.5)).toThrow(/whole number/);
+    expect(() => validateTtl(0.5)).toThrow(/whole number/);
+  });
+
+  it('refuses one second past the ceiling — the boundary, from both sides', () => {
+    expect(validateTtl(TTL_CONSTRAINTS.MAX_SECONDS)).toBe(TTL_CONSTRAINTS.MAX_SECONDS);
+    expect(() => validateTtl(TTL_CONSTRAINTS.MAX_SECONDS + 1)).toThrow(/between/);
+  });
+
+  it('refuses what is not a number at all, including NaN and Infinity', () => {
+    // `Number.parseInt('abc')` is NaN, and NaN passes every comparison
+    // silently — which is the whole reason the CLI's own parser exists.
+    expect(() => validateTtl(Number.NaN)).toThrow(/number of seconds/);
+    expect(() => validateTtl(Number.POSITIVE_INFINITY)).toThrow(/number of seconds/);
+    expect(() => validateTtl('3600')).toThrow(/number of seconds/);
+    expect(() => validateTtl(true)).toThrow(/number of seconds/);
+  });
+
+  it('states the ceiling as one year, in the unit it is enforced in', () => {
+    // Pinned as a literal rather than recomputed from the constant — a test
+    // that repeats the expression passes at any value and holds nothing.
+    expect(TTL_CONSTRAINTS.MAX_SECONDS).toBe(31_536_000);
+  });
+
+  it('is the same rule the deploy form field names', () => {
+    // `ttl` on the multipart body and `ttl` in the options object are one
+    // fact; DEPLOY_FIELDS is where the wire spelling lives.
+    expect(DEPLOY_FIELDS.TTL).toBe('ttl');
   });
 });
