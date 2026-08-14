@@ -25,9 +25,9 @@ Single file: `src/index.ts`, organized into named sections in this order:
 | Filename Character Validation | `UNSAFE_FILENAME_CHARS`, `hasUnsafeChars()` |
 | Unbuilt Project Markers | `UNBUILT_PROJECT_MARKERS`, `hasUnbuiltMarker()` |
 | Common Responses | `PingResponse` (`timestamp` in unix seconds) |
-| Credential Shapes | The one address for credential vocabulary: `AUTH_BASE_PATH` (the identity mount — API server and web auth client read the same path), `AuthMethod`, `API_KEY` / `DEPLOY_TOKEN` / `OAUTH_TOKEN` / `CALLER` (namespaced shape constants), `TokenKind` (structurally derived from `AuthMethod`) + `classifyToken` (the single token dispatch, both sides of the wire), `OAuthScope` |
+| Credential Shapes | The one address for credential vocabulary: `AUTH_BASE_PATH` (the identity mount — API server and web auth client read the same path), `AuthMethod`, `API_KEY` / `DEPLOY_TOKEN` / `OAUTH_TOKEN` / `CALLER` (namespaced shape constants), and **both halves of the one Bearer slot** — `readBearerValue` READS it (RFC 7235 §2.1 scheme fold; absence stays the caller's own question) and `TokenKind` + `classifyToken` DISPATCH on what came out, both sides of the wire — plus `OAuthScope` |
 | Deployment Config Constants | `DEPLOYMENT_CONFIG_FILENAME`, `SPA_DEFAULT_CONFIG`, `SPA_CHECK_CONSTRAINTS` (the `/spa-check` pre-flight's envelope — the index-file selection rule + the skip cap; NOT a validation boundary, the server answers an oversized index `isSPA: false`) |
-| Validation Utilities | `validateIdempotencyKey` (+ `IDEMPOTENCY_KEY_CONSTRAINTS`, which owns the header NAME as well as the format — see `CALLER.HEADER` for the same reasoning), `normalizeVia` (moved from the API 2026-08-06: a client reaches the same verdict offline, which is this file's own test for a format rule), `validateToken` (classify, then apply the population's format rules via one shared prefixed-credential helper), `validateApiKey`, `validateDeployToken`, `validateCaller`, `validateApiUrl`, `isDeployment`, `validateTtl` (+ `TTL_CONSTRAINTS` — see "One lifetime grammar") |
+| Validation Utilities | `validateIdempotencyKey` (+ `IDEMPOTENCY_KEY_CONSTRAINTS`, which owns the header NAME as well as the format — see `CALLER.HEADER` for the same reasoning), `normalizeVia` (moved from the API 2026-08-06: a client reaches the same verdict offline, which is this file's own test for a format rule), `readBearerValue` (the Authorization header's scheme fold — see "The credential shape law"), `validateToken` (classify, then apply the population's format rules via one shared prefixed-credential helper), `validateApiKey`, `validateDeployToken`, `validateOAuthToken`, `validateCaller`, `validateApiUrl`, `isDeployment`, `validateTtl` (+ `TTL_CONSTRAINTS` — see "One lifetime grammar") |
 | SPA Check Types | `SPACheckRequest`, `SPACheckResponse` |
 | Static File | `StaticFile` (cross-environment file representation) |
 | Platform Constants | `DEFAULT_API`, `PUBLIC_DEPLOYMENT_TTL_SECONDS` (the anonymous-deploy lifetime — the API stamps `expires` and the claim window from it, and both MCP transports derive the duration they quote to agents; it was four restatements until 2026-08-06), `SHIP_ENV` (the Node SDK's ambient pair `SHIP_TOKEN`/`SHIP_API_URL` — the COMPLETE scrub list for embedding hosts; CLI-only vars deliberately excluded), `MY_API_KEY_URL` (the console deep link every authentication-teaching surface quotes — five files, three repos, until 2.5.0-beta.21) |
@@ -548,6 +548,22 @@ the named check watched to fail, reverted).
    mint hook, so the platform could not name its own credential. Its successor
    does (`generateOpaqueAccessToken`), and the exception closed as a
    consequence of migrating rather than by hand-patching somebody's default.
+
+   **Reading the slot has one owner too, as of 2026-08-14.** `readBearerValue`
+   is the RFC 7235 §2.1 scheme fold — case-insensitive on the SCHEME, never on
+   the credential's own bytes — and it lives here beside `classifyToken`
+   because they are two halves of one wire boundary. It had two hand-rolled
+   holders (the api middleware's `readCredential`, the mcp worker's
+   `readBearer`), and the platform has paid for getting the rule wrong twice:
+   a spec-conformant `bearer ship-…` client was refused for as long as the
+   API's test was case-sensitive, and `@better-auth/oauth-provider` carries
+   the same defect in four places today — which is exactly why the platform
+   folds the scheme itself and hands that provider a bare token. **The
+   recorded refusal to own a `Bearer` CONSTANT still stands and is a different
+   thing**: that is RFC vocabulary, the same reason this package owns no
+   `"POST"`. A parser is not a spelling. Operator decision, taken over a
+   `cloudflare/shared/` placement that would have avoided a publish convoy —
+   the convoy is the cost of one owner, not a reason to accept two.
 
 3. **No prefix is a prefix of another.** This is why the populations are named
    on different axes — `ship-` for the product, `deploy-` for the capability,

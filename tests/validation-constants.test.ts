@@ -28,6 +28,7 @@ import {
   type OAuthScopeType,
   PASSWORD_CONSTRAINTS,
   type PlatformLimits,
+  readBearerValue,
   TokenKind,
   type TokenListResponse,
   type TokenResource,
@@ -474,6 +475,53 @@ describe('Validation Constants - @shipstatic/types', () => {
         expect(() => validateToken(`${shape.PREFIX}tooshort`), name).toThrow(/characters total/);
         expect(validateToken(`${shape.PREFIX}${'a'.repeat(shape.HEX_LENGTH)}`)).toBeUndefined();
       }
+    });
+  });
+
+  /**
+   * The other half of the Bearer slot. Two workers hand-rolled this rule
+   * (the api middleware's `readCredential`, the mcp worker's `readBearer`)
+   * until 2026-08-14; the platform had already paid for getting it wrong
+   * once, and the OAuth provider carries the same defect in four places.
+   */
+  describe('readBearerValue()', () => {
+    const token = `${API_KEY.PREFIX}${'a'.repeat(API_KEY.HEX_LENGTH)}`;
+
+    it('folds the scheme in any casing — RFC 7235 §2.1', () => {
+      for (const scheme of ['Bearer', 'bearer', 'BEARER', 'BeArEr']) {
+        expect(readBearerValue(`${scheme} ${token}`), scheme).toBe(token);
+      }
+    });
+
+    it('NEVER folds the credential’s own bytes', () => {
+      // The value is opaque and compared literally everywhere it is used.
+      // Folding it would make a credential match values it is not — and the
+      // populations are lowercase hex, so an upper-case one is simply wrong.
+      const mixed = `${API_KEY.PREFIX}AbCdEf0123456789AbCdEf0123456789`;
+      expect(readBearerValue(`Bearer ${mixed}`)).toBe(mixed);
+    });
+
+    it('refuses a foreign scheme', () => {
+      for (const header of ['Basic abc123', 'Token abc123', 'bearerish abc']) {
+        expect(readBearerValue(header), header).toBeNull();
+      }
+    });
+
+    it('refuses a scheme with nothing after it', () => {
+      // `Bearer ` with an empty value is a presented-but-broken credential,
+      // not a missing one — the caller's own layer decides what to do about
+      // that, but there is no value to hand it.
+      expect(readBearerValue('Bearer ')).toBeNull();
+      expect(readBearerValue('Bearer')).toBeNull();
+      expect(readBearerValue('')).toBeNull();
+    });
+
+    it('keeps ABSENCE out of its answer — a caller passes a value, never a Request', () => {
+      // Stated as a row because it is a design decision the api worker
+      // depends on: `absent` (the only anonymous path) and `unreadable` (a
+      // refusal) must stay distinguishable, and they cannot be if this
+      // function collapses them. It never sees a missing header at all.
+      expect(readBearerValue.length).toBe(1);
     });
   });
 
