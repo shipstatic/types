@@ -833,6 +833,33 @@ describe('DeploymentVia — the origin vocabulary', () => {
     }
   });
 
+  it('carries the two channel members the marketplace doors are named for', () => {
+    // The derived loop above cannot assert MEMBERSHIP — it iterates whatever
+    // the const happens to hold, so deleting a member keeps it green. These
+    // two are pinned BY NAME because a hosted-MCP door is named for its via
+    // value: `mcp.<domain>/cld` sends `cld` and `/crs` sends `crs`.
+    //
+    // The failure mode is why it is worth a row: the API drops a via its own
+    // types pin does not know, SILENTLY, by design (origin tracking is
+    // telemetry and must never fail a deploy). So a convoy that does not reach
+    // the API costs attribution and raises nothing anywhere.
+    expect(DeploymentVia.CLD).toBe('cld');
+    expect(DeploymentVia.CRS).toBe('crs');
+    expect(normalizeVia('CLD')).toBe(DeploymentVia.CLD);
+    expect(normalizeVia(' crs ')).toBe(DeploymentVia.CRS);
+  });
+
+  it('every member is three characters — which is what lets a door path BE its via', () => {
+    // The convention that makes channel doors expressible: `/gpt` → 'gpt',
+    // `/cld` → 'cld', `/crs` → 'crs'. Nothing else in the platform enforces
+    // it, so a four-character member would silently break the one property
+    // the door table relies on when it spells a path and an attribution the
+    // same way.
+    for (const via of Object.values(DeploymentVia)) {
+      expect(via).toHaveLength(3);
+    }
+  });
+
   it('types the request option but NOT the stored entity', () => {
     // Deliberate asymmetry: rows predate the vocabulary being closed, so the
     // entity's `via` stays `string | null`. These bindings fail the typecheck
