@@ -1697,9 +1697,10 @@ export interface PingResponse {
 // =============================================================================
 // The one address for credential vocabulary: where human identity lives
 // (AUTH_BASE_PATH), how a request is authorized (AuthMethod), the shapes
-// that distinguish populations on the wire (API_KEY, DEPLOY_TOKEN, CALLER),
-// the single dispatch over them (TokenKind, classifyToken), and the
-// delegated-access scopes (OAuthScope).
+// that distinguish populations on the wire (API_KEY, DEPLOY_TOKEN,
+// OAUTH_TOKEN, CALLER), the two halves of the one Bearer slot
+// (readBearerValue reads it, classifyToken/TokenKind dispatch on what came
+// out), and the delegated-access scopes (OAuthScope).
 //
 // THE SHAPE LAW, in three clauses, over the `Authorization: Bearer` slot's
 // three populations below. The deployment claim code is the API's own
@@ -1884,6 +1885,50 @@ export function classifyToken(token: string): TokenKindType {
   if (token.startsWith(DEPLOY_TOKEN.PREFIX)) return TokenKind.DEPLOY_TOKEN;
   if (token.startsWith(OAUTH_TOKEN.PREFIX)) return TokenKind.OAUTH;
   return TokenKind.OPAQUE;
+}
+
+/** The auth-scheme, lowercased — the form the comparison is made in. */
+const BEARER_SCHEME = 'bearer ';
+
+/**
+ * Read the credential out of an `Authorization` header value — the step
+ * BEFORE `classifyToken`, and the other half of the one wire slot this
+ * section owns.
+ *
+ * Returns the credential's own bytes, or `null` when the header carries a
+ * foreign scheme or nothing after the scheme.
+ *
+ * **The scheme is folded; the credential is not.** RFC 7235 §2.1 makes the
+ * auth-scheme case-insensitive, so `bearer`, `Bearer` and `BEARER` are the
+ * same header. The value after it is opaque and is compared literally
+ * everywhere it is used — `ship-`/`deploy-`/`oauth-` are lowercase hex, and
+ * folding them would make a credential match values it is not.
+ *
+ * **This platform has paid for the rule twice, which is why it has an owner
+ * rather than a convention.** A spec-conformant `bearer ship-…` client was
+ * refused for as long as the API's scheme test was spelled case-sensitively;
+ * and `@better-auth/oauth-provider` carries the same defect in four places
+ * today (`startsWith("Bearer ")`), which is precisely why the platform folds
+ * the scheme itself and hands the provider a bare token.
+ *
+ * **ABSENCE is deliberately not this function's business.** A missing header
+ * and an unreadable one are different facts, and the callers that care split
+ * on them: the API worker's middleware distinguishes `absent` (the only
+ * anonymous path) from `unreadable` (a presented credential that is refused),
+ * and collapsing the two here would take that distinction away from the layer
+ * that needs it. Callers check for the header themselves and pass its value.
+ *
+ * **Why this lives in the constitution rather than in a worker's `shared/`.**
+ * It is the same wire boundary `classifyToken` already owns — one reads the
+ * slot, the other dispatches on what came out — and a rule with two holders
+ * whose drift is silent earns exactly one owner regardless of what the
+ * convoy costs. The estate's recorded refusal to own a `Bearer` CONSTANT
+ * stands and is a different thing: that is RFC vocabulary, the same reason
+ * this package owns no `"POST"`. A parser is not a spelling.
+ */
+export function readBearerValue(header: string): string | null {
+  if (header.slice(0, BEARER_SCHEME.length).toLowerCase() !== BEARER_SCHEME) return null;
+  return header.slice(BEARER_SCHEME.length) || null;
 }
 
 /**
