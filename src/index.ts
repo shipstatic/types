@@ -28,35 +28,66 @@ export type DeploymentStatusType = (typeof DeploymentStatus)[keyof typeof Deploy
  * outside the set was **silently dropped** by the server, so a typo did not
  * fail anywhere. It stopped recording where deploys came from and said nothing.
  *
- * **Members name one of two things, and the distinction is worth keeping.**
- * Most name a CLIENT that identifies itself — the CLI, the SDK, the dashboard,
- * the stdio MCP, the GitHub Action, the n8n node, the VS Code extension. The
- * rest name a CHANNEL: a marketplace or directory listing, whose users all
- * arrive through one hosted-MCP door. A channel cannot identify itself in a
- * request the way an installed client can, because every one of them is the
- * same server speaking the same protocol — so the DOOR carries the identity,
- * and the door's path IS the value (`/gpt` → `gpt`, and since 2026-08-15
- * `/cld` → `cld`, `/crs` → `crs`). That is why a listing needs its own member:
- * a marketplace entry names exactly one URL, and the URL is the only thing a
- * listing's traffic has in common.
+ * **The origin law: origin is declared by whatever we control — our code where
+ * we ship code, our URL where we ship only a URL.** One rule decides every
+ * member here and every future one:
  *
- * Every member is three characters, which is what lets a door path and its
- * `via` be spelled the same.
+ * - **Where the platform ships CODE, the code declares it.** `web`, `sdk`,
+ *   `cli`, `git`, `n8n` and `vsc` are surfaces this platform authors, so each
+ *   names itself in its own source and nothing external is needed to tell them
+ *   apart.
+ * - **Where the platform ships only a URL, the URL declares it.** A
+ *   marketplace listing runs somebody else's client against a bare endpoint —
+ *   every one of them the same server speaking the same protocol, and
+ *   indistinguishable in a request. The only thing such a listing's traffic
+ *   has in common is the URL its users were handed, so the hosted MCP serves
+ *   one DOOR per listing and the door's path IS the value: `gpt`, `cld`,
+ *   `crs`.
+ *
+ * **A member names the most specific surface the platform can honestly
+ * claim**, which is what makes the two FALLBACKS fallbacks rather than peers
+ * of the named surfaces. `mcp` is any MCP host that was never handed a door of
+ * its own; `api` is a call that reached the REST API naming nothing at all.
+ * Guessing past either would be inventing attribution rather than recording
+ * it, which is the one thing this vocabulary exists to prevent.
+ *
+ * Every member is three lowercase characters — the property that lets a
+ * channel door's path and its attribution be spelled the same. The suite pins
+ * both the width and the channel members by name.
  */
 export const DeploymentVia = {
+  /** The web dashboard. */
   WEB: 'web',
+  /** A program embedding the SDK directly. */
   SDK: 'sdk',
+  /** The `ship` CLI. */
   CLI: 'cli',
+  /** Any MCP host with no door of its own — the stdio server included. The family fallback. */
   MCP: 'mcp',
+  /** The GitHub Action. */
   GIT: 'git',
+  /** The n8n community node. */
   N8N: 'n8n',
-  /** Channel: the ChatGPT App listing, served at `mcp.<domain>/gpt`. */
+  /** Channel: the ChatGPT App listing → `mcp.<domain>/gpt`. */
   GPT: 'gpt',
+  /** The VS Code extension. */
   VSC: 'vsc',
-  /** Channel: the Claude connectors directory listing, served at `mcp.<domain>/cld`. */
+  /** Channel: the Claude connectors directory listing → `mcp.<domain>/cld`. */
   CLD: 'cld',
-  /** Channel: the Cursor marketplace listing, served at `mcp.<domain>/crs`. */
+  /** Channel: the Cursor marketplace listing → `mcp.<domain>/crs`. */
   CRS: 'crs',
+  /**
+   * A deploy that reached the REST API naming no origin at all — the
+   * platform-wide fallback, one altitude below `mcp`'s family fallback.
+   *
+   * **Declared ahead of its emitter, deliberately.** Nothing sends it yet and
+   * the server still records an unattributed deploy as `null`. Vocabulary must
+   * exist before a consumer can adopt it, and adding a member costs a full
+   * constellation convoy — so the word ships first and the API adopts it as a
+   * default whenever that decision is taken, with no convoy standing between
+   * the decision and the deploy.
+   */
+  API: 'api',
 } as const;
 
 export type DeploymentViaType = (typeof DeploymentVia)[keyof typeof DeploymentVia];
