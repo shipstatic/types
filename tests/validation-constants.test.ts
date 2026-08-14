@@ -849,6 +849,20 @@ describe('DeploymentVia — the origin vocabulary', () => {
     expect(normalizeVia(' crs ')).toBe(DeploymentVia.CRS);
   });
 
+  it('carries both fallbacks, and one of them has no emitter yet', () => {
+    // `mcp` = an MCP host with no door of its own; `api` = a call that named
+    // nothing at all. Pinned by name for the same reason the channel members
+    // are — the derived loop iterates whatever the const happens to hold.
+    //
+    // `api` is declared AHEAD of its emitter: nothing sends it and the server
+    // still records an unattributed deploy as `null`. That is the point of
+    // adding it early — a member costs a full constellation convoy, so the
+    // word ships before the decision that adopts it, never after.
+    expect(DeploymentVia.MCP).toBe('mcp');
+    expect(DeploymentVia.API).toBe('api');
+    expect(normalizeVia('API')).toBe(DeploymentVia.API);
+  });
+
   it('every member is three characters — which is what lets a door path BE its via', () => {
     // The convention that makes channel doors expressible: `/gpt` → 'gpt',
     // `/cld` → 'cld', `/crs` → 'crs'. Nothing else in the platform enforces
