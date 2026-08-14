@@ -20,15 +20,28 @@ export const DeploymentStatus = {
 export type DeploymentStatusType = (typeof DeploymentStatus)[keyof typeof DeploymentStatus];
 
 /**
- * Which client made a deployment — the origin-tracking vocabulary.
+ * Where a deployment came from — the origin-tracking vocabulary.
  *
- * A closed set with many authors: the CLI, the SDK, the dashboard, both MCP
- * transports, the GitHub Action, the n8n node and the VS Code extension each
- * name themselves here. It lived in the API's config until 2026-08-06, where
- * being server-side made it unenforceable in the one direction that matters —
- * every client wrote a bare string, and a value outside the set was **silently
- * dropped** by the server, so a typo did not fail anywhere. It stopped
- * recording where deploys came from and said nothing.
+ * A closed set with many authors. It lived in the API's config until
+ * 2026-08-06, where being server-side made it unenforceable in the one
+ * direction that matters — every client wrote a bare string, and a value
+ * outside the set was **silently dropped** by the server, so a typo did not
+ * fail anywhere. It stopped recording where deploys came from and said nothing.
+ *
+ * **Members name one of two things, and the distinction is worth keeping.**
+ * Most name a CLIENT that identifies itself — the CLI, the SDK, the dashboard,
+ * the stdio MCP, the GitHub Action, the n8n node, the VS Code extension. The
+ * rest name a CHANNEL: a marketplace or directory listing, whose users all
+ * arrive through one hosted-MCP door. A channel cannot identify itself in a
+ * request the way an installed client can, because every one of them is the
+ * same server speaking the same protocol — so the DOOR carries the identity,
+ * and the door's path IS the value (`/gpt` → `gpt`, and since 2026-08-15
+ * `/cld` → `cld`, `/crs` → `crs`). That is why a listing needs its own member:
+ * a marketplace entry names exactly one URL, and the URL is the only thing a
+ * listing's traffic has in common.
+ *
+ * Every member is three characters, which is what lets a door path and its
+ * `via` be spelled the same.
  */
 export const DeploymentVia = {
   WEB: 'web',
@@ -37,8 +50,13 @@ export const DeploymentVia = {
   MCP: 'mcp',
   GIT: 'git',
   N8N: 'n8n',
+  /** Channel: the ChatGPT App listing, served at `mcp.<domain>/gpt`. */
   GPT: 'gpt',
   VSC: 'vsc',
+  /** Channel: the Claude connectors directory listing, served at `mcp.<domain>/cld`. */
+  CLD: 'cld',
+  /** Channel: the Cursor marketplace listing, served at `mcp.<domain>/crs`. */
+  CRS: 'crs',
 } as const;
 
 export type DeploymentViaType = (typeof DeploymentVia)[keyof typeof DeploymentVia];
