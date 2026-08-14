@@ -23,6 +23,7 @@ import {
   LABEL_CONSTRAINTS,
   LABEL_PATTERN,
   normalizeVia,
+  OAUTH_TOKEN,
   OAuthScope,
   type OAuthScopeType,
   PASSWORD_CONSTRAINTS,
@@ -404,9 +405,13 @@ describe('Validation Constants - @shipstatic/types', () => {
   // src/index.ts. Each was true by construction and checked by nothing, which
   // is the state a law is in right before it quietly stops holding.
   describe('the credential shape law', () => {
+    // Every Bearer population, with the kind its own prefix must classify to.
+    // The kind rides the table rather than being reconstructed from the name,
+    // so adding a population is one row and cannot half-land.
     const POPULATIONS = [
-      ['API_KEY', API_KEY],
-      ['DEPLOY_TOKEN', DEPLOY_TOKEN],
+      ['API_KEY', API_KEY, TokenKind.API_KEY],
+      ['DEPLOY_TOKEN', DEPLOY_TOKEN, TokenKind.DEPLOY_TOKEN],
+      ['OAUTH_TOKEN', OAUTH_TOKEN, TokenKind.OAUTH],
     ] as const;
 
     it('one entropy standard — every minted population is the same width', () => {
@@ -440,11 +445,34 @@ describe('Validation Constants - @shipstatic/types', () => {
     // a well-formed member of each population classifies as itself, whichever
     // order the branches happen to sit in.
     it('every population classifies as itself', () => {
-      for (const [name, shape] of POPULATIONS) {
+      for (const [name, shape, kind] of POPULATIONS) {
         const token = `${shape.PREFIX}${'a'.repeat(shape.HEX_LENGTH)}`;
-        expect(`${name}: ${classifyToken(token)}`).toBe(
-          `${name}: ${name === 'API_KEY' ? TokenKind.API_KEY : TokenKind.DEPLOY_TOKEN}`,
-        );
+        expect(`${name}: ${classifyToken(token)}`).toBe(`${name}: ${kind}`);
+      }
+    });
+
+    // Clause 2 read as a completeness check rather than a per-member one: a
+    // population added to the constitution without a classifier branch would
+    // pass every test above (they all iterate this same table) and land in
+    // OPAQUE at runtime, where the server refuses it. The dispatch's codomain
+    // must therefore cover every population the table names.
+    it('no population falls through to OPAQUE — the dispatch is total over them', () => {
+      const unclassified = POPULATIONS.filter(
+        ([, shape]) =>
+          classifyToken(`${shape.PREFIX}${'a'.repeat(shape.HEX_LENGTH)}`) === TokenKind.OPAQUE,
+      ).map(([name]) => name);
+
+      expect(unclassified).toEqual([]);
+    });
+
+    // And the same for the format rules: a population classifying correctly
+    // while `validateToken` has no arm for it would validate as "non-empty",
+    // which is the OPAQUE rule wearing a prefixed population's clothes.
+    it('every population is validated strictly, never as an opaque string', () => {
+      for (const [name, shape] of POPULATIONS) {
+        // Right prefix, wrong width — only a strict arm can tell.
+        expect(() => validateToken(`${shape.PREFIX}tooshort`), name).toThrow(/characters total/);
+        expect(validateToken(`${shape.PREFIX}${'a'.repeat(shape.HEX_LENGTH)}`)).toBeUndefined();
       }
     });
   });
@@ -455,6 +483,7 @@ describe('Validation Constants - @shipstatic/types', () => {
       expect(classifyToken(`deploy-${'a'.repeat(DEPLOY_TOKEN.HEX_LENGTH)}`)).toBe(
         TokenKind.DEPLOY_TOKEN,
       );
+      expect(classifyToken(`oauth-${'a'.repeat(OAUTH_TOKEN.HEX_LENGTH)}`)).toBe(TokenKind.OAUTH);
       expect(classifyToken('some-oauth-access-token')).toBe(TokenKind.OPAQUE);
       expect(classifyToken('')).toBe(TokenKind.OPAQUE);
     });
@@ -469,8 +498,10 @@ describe('Validation Constants - @shipstatic/types', () => {
       // literals pin the WIRE values, which a rename of either would break.
       expect(TokenKind.API_KEY).toBe(AuthMethod.API_KEY);
       expect(TokenKind.DEPLOY_TOKEN).toBe(AuthMethod.TOKEN);
+      expect(TokenKind.OAUTH).toBe(AuthMethod.OAUTH);
       expect(TokenKind.API_KEY).toBe('apiKey');
       expect(TokenKind.DEPLOY_TOKEN).toBe('token');
+      expect(TokenKind.OAUTH).toBe('oauth');
       expect(TokenKind.OPAQUE).toBe('opaque');
     });
   });
@@ -494,14 +525,22 @@ describe('Validation Constants - @shipstatic/types', () => {
     it('applies strict format rules to prefixed populations', () => {
       expect(() => validateToken('ship-tooshort')).toThrow(/characters total/);
       expect(() => validateToken('deploy-tooshort')).toThrow(/characters total/);
+      expect(() => validateToken('oauth-tooshort')).toThrow(/characters total/);
       // Widths come from the shape constants, never a literal: a hand-written
       // length here would pass while the population it describes had moved.
       expect(validateToken(`ship-${'a'.repeat(API_KEY.HEX_LENGTH)}`)).toBeUndefined();
       expect(validateToken(`deploy-${'b'.repeat(DEPLOY_TOKEN.HEX_LENGTH)}`)).toBeUndefined();
+      expect(validateToken(`oauth-${'c'.repeat(OAUTH_TOKEN.HEX_LENGTH)}`)).toBeUndefined();
     });
 
     it('passes opaque tokens through when non-empty', () => {
-      expect(validateToken('oauth-access-token-value')).toBeUndefined();
+      // Deliberately carries NO platform prefix. This row read
+      // `'oauth-access-token-value'` until the OAuth population got its shape,
+      // at which point it stopped being opaque and started being a malformed
+      // member of a real population — which the strict arm above refuses. The
+      // lesson generalises: introducing a prefix reclassifies every string
+      // that happened to start with it.
+      expect(validateToken('a-bearer-of-no-known-population')).toBeUndefined();
       expect(() => validateToken('')).toThrow(/non-empty/);
     });
   });

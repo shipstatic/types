@@ -25,7 +25,7 @@ Single file: `src/index.ts`, organized into named sections in this order:
 | Filename Character Validation | `UNSAFE_FILENAME_CHARS`, `hasUnsafeChars()` |
 | Unbuilt Project Markers | `UNBUILT_PROJECT_MARKERS`, `hasUnbuiltMarker()` |
 | Common Responses | `PingResponse` (`timestamp` in unix seconds) |
-| Credential Shapes | The one address for credential vocabulary: `AUTH_BASE_PATH` (the identity mount — API server and web auth client read the same path), `AuthMethod`, `API_KEY` / `DEPLOY_TOKEN` / `CALLER` (namespaced shape constants), `TokenKind` (structurally derived from `AuthMethod`) + `classifyToken` (the single token dispatch, both sides of the wire), `OAuthScope` |
+| Credential Shapes | The one address for credential vocabulary: `AUTH_BASE_PATH` (the identity mount — API server and web auth client read the same path), `AuthMethod`, `API_KEY` / `DEPLOY_TOKEN` / `OAUTH_TOKEN` / `CALLER` (namespaced shape constants), `TokenKind` (structurally derived from `AuthMethod`) + `classifyToken` (the single token dispatch, both sides of the wire), `OAuthScope` |
 | Deployment Config Constants | `DEPLOYMENT_CONFIG_FILENAME`, `SPA_DEFAULT_CONFIG`, `SPA_CHECK_CONSTRAINTS` (the `/spa-check` pre-flight's envelope — the index-file selection rule + the skip cap; NOT a validation boundary, the server answers an oversized index `isSPA: false`) |
 | Validation Utilities | `validateIdempotencyKey` (+ `IDEMPOTENCY_KEY_CONSTRAINTS`, which owns the header NAME as well as the format — see `CALLER.HEADER` for the same reasoning), `normalizeVia` (moved from the API 2026-08-06: a client reaches the same verdict offline, which is this file's own test for a format rule), `validateToken` (classify, then apply the population's format rules via one shared prefixed-credential helper), `validateApiKey`, `validateDeployToken`, `validateCaller`, `validateApiUrl`, `isDeployment`, `validateTtl` (+ `TTL_CONSTRAINTS` — see "One lifetime grammar") |
 | SPA Check Types | `SPACheckRequest`, `SPACheckResponse` |
@@ -524,21 +524,55 @@ the named check watched to fail, reverted).
    (`cloudflare/api/src/lib/crypto.ts` takes its byte count as a parameter), so
    a minted value and an accepted value cannot be different lengths.
 
-2. **Every population is named by its prefix.** A credential says what it is
-   before anything parses it. That is what lets `classifyToken` dispatch two
-   populations sharing one `Authorization: Bearer` slot — and what lets a value
-   found in a log, a support ticket or a pasted URL be recognised and revoked on
-   sight. **The name is the credential's own, never its location's:** a claim
-   code is `claim-` prefixed even though it arrives at a route that already
-   reads `/claims/`, because the route is where it was found, not what it is.
+2. **Every BEARER population is named by its prefix.** A credential says what
+   it is before anything parses it. That is what lets `classifyToken` dispatch
+   three populations sharing one `Authorization: Bearer` slot — `ship-`
+   (`API_KEY`), `deploy-` (`DEPLOY_TOKEN`) and `oauth-` (`OAUTH_TOKEN`) — and
+   what lets a value found in a log, a support ticket or a pasted URL be
+   recognised and revoked on sight.
+
+   **The clause is scoped to the Bearer slot, and the two exclusions are
+   decisions rather than gaps.** The deployment claim code is BARE: it never
+   enters the Bearer slot at all — minted into one URL, consumed by one
+   endpoint's one field, so its context names it and a prefix would restate
+   its route. (It carried `claim-` for one day in 2026-08 and the operator
+   reverted it the same day; this file said otherwise until 2026-08-14, which
+   is what a doctrine sentence with no fence under it does.) And the OAuth
+   REFRESH token, authorization code and client secret are likewise unprefixed
+   — a refresh token is posted as a form field to an endpoint that knows what
+   it is receiving, so no dispatcher ever classifies one.
+
+   **The OAuth access token was this clause's one standing exception until
+   2026-08-14**, and the reason is worth keeping because it is the shape of
+   every such exception: the authorization server it was born on exposed no
+   mint hook, so the platform could not name its own credential. Its successor
+   does (`generateOpaqueAccessToken`), and the exception closed as a
+   consequence of migrating rather than by hand-patching somebody's default.
 
 3. **No prefix is a prefix of another.** This is why the populations are named
-   on different axes — `ship-` for the product, `deploy-` and `claim-` for the
-   capability — rather than sharing a stem. `ship-` / `ship-deploy-` looks more
-   symmetrical and is a trap: every deploy token also matches the API-key
-   branch, so correctness would rest on the order of two `if`s. Introducing
-   that pair turns **five** tests red, which is the shape of the bug it
-   prevents.
+   on different axes — `ship-` for the product, `deploy-` for the capability,
+   `oauth-` for the protocol that mints it — rather than sharing a stem.
+   `ship-` / `ship-deploy-` looks more symmetrical and is a trap: every deploy
+   token also matches the API-key branch, so correctness would rest on the
+   order of two `if`s. Introducing that pair turns **seven** tests red, which
+   is the shape of the bug it prevents.
+
+   **The three clauses are held over a TABLE, not per member** — the
+   populations list in `tests/validation-constants.test.ts` drives every one
+   of them, plus two completeness rows added with the OAuth population: that
+   no listed population falls through to `OPAQUE`, and that every listed
+   population is validated STRICTLY rather than as a non-empty string. Without
+   those two, a constant added without a `classifyToken` branch or a
+   `validateToken` arm passes every table-driven test by being iterated over
+   while doing nothing.
+
+   **And a prefix is retroactive over every string that already starts with
+   it.** Adding `oauth-` reclassified two test fixtures that used
+   `oauth-…`-shaped literals as examples of OPAQUE tokens — one here, one in
+   `npm/ship` — turning them into malformed members of a real population. Both
+   went red immediately, which is the fence working; the general point is that
+   introducing a prefix is a change to the meaning of existing values, so
+   sweep for the spelling before shipping one.
 
 **Not covered, deliberately:** the unsubscribe token is an HMAC-SHA256 output,
 not a minted secret — its width is the algorithm's, and it is verified through
@@ -554,7 +588,7 @@ Validators in this package enforce **wire-format rules** — the rules that defi
 Examples that belong here:
 
 - `validateApiKey` — `ship-` prefix + `API_KEY.HEX_LENGTH` hex chars; the format defines the type. The width lives in the shape constant, never in prose or a test literal — a hand-written number here is a second owner for it.
-- `validateDeployToken` — same shape, different prefix.
+- `validateDeployToken`, `validateOAuthToken` — same shape, different prefix.
 - `validatePassword` — length 6–128 is the wire-format envelope an API endpoint accepts.
 
 Examples that do **not** belong here (keep in the API):
