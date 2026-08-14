@@ -1702,7 +1702,7 @@ export interface PingResponse {
 // delegated-access scopes (OAuthScope).
 //
 // THE SHAPE LAW, in three clauses, over the `Authorization: Bearer` slot's
-// two populations below. The deployment claim code is the API's own
+// three populations below. The deployment claim code is the API's own
 // (`AUTH.CLAIM`, server-side: the API mints it and the API validates it, so
 // it has one holder and stays there) and shares only clause 1 — it is the
 // platform's one deliberately BARE secret, because it never enters the
@@ -1719,9 +1719,12 @@ export interface PingResponse {
 //
 //  2. EVERY BEARER POPULATION IS NAMED BY ITS PREFIX. A credential says what
 //     it is before anything parses it — which is what lets `classifyToken`
-//     below dispatch two populations sharing one `Authorization: Bearer`
+//     below dispatch three populations sharing one `Authorization: Bearer`
 //     slot, and what lets a value found in a log, a support ticket or a
-//     pasted URL be recognised and revoked on sight.
+//     pasted URL be recognised and revoked on sight. The OAuth access token
+//     was this clause's one standing exception until 2026-08-14 — the
+//     authorization server it was born on had no mint hook to give it a
+//     prefix, and its successor does.
 //
 //  3. NO PREFIX IS A PREFIX OF ANOTHER. This is what makes the dispatch
 //     order-independent, and it is the reason the populations are named on
@@ -1794,6 +1797,40 @@ export const DEPLOY_TOKEN = {
 } as const;
 
 /**
+ * Shape constants for OAuth access tokens (`oauth-{32 hex chars}`) — the
+ * delegated population, minted by the platform's own authorization server
+ * for a connected app acting on a user's behalf.
+ *
+ * Same width as the other two, and for the same reason: one entropy standard
+ * across the platform, so "how long is a credential" has one answer.
+ *
+ * **This population is the access token alone.** Refresh tokens, authorization
+ * codes and client secrets are deliberately NOT here and are deliberately not
+ * prefixed by this constant: none of them ever enters the `Authorization:
+ * Bearer` slot — a refresh token is posted as a form field to the token
+ * endpoint, which knows what it is receiving — so `classifyToken` never sees
+ * one and a prefix would name a population no dispatcher dispatches. The same
+ * reasoning that keeps the deployment claim code bare.
+ *
+ * **The prefix must be applied at the MINT, never as a display wrapper.** The
+ * authorization server hashes what it stores and the API hashes what it is
+ * presented, so the prefix has to be inside the hashed string on both sides.
+ * `@better-auth/oauth-provider` offers a `prefix.opaqueAccessToken` option
+ * that prepends AFTER hashing and strips on its own read paths; using it would
+ * store a hash of the UNPREFIXED token and silently break the platform's read
+ * arm. The API therefore mints through `generateOpaqueAccessToken` — recorded
+ * beside the config in `cloudflare/api/src/lib/auth/instance.ts`.
+ */
+export const OAUTH_TOKEN = {
+  /** Prefix that identifies an OAuth access token. */
+  PREFIX: 'oauth-',
+  /** Number of hex characters following the prefix. */
+  HEX_LENGTH: 32,
+  /** Total length including prefix (`PREFIX.length + HEX_LENGTH = 38`). */
+  TOTAL_LENGTH: 38,
+} as const;
+
+/**
  * Shape constants for caller identifiers (the `X-Caller` instance-identity
  * header — rate-limit bucketing for multi-tenant orchestrators). The API
  * normalizes case and silently ignores malformed values (the header is
@@ -1814,16 +1851,23 @@ export const CALLER = {
  * client token in one wire slot (`Authorization: Bearer <value>`) and
  * classifies by value, never by a side channel — this is the classifier.
  *
- * `API_KEY` and `DEPLOY_TOKEN` *are* `AuthMethod.API_KEY` and
- * `AuthMethod.TOKEN` — the equality is structural, so a classification flows
- * straight into an auth method and the pair can never drift. `OPAQUE` is any
- * other value — shape says nothing about it, so only a lookup can. Today the
- * server refuses every opaque bearer; the OAuth access-token population
- * resolves there when the authorization server ships.
+ * `API_KEY`, `DEPLOY_TOKEN` and `OAUTH` *are* `AuthMethod.API_KEY`,
+ * `AuthMethod.TOKEN` and `AuthMethod.OAUTH` — the equality is structural, so
+ * a classification flows straight into an auth method and the trio can never
+ * drift.
+ *
+ * `OPAQUE` is any other value, and since 2026-08-14 it names NO population:
+ * every credential this platform mints for the Bearer slot carries a prefix,
+ * so an opaque bearer is a bearer we did not mint. It stays a member rather
+ * than becoming a `null` return because a dispatcher with a total codomain
+ * reads better than one with an absence in it — and because it is where a
+ * future population would land before anyone gave it a shape, which is
+ * exactly what the OAuth token itself did until its prefix existed.
  */
 export const TokenKind = {
   API_KEY: AuthMethod.API_KEY,
   DEPLOY_TOKEN: AuthMethod.TOKEN,
+  OAUTH: AuthMethod.OAUTH,
   OPAQUE: 'opaque',
 } as const;
 
@@ -1838,6 +1882,7 @@ export type TokenKindType = (typeof TokenKind)[keyof typeof TokenKind];
 export function classifyToken(token: string): TokenKindType {
   if (token.startsWith(API_KEY.PREFIX)) return TokenKind.API_KEY;
   if (token.startsWith(DEPLOY_TOKEN.PREFIX)) return TokenKind.DEPLOY_TOKEN;
+  if (token.startsWith(OAUTH_TOKEN.PREFIX)) return TokenKind.OAUTH;
   return TokenKind.OPAQUE;
 }
 
@@ -1989,10 +2034,24 @@ export function validateDeployToken(deployToken: string): void {
 }
 
 /**
+ * Validate OAuth access token format
+ */
+export function validateOAuthToken(oauthToken: string): void {
+  validatePrefixedCredential(oauthToken, OAUTH_TOKEN, 'OAuth access token');
+}
+
+/**
  * Validate a client token of any population. Classifies by shape and applies
- * the matching format rules: `ship-` keys and `deploy-` deploy tokens are
- * validated strictly; opaque tokens (OAuth access tokens, future populations)
- * only need to be non-empty — their validity is the server's to decide.
+ * the matching format rules: all three prefixed populations are validated
+ * strictly; an OPAQUE token only needs to be non-empty.
+ *
+ * **The OPAQUE arm stays permissive on purpose**, even though the platform no
+ * longer mints an unprefixed credential. It is the fallback for a population
+ * that does not exist yet, and a client refusing a shape the server would
+ * accept is the one failure mode this boundary must never have — the server
+ * decides, and it refuses an unrecognised bearer anyway. Unprefixed OAuth
+ * tokens from before 2026-08-14 land here and are refused server-side, which
+ * is correct: they were revoked by the change, not grandfathered.
  */
 export function validateToken(token: string): void {
   switch (classifyToken(token)) {
@@ -2001,6 +2060,9 @@ export function validateToken(token: string): void {
       return;
     case TokenKind.DEPLOY_TOKEN:
       validateDeployToken(token);
+      return;
+    case TokenKind.OAUTH:
+      validateOAuthToken(token);
       return;
     case TokenKind.OPAQUE:
       if (!token) throw ShipError.validation('Token must be a non-empty string');
