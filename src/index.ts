@@ -2738,6 +2738,17 @@ export interface ActivityMeta {
   hasConfig?: boolean;
   /** Whether deployment has a password set */
   hasPassword?: boolean;
+  /**
+   * The client/tool that created the deployment.
+   *
+   * Narrower than {@link Deployment.via}, deliberately: the entity is
+   * `string | null` because stored rows predate the vocabulary, while an
+   * activity is only ever written by code that names one. It is here rather
+   * than read off the deployment because the deployment row is deleted at
+   * expiry or on request and the activity is not — this is where a deploy's
+   * origin stays answerable afterwards.
+   */
+  via?: DeploymentViaType;
 
   // Domain events
   /** Whether this was an update (vs create) */
