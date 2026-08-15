@@ -849,15 +849,15 @@ describe('DeploymentVia — the origin vocabulary', () => {
     expect(normalizeVia(' crs ')).toBe(DeploymentVia.CRS);
   });
 
-  it('carries both fallbacks, and one of them has no emitter yet', () => {
+  it('carries both fallbacks', () => {
     // `mcp` = an MCP host with no door of its own; `api` = a call that named
     // nothing at all. Pinned by name for the same reason the channel members
     // are — the derived loop iterates whatever the const happens to hold.
     //
-    // `api` is declared AHEAD of its emitter: nothing sends it and the server
-    // still records an unattributed deploy as `null`. That is the point of
-    // adding it early — a member costs a full constellation convoy, so the
-    // word ships before the decision that adopts it, never after.
+    // `api` was declared one wave AHEAD of its emitter, and the API has
+    // stamped it since 2026-08-15. That is the point of adding it early — a
+    // member costs a full constellation convoy, so the word ships before the
+    // decision that adopts it, never after.
     expect(DeploymentVia.MCP).toBe('mcp');
     expect(DeploymentVia.API).toBe('api');
     expect(normalizeVia('API')).toBe(DeploymentVia.API);

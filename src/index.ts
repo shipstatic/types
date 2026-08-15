@@ -80,12 +80,14 @@ export const DeploymentVia = {
    * A deploy that reached the REST API naming no origin at all — the
    * platform-wide fallback, one altitude below `mcp`'s family fallback.
    *
-   * **Declared ahead of its emitter, deliberately.** Nothing sends it yet and
-   * the server still records an unattributed deploy as `null`. Vocabulary must
-   * exist before a consumer can adopt it, and adding a member costs a full
-   * constellation convoy — so the word ships first and the API adopts it as a
-   * default whenever that decision is taken, with no convoy standing between
-   * the decision and the deploy.
+   * **The API stamps it, since 2026-08-15.** A deploy that names no origin —
+   * or names one this vocabulary does not know — is stored as `api`, so a
+   * stored `null` now means only that the row predates attribution.
+   *
+   * It was declared one wave ahead of that decision, deliberately: vocabulary
+   * must exist before a consumer can adopt it, and adding a member costs a
+   * full constellation convoy, so the word shipped first and the server
+   * adopted it with no convoy standing between the decision and the deploy.
    */
   API: 'api',
 } as const;
@@ -113,7 +115,10 @@ export interface Deployment {
   /** Labels for categorization and filtering (lowercase, alphanumeric with separators). Always present, empty array when none. */
   labels: string[];
   /**
-   * The client/tool that created this deployment, null if unknown.
+   * The client/tool that created this deployment. Every deployment created
+   * today names one — {@link DeploymentVia.API} when the caller named nothing
+   * the vocabulary knows — so `null` is historical: the row predates
+   * attribution.
    *
    * Deliberately wider than {@link DeploymentViaType}: this is stored data,
    * and rows predate the vocabulary being closed. Narrowing the ENTITY would
