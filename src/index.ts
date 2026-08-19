@@ -707,21 +707,6 @@ export interface AccountKeyResponse {
 }
 
 /**
- * What `GET /account/claim` answers — the render half of the claim door: the
- * deployment a claim code names, and whether it is still there for THIS
- * caller to take. Claimability is a fact of code-plus-caller only the API can
- * compute; consumers must never infer it from `expires`, an entitlement
- * detail that is free to diverge. (The POST — the intent half — answers the
- * bare {@link Deployment} it moved.)
- */
-export interface ClaimResolveResponse {
-  /** The deployment the code names, as the caller may see it. */
-  readonly deployment: Deployment;
-  /** Still the public account's to take — false once it is the caller's own. */
-  readonly claimable: boolean;
-}
-
-/**
  * Account-specific configuration overrides
  * Allows per-account customization of limits without changing plan
  */
