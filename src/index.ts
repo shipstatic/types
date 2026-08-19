@@ -707,6 +707,21 @@ export interface AccountKeyResponse {
 }
 
 /**
+ * What `GET /account/claim` answers — the render half of the claim door: the
+ * deployment a claim code names, and whether it is still there for THIS
+ * caller to take. Claimability is a fact of code-plus-caller only the API can
+ * compute; consumers must never infer it from `expires`, an entitlement
+ * detail that is free to diverge. (The POST — the intent half — answers the
+ * bare {@link Deployment} it moved.)
+ */
+export interface ClaimResolveResponse {
+  /** The deployment the code names, as the caller may see it. */
+  readonly deployment: Deployment;
+  /** Still the public account's to take — false once it is the caller's own. */
+  readonly claimable: boolean;
+}
+
+/**
  * Account-specific configuration overrides
  * Allows per-account customization of limits without changing plan
  */
@@ -1798,6 +1813,21 @@ export interface PingResponse {
 export const AUTH_BASE_PATH = '/auth';
 
 /**
+ * The query marker a completed sign-in LANDS with.
+ *
+ * The API's magic-link verify leg stamps `?signing-in=1` onto its success
+ * redirect, and the console boots into its wait screen on seeing it — two
+ * repos, one spelling, which is why it lives here. Success is marked and the
+ * error leg deliberately is NOT: the console gives the marker precedence, so
+ * a marked error would render a wait that resolves to bare doors with the
+ * error's sentence lost. If the spellings ever diverged the failure would be
+ * invisible to every suite — email landings would flash the doors for one
+ * round trip instead of waiting — which is exactly the silent-drift class
+ * this constitution exists to delete.
+ */
+export const SIGN_IN_RETURN_PARAM = 'signing-in';
+
+/**
  * How a request (or recorded activity) was authorized.
  *
  * Client populations: `SESSION` (first-party cookie), `API_KEY` (`ship-`
@@ -2644,6 +2674,7 @@ export type ActivityEvent =
   | 'deployment.delete'
   | 'deployment.claim'
   | 'deployment.flagged' // Internal: HTML content matched a detection rule (not user-visible)
+  | 'deployment.open' // Internal: an operator opened hosted content for moderation (not user-visible)
   // Domain events
   | 'domain.create'
   | 'domain.update'
