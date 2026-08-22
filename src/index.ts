@@ -590,11 +590,11 @@ export interface TokenDeleteResponse {
  * account keeps its tier through suspension and into deletion.
  *
  * - **Free** — `free`.
- * - **Billed** — `pro`. The one plan a customer can buy; the only plan the
- *   payment provider knows about, and the only one the platform never sets
- *   by hand — it is derived from the provider's state.
+ * - **Billed** — `pro`. The one plan a customer can buy; the only plan Stripe
+ *   knows about, and the only one the platform never sets by hand — it is
+ *   derived from the Stripe subscription.
  * - **Granted** — `scale`, `sponsored`. Paid plans the operator confers by
- *   hand; no subscription, no checkout, no provider object.
+ *   hand; no Stripe subscription, no Checkout, no Stripe object at all.
  *
  * The numbers each plan confers — caps, sizes — are POLICY and are delivered
  * by the API (`GET /plans`, `GET /account`, `GET /limits`), never published
@@ -689,13 +689,13 @@ export interface Account {
    */
   readonly used?: number | null;
   /**
-   * True while a payment for this account is overdue and the provider is
-   * still retrying it. The plan is unchanged — the account keeps everything
-   * it has — so this is a banner, not a gate.
+   * True while the Stripe subscription's status is `past_due` and Stripe is
+   * still retrying the card. The plan is unchanged — the account keeps
+   * everything it has — so this is a banner, not a gate.
    *
-   * A BOOLEAN and not the provider's status string, deliberately: no
-   * provider vocabulary reaches a user. The raw status is mirrored on the
-   * account row for the operator surface and stops there.
+   * A BOOLEAN rather than the status string: one fact for the console to
+   * act on. Stripe's own status word is mirrored on the account row for the
+   * operator surface.
    */
   readonly overdue: boolean;
 }
@@ -2667,43 +2667,14 @@ export interface PlansResponse {
 }
 
 /**
- * Response for `GET /billing/status` — everything the console needs to
- * compose one sentence about a subscription, and nothing else.
- *
- * **Deliberately provider-neutral.** Every field is a platform word; no
- * payment-provider enum, id or URL crosses this wire. Cancelling, switching
- * interval, updating a card and downloading an invoice all happen on the
- * provider's own hosted surfaces, so the platform has nothing to say about
- * them beyond what is here.
- *
- * `cancelAtPeriodEnd` is why `plan` and `periodEnd` are not enough on their
- * own: "Pro, renews 30 Sep" and "Pro, ends 30 Sep" are the same plan and the
- * same instant, and only this flag tells them apart.
- */
-export interface BillingStatus {
-  /** The plan the subscription confers — the account's own plan field. */
-  readonly plan: AccountPlanType;
-  /** How often it renews, null when there is no subscription. */
-  readonly interval: BillingInterval | null;
-  /**
-   * End of the paid period (unix seconds), null when there is no
-   * subscription — the instant the plan either renews or lapses, which one
-   * decided by {@link cancelAtPeriodEnd}.
-   */
-  readonly periodEnd: number | null;
-  /** True once cancellation is scheduled; the plan stays active until {@link periodEnd}. */
-  readonly cancelAtPeriodEnd: boolean;
-}
-
-/**
- * A page the payment provider hosts and the caller is sent to — the answer
- * of `POST /billing/checkout` and `POST /billing/portal` alike.
+ * A page Stripe hosts — a Checkout Session or a Customer Portal session — the
+ * answer of `POST /billing/checkout` and `POST /billing/portal` alike.
  *
  * One shape for both because both say the same thing: the platform is not
  * where this happens, go here. There is nothing else to return — the
- * outcome arrives later, as a webhook.
+ * outcome arrives later, as a Stripe webhook.
  */
-export interface HostedSession {
+export interface StripeSession {
   /** Absolute URL to redirect the browser to. Single use, short-lived. */
   readonly url: string;
 }
@@ -2749,13 +2720,10 @@ export type ActivityEvent =
   | 'admin.domain.delete'
   | 'admin.impersonate';
 
-// A subscription's own history is not logged here. Thirteen `billing.*`
-// members mirrored a payment provider's event stream into this list, which
-// made the activity log a second, worse copy of the provider's dashboard —
-// and one that spoke the provider's vocabulary to users. What a plan change
-// MEANS is already recorded, once, as `account.plan.transition`; everything
-// behind it (invoices, refunds, disputes, retries) belongs to the provider,
-// which owns the record and shows it to the customer directly.
+// A subscription's own history is not logged here. What a plan change MEANS
+// is recorded once, as `account.plan.transition`; everything behind it
+// (invoices, refunds, disputes, retries) belongs to Stripe, which owns the
+// record and shows it to the customer in the Customer Portal.
 
 /**
  * Activity events visible to users in the dashboard
