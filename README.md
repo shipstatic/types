@@ -24,7 +24,7 @@ import type {
   Deployment, DeploymentListResponse, DeploymentDeleteResponse, DeploymentSetOptions,
   Domain, DomainSetResult, DomainSetOptions, DomainListResponse, DnsRecord, DnsLookup, DomainDnsResponse, DomainRecordsResponse, DomainShareResponse, DomainValidateResponse, DomainDeleteResponse, DomainVerifyResponse,
   Token, TokenListResponse, TokenCreateResponse, TokenCreateOptions, TokenDeleteResponse,
-  Account, AccountUsage, AccountOverrides, AccountDeleteResponse, AccountKeyResponse,
+  Account, Caps, AccountDeleteResponse, AccountKeyResponse,
   LabelsResponse, SetupInstructionsResponse,
   StaticFile
 } from '@shipstatic/types';
@@ -90,7 +90,7 @@ Both helpers accept an optional operation-name string for contextual messages (`
 import {
   DeploymentStatus,   // pending | success | failed | deleting
   DomainStatus,       // pending | partial | success | paused
-  AccountPlan,        // free | standard | sponsored | enterprise | suspended | terminating | terminated
+  AccountPlan,        // free | pro | scale | sponsored | suspended | terminating | terminated
   FileValidationStatus, // pending | processing_error | excluded | validation_failed | ready
   AuthMethod,         // session | apiKey | token | agent | oauth | webhook | system
 } from '@shipstatic/types';
@@ -100,9 +100,9 @@ import {
 
 ```typescript
 import type {
-  PlatformLimits,        // plan-based caps from /limits (file size, file count, total size)
-  BillingStatus,
-  CheckoutSession,
+  PlatformLimits,        // per-request size limits from /limits (file size, file count, total size)
+  Plan, PlansResponse,   // the public plan menu from /plans
+  BillingStatus, BillingInterval, HostedSession,
   ActivityListResponse,
   PingResponse,
 } from '@shipstatic/types';
