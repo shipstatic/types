@@ -16,7 +16,7 @@ Single file: `src/index.ts`, organized into named sections in this order:
 
 | Section | Purpose |
 |---------|---------|
-| Core Entities | Deployment (+ `DeploymentVia` — the origin vocabulary, closed here so the seven clients that name themselves are compiler-checked; `Deployment.via` stays `string \| null` because stored rows predate it), Domain (+ `DomainSetResult`), Token, Account (+ `AccountGetResponse` — request-scoped `authMethod` lives on the response, not the entity; `AccountUsage`, `AccountOverrides`) — status consts, interfaces, list responses (+ `ListResponse`, `ListOptions`), request shapes (`DeploymentSetOptions`, `DomainSetOptions`, `TokenCreateOptions`), DNS/domain response shapes (`DnsRecord`, `DnsProvider`, `DnsLookup`, `DomainDnsResponse`, `DomainRecordsResponse`, `DomainShareResponse`, `DomainValidateResponse`), the aggregate responses (`LabelsResponse`, `SetupInstructionsResponse`), and the mutation acknowledgements (`DeploymentDeleteResponse` — where the law is written — `DomainDeleteResponse`, `DomainVerifyResponse`, `TokenDeleteResponse`, `AccountDeleteResponse`, `AccountKeyResponse`) |
+| Core Entities | Deployment (+ `DeploymentVia` — the origin vocabulary, closed here so the seven clients that name themselves are compiler-checked; `Deployment.via` stays `string \| null` because stored rows predate it), Domain (+ `DomainSetResult`), Token, Account (+ `AccountGetResponse` — request-scoped `authMethod` lives on the response, not the entity; `Caps` — one shape for both `usage` and `caps`, so the pair divides) — status consts, interfaces, list responses (+ `ListResponse`, `ListOptions`), request shapes (`DeploymentSetOptions`, `DomainSetOptions`, `TokenCreateOptions`), DNS/domain response shapes (`DnsRecord`, `DnsProvider`, `DnsLookup`, `DomainDnsResponse`, `DomainRecordsResponse`, `DomainShareResponse`, `DomainValidateResponse`), the aggregate responses (`LabelsResponse`, `SetupInstructionsResponse`), and the mutation acknowledgements (`DeploymentDeleteResponse` — where the law is written — `DomainDeleteResponse`, `DomainVerifyResponse`, `TokenDeleteResponse`, `AccountDeleteResponse`, `AccountKeyResponse`) |
 | Wire Surface | `API_PATHS` — every public path declared once, mounted by the API and requested by the SDK and dashboard (`/admin/*` deliberately absent; see "Admin types") — and `DEPLOY_FIELDS`, the deploy multipart body's field names: the paths and the fields are the two halves of one wire surface, which is why they share a section |
 | Error System | `ErrorType` (`as const` + type), `ShipError` class, `isShipError` guard |
 | Platform Limits | `PlatformLimits` — what the platform will refuse, from the `/limits` endpoint: the three plan-based caps (file size, count, total size) plus `blockedExtensions`, the API-owned hosting blocklist. The blocklist field is OPTIONAL and its absence means "no client-side check", never "an empty policy" — see "Validation: format vs policy" |
@@ -32,7 +32,7 @@ Single file: `src/index.ts`, organized into named sections in this order:
 | Static File | `StaticFile` (cross-environment file representation) |
 | Platform Constants | `DEFAULT_API`, `PUBLIC_DEPLOYMENT_TTL_SECONDS` (the anonymous-deploy lifetime — the API stamps `expires` and the claim window from it, and both MCP transports derive the duration they quote to agents; it was four restatements until 2026-08-06), `SHIP_ENV` (the Node SDK's ambient pair `SHIP_TOKEN`/`SHIP_API_URL` — the COMPLETE scrub list for embedding hosts; CLI-only vars deliberately excluded), `MY_API_KEY_URL` (the console deep link every authentication-teaching surface quotes — five files, three repos, until 2.5.0-beta.21) |
 | Resource Contracts | `DeployInput`, `DeploymentUploadOptions`, `*Resource` interfaces |
-| Billing Types | `BillingStatus`, `CheckoutSession` |
+| Billing Types | `BillingInterval`, `Plan`, `PlansResponse`, `BillingStatus`, `HostedSession` — the vocabulary only. No price and no cap is published: they are policy, delivered by `GET /plans` (see "Validation: format vs policy"). No payment provider is named, fenced by `tests/billing-vocabulary.test.ts` |
 | Activity Types | `ActivityEvent`, `UserVisibleActivityEvent`, `Activity`, `ActivityMeta`, `ActivityListResponse` — wire contracts for `GET /activities`, produced by the API and consumed by `web/my`. There is deliberately **no** `ActivityResource`: the SDK does not reach that endpoint (recorded in `npm/ship/CLAUDE.md`), and a resource interface nothing implements would be dead surface. A shared type needs two consumers, not three. |
 | File Upload Types | `FileValidationStatus`, `ValidationIssue`, `ValidatableFile`, `FileValidationResult`, `UploadedFile` |
 | Domain Utilities | `isPlatformDomain`, `isCustomDomain`, `extractSubdomain`, `generate*Url` |
@@ -509,6 +509,23 @@ column touches both files in one commit or it is drift.
 
 If the operator surface ever needs a third consumer, that is the moment to
 reopen this — a private `@shipstatic/admin-types` package, not this one.
+
+**`AccountOverrides` left for the same reason, in 2026-08 (the billing
+rewrite).** It had sat here since before the rule was written, and it was
+never anything but operator surface: an operator's per-account grant of extra
+capacity, produced and consumed by `cloudflare/api` alone — no SDK reads it,
+and `web/my` declares the admin row shapes itself. Published, it enumerated
+the platform's cap keys to anyone running `npm install`, and it made the cap
+rename a three-repository lock-step for a type with one holder. It lives in
+`cloudflare/api/src/lib/plans.ts` now, beside the table it overrides.
+
+**Its siblings never entered.** The per-plan `Limits` (request sizes) and
+`Grants` (may this plan act at all — is it billed, is it paid) have exactly
+one holder each, which is the stopping rule's first clause failing: a fact
+with one holder needs no owner. `Caps` DID earn its place, on the same test —
+`Account.usage` and `Account.caps` are the wire, so the SDK and the console
+both hold it, and a fourth counted kind added on one side and not the other
+would be silent.
 
 ### The credential shape law
 

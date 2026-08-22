@@ -582,13 +582,29 @@ export interface TokenDeleteResponse {
 // =============================================================================
 
 /**
- * Account plan constants
+ * Every plan an account can hold — the platform's whole plan vocabulary, in
+ * one place, and nothing about what a plan is WORTH.
+ *
+ * Three kinds share the field, deliberately (splitting tier from lifecycle is
+ * recorded in `backlog.md` as the right shape and the wrong wave):
+ *
+ * - **Billed** — `pro`. The one plan a customer can buy; the only plan the
+ *   payment provider knows about.
+ * - **Granted** — `scale`, `sponsored`. Paid plans the operator confers by
+ *   hand; no subscription, no checkout, no provider object.
+ * - **Lifecycle** — `suspended`, `terminating`, `terminated`. Not tiers at
+ *   all; states an account passes through.
+ *
+ * The numbers each plan confers — caps, sizes — are POLICY and are delivered
+ * by the API (`GET /plans`, `GET /account`, `GET /limits`), never published
+ * here: a price or a cap in a published package is pinned to whatever version
+ * a client installed (`CLAUDE.md`, "Validation: format vs policy").
  */
 export const AccountPlan = {
   FREE: 'free',
-  STANDARD: 'standard',
+  PRO: 'pro',
+  SCALE: 'scale',
   SPONSORED: 'sponsored',
-  ENTERPRISE: 'enterprise',
   SUSPENDED: 'suspended',
   TERMINATING: 'terminating',
   TERMINATED: 'terminated',
@@ -597,35 +613,43 @@ export const AccountPlan = {
 export type AccountPlanType = (typeof AccountPlan)[keyof typeof AccountPlan];
 
 /**
- * Account usage metrics — always available regardless of billing provider.
+ * The three things an account ACCUMULATES, and therefore the three things a
+ * plan caps. One word for the count and for the ceiling: `Account.usage` and
+ * `Account.caps` are the same shape, so a surface renders "2 of 3" by
+ * dividing one by the other and can never divide by a different denominator
+ * than the 403 uses.
  *
- * This is where a caller's own totals live. Lists answer pages and carry no
- * `total` (see {@link ListOptions}); a count is an aggregate over a
- * collection, so it belongs to the summary resource that owns the
- * collection. `GET /account` is that resource for one caller, `GET
- * /admin/stats` for the platform.
+ * The split that matters is the last two, and it is commercial rather than
+ * technical: a **platform domain** is a name under the platform's own suffix
+ * (`x.shipstatic.com`) — the platform owns it, it costs nothing, and its cap
+ * is an anti-squatting sanity number. A **custom domain** is a hostname the
+ * customer owns, and it is the thing paid plans sell. The retired
+ * `AccountUsage.domains` counted both as one number and could not tell them
+ * apart.
  *
- * The counted dimensions are the ones the plan caps — deployments and
- * domains (`PlatformLimits`) — plus the billable custom-domain subset, so a
- * surface can render "3 of 10" without a second request.
+ * Every cap carries a number on every plan — never `null`, never
+ * "unlimited" — so no consumer needs an "is it bounded?" branch.
+ *
+ * A count is an aggregate over a collection, so it lives on the summary
+ * resource that owns the collection: `GET /account` for one caller, `GET
+ * /admin/stats` platform-wide. Lists answer pages and carry no `total` (see
+ * {@link ListOptions}).
  */
-export interface AccountUsage {
-  /** Number of active custom domains (excludes paused) */
-  customDomains: number;
+export interface Caps {
   /**
-   * Deployments counted against the plan's deployment cap — every row
-   * whatever its status, because that is what the cap counts, so a surface
-   * renders "3 of 10" against the denominator the 403 divides by. (`GET
-   * /deployments` lists successful ones only; that is a different question
-   * asked of a different resource.) Optional by the additive-evolution law:
-   * an API predating this field omits it.
+   * Deployments — every row whatever its status, because that is what the cap
+   * counts. (`GET /deployments` lists successful ones only; that is a
+   * different question asked of a different resource.)
    */
-  deployments?: number;
+  readonly deployments: number;
+  /** Domains under the platform's own suffix. */
+  readonly platformDomains: number;
   /**
-   * Domains counted against the plan's domain cap — every domain, platform
-   * and custom alike, unlike `customDomains`. Optional for the same reason.
+   * Hostnames the customer owns — every row, paused ones included. A paused
+   * domain still occupies its slot, so deleting one is what frees capacity.
+   * A downgraded account therefore reads honestly as "3 of 0".
    */
-  domains?: number;
+  readonly customDomains: number;
 }
 
 /**
@@ -641,8 +665,15 @@ export interface Account {
   readonly picture: string | null;
   /** Account plan status */
   readonly plan: AccountPlanType;
-  /** Account usage metrics (custom domains, etc.) */
-  readonly usage: AccountUsage;
+  /** What the account currently holds — see {@link Caps}. */
+  readonly usage: Caps;
+  /**
+   * What the account is allowed to hold — the same three keys as
+   * {@link usage}, so the pair divides. These are the account's EFFECTIVE
+   * caps: its plan's numbers, plus whatever the operator granted it
+   * individually.
+   */
+  readonly caps: Caps;
   /** Unix timestamp (seconds) when account was created */
   readonly created: number;
   /** Unix timestamp (seconds) when account was activated (first deployment), null if not yet activated */
@@ -656,8 +687,16 @@ export interface Account {
    * when present rather than forcing a lockstep SDK release.
    */
   readonly used?: number | null;
-  /** Grace period expiration (unix seconds), null if no grace period active */
-  readonly grace: number | null;
+  /**
+   * True while a payment for this account is overdue and the provider is
+   * still retrying it. The plan is unchanged — the account keeps everything
+   * it has — so this is a banner, not a gate.
+   *
+   * A BOOLEAN and not the provider's status string, deliberately: no
+   * provider vocabulary reaches a user. The raw status is mirrored on the
+   * account row for the operator surface and stops there.
+   */
+  readonly overdue: boolean;
 }
 
 /**
@@ -704,23 +743,6 @@ export interface AccountDeleteResponse {
 export interface AccountKeyResponse {
   /** The raw API key (shown once at mint, then never again) */
   readonly secret: string;
-}
-
-/**
- * Account-specific configuration overrides
- * Allows per-account customization of limits without changing plan
- */
-export interface AccountOverrides {
-  /** Override for maximum number of domains */
-  domains?: number;
-  /** Override for maximum number of deployments */
-  deployments?: number;
-  /** Override for maximum individual file size in bytes */
-  fileSize?: number;
-  /** Override for maximum number of files per deployment */
-  filesCount?: number;
-  /** Override for maximum total deployment size in bytes */
-  totalSize?: number;
 }
 
 // =============================================================================
@@ -778,6 +800,7 @@ export const API_PATHS = {
   ACTIVITIES: '/activities',
   LABELS: '/labels',
   LIMITS: '/limits',
+  PLANS: '/plans',
   PING: '/ping',
   SETUP: '/setup',
   SPA_CHECK: '/spa-check',
@@ -2590,50 +2613,98 @@ export interface TokenResource {
 // =============================================================================
 
 /**
- * Billing status response from GET /billing/status
+ * How often a subscription renews. The platform sells one plan at two
+ * intervals, so this is the only thing a buyer chooses at checkout.
  *
- * Note: The user's `plan` comes from Account, not here.
- * This endpoint only returns billing-specific data (usage, portal, etc.)
+ * It never branches business logic — monthly and yearly confer identical
+ * caps. It exists to be displayed and to pick a price at checkout.
+ */
+export type BillingInterval = 'month' | 'year';
+
+/**
+ * One row of the plan menu, answered by `GET /plans`.
  *
- * If `billing` is null, the user has no active billing.
+ * **Vocabulary here, values from the server.** The shape is a wire contract
+ * every surface agrees on; the numbers in it are policy the API owns and may
+ * change on a deploy (`CLAUDE.md`, "Validation: format vs policy"). That is
+ * why the public site and the console both READ this endpoint instead of
+ * carrying their own copy of the price list — a hand-copied plan table was
+ * the platform's longest-lived restatement.
+ */
+export interface Plan {
+  /** Which plan this row describes. */
+  readonly plan: AccountPlanType;
+  /** Display name, as the marketing site and the console should print it. */
+  readonly name: string;
+  /**
+   * What it costs. A union rather than a nullable number, so "free" and
+   * "talk to us" are two different answers instead of two readings of the
+   * same `null`. Amounts are integer CENTS in USD — the wire never carries a
+   * formatted price, because formatting is the reader's job.
+   */
+  readonly price: 'free' | 'contact' | { readonly month: number; readonly year: number };
+  /**
+   * The caps this plan publishes, or `null` where the menu deliberately says
+   * nothing (a plan sold by conversation publishes no numbers). Only the two
+   * SOLD counts appear — platform-domain sanity numbers are not menu items.
+   */
+  readonly caps: { readonly customDomains: number; readonly deployments: number } | null;
+}
+
+/**
+ * Response for `GET /plans` — the whole public menu, in display order.
+ *
+ * Public, unauthenticated and cacheable: it describes the product, not the
+ * caller. Plans the operator only ever grants by hand are absent — a menu
+ * lists what can be ordered.
+ *
+ * An aggregate rather than a list: the registry is the bound, so there is no
+ * cursor (the {@link LabelsResponse} shape).
+ */
+export interface PlansResponse {
+  readonly plans: readonly Plan[];
+}
+
+/**
+ * Response for `GET /billing/status` — everything the console needs to
+ * compose one sentence about a subscription, and nothing else.
+ *
+ * **Deliberately provider-neutral.** Every field is a platform word; no
+ * payment-provider enum, id or URL crosses this wire. Cancelling, switching
+ * interval, updating a card and downloading an invoice all happen on the
+ * provider's own hosted surfaces, so the platform has nothing to say about
+ * them beyond what is here.
+ *
+ * `cancelAtPeriodEnd` is why `plan` and `periodEnd` are not enough on their
+ * own: "Pro, renews 30 Sep" and "Pro, ends 30 Sep" are the same plan and the
+ * same instant, and only this flag tells them apart.
  */
 export interface BillingStatus {
-  /** Creem billing ID, or null if no active billing */
-  billing: string | null;
-  /** Number of billing units (1 unit = 1 custom domain), null if no billing */
-  units: number | null;
-  /** Billing status from Creem (active, trialing, canceled, etc.), null if no billing */
-  status: string | null;
-  /** Link to Creem customer portal for billing management, null if unavailable */
-  portal: string | null;
-}
-
-/**
- * Acknowledgement of `POST /billing/cancel`.
- *
- * Cancelling leaves no billing entity to return, so it answers with the
- * account and the one field of the account the call changed — the plan it
- * landed on. See {@link DeploymentDeleteResponse} for the law.
- *
- * This read `{ success: true, message: 'Subscription canceled successfully…' }`
- * until 2026-07-29, an anonymous shape that `web/my` redeclared inline and
- * whose prose no surface ever displayed: both callers await the promise and
- * discard the body, then compose their own toast. The message was written,
- * serialized, and thrown away on every cancellation.
- */
-export interface BillingCancelResponse {
-  /** The account whose subscription was cancelled */
-  readonly account: string;
-  /** The plan the account now holds — `free` on a successful cancellation */
+  /** The plan the subscription confers — the account's own plan field. */
   readonly plan: AccountPlanType;
+  /** How often it renews, null when there is no subscription. */
+  readonly interval: BillingInterval | null;
+  /**
+   * End of the paid period (unix seconds), null when there is no
+   * subscription — the instant the plan either renews or lapses, which one
+   * decided by {@link cancelAtPeriodEnd}.
+   */
+  readonly periodEnd: number | null;
+  /** True once cancellation is scheduled; the plan stays active until {@link periodEnd}. */
+  readonly cancelAtPeriodEnd: boolean;
 }
 
 /**
- * Checkout session response from POST /billing/checkout
+ * A page the payment provider hosts and the caller is sent to — the answer
+ * of `POST /billing/checkout` and `POST /billing/portal` alike.
+ *
+ * One shape for both because both say the same thing: the platform is not
+ * where this happens, go here. There is nothing else to return — the
+ * outcome arrives later, as a webhook.
  */
-export interface CheckoutSession {
-  /** URL to redirect user to Creem checkout page */
-  url: string;
+export interface HostedSession {
+  /** Absolute URL to redirect the browser to. Single use, short-lived. */
+  readonly url: string;
 }
 
 // =============================================================================
@@ -2672,30 +2743,18 @@ export type ActivityEvent =
   // Admin events (not user-visible)
   | 'admin.account.plan.update'
   | 'admin.account.ref.update'
-  | 'admin.account.billing.update'
   | 'admin.account.labels.update'
   | 'admin.deployment.delete'
   | 'admin.domain.delete'
-  | 'admin.billing.sync'
-  | 'admin.billing.terminated'
-  | 'admin.impersonate'
-  // Webhook events (logged directly from payment provider)
-  | 'billing.active'
-  | 'billing.canceled'
-  | 'billing.paused'
-  | 'billing.expired'
-  | 'billing.paid'
-  | 'billing.trialing'
-  | 'billing.scheduled_cancel'
-  | 'billing.unpaid'
-  | 'billing.update'
-  | 'billing.past_due'
-  | 'refund.created'
-  | 'dispute.created'
-  // Billing operational events (admin/debug only, not user-visible)
-  | 'billing.sync' // Outbound: unit count pushed to payment provider
-  | 'billing.stale' // Dropped: webhook predates last known state
-  | 'billing.race'; // Dropped: concurrent webhook already updated state
+  | 'admin.impersonate';
+
+// A subscription's own history is not logged here. Thirteen `billing.*`
+// members mirrored a payment provider's event stream into this list, which
+// made the activity log a second, worse copy of the provider's dashboard —
+// and one that spoke the provider's vocabulary to users. What a plan change
+// MEANS is already recorded, once, as `account.plan.transition`; everything
+// behind it (invoices, refunds, disputes, retries) belongs to the provider,
+// which owns the record and shows it to the customer directly.
 
 /**
  * Activity events visible to users in the dashboard
