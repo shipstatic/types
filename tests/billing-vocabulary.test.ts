@@ -44,16 +44,8 @@ const PROVIDER_NAMES = ['creem', 'stripe', 'paddle', 'lemonsqueezy', 'chargebee'
 const PROVIDER_STATUSES = ['past_due', 'trialing', 'incomplete', 'incomplete_expired', 'unpaid'];
 
 describe('the plan vocabulary', () => {
-  it('is exactly the seven plans the platform holds', () => {
-    expect(Object.values(AccountPlan).sort()).toEqual([
-      'free',
-      'pro',
-      'scale',
-      'sponsored',
-      'suspended',
-      'terminated',
-      'terminating',
-    ]);
+  it('is exactly the four TIERS — no lifecycle state wears the plan field', () => {
+    expect(Object.values(AccountPlan).sort()).toEqual(['free', 'pro', 'scale', 'sponsored']);
   });
 
   it('names no retired plan, anywhere in the constitution', () => {

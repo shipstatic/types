@@ -585,15 +585,16 @@ export interface TokenDeleteResponse {
  * Every plan an account can hold — the platform's whole plan vocabulary, in
  * one place, and nothing about what a plan is WORTH.
  *
- * Three kinds share the field, deliberately (splitting tier from lifecycle is
- * recorded in `backlog.md` as the right shape and the wrong wave):
+ * A plan is a TIER and nothing else. Whether an account may act is a separate
+ * fact (`Account.suspended`; deletion ends the session outright), so an
+ * account keeps its tier through suspension and into deletion.
  *
+ * - **Free** — `free`.
  * - **Billed** — `pro`. The one plan a customer can buy; the only plan the
- *   payment provider knows about.
+ *   payment provider knows about, and the only one the platform never sets
+ *   by hand — it is derived from the provider's state.
  * - **Granted** — `scale`, `sponsored`. Paid plans the operator confers by
  *   hand; no subscription, no checkout, no provider object.
- * - **Lifecycle** — `suspended`, `terminating`, `terminated`. Not tiers at
- *   all; states an account passes through.
  *
  * The numbers each plan confers — caps, sizes — are POLICY and are delivered
  * by the API (`GET /plans`, `GET /account`, `GET /limits`), never published
@@ -605,9 +606,6 @@ export const AccountPlan = {
   PRO: 'pro',
   SCALE: 'scale',
   SPONSORED: 'sponsored',
-  SUSPENDED: 'suspended',
-  TERMINATING: 'terminating',
-  TERMINATED: 'terminated',
 } as const;
 
 export type AccountPlanType = (typeof AccountPlan)[keyof typeof AccountPlan];
@@ -623,9 +621,7 @@ export type AccountPlanType = (typeof AccountPlan)[keyof typeof AccountPlan];
  * technical: a **platform domain** is a name under the platform's own suffix
  * (`x.shipstatic.com`) — the platform owns it, it costs nothing, and its cap
  * is an anti-squatting sanity number. A **custom domain** is a hostname the
- * customer owns, and it is the thing paid plans sell. The retired
- * `AccountUsage.domains` counted both as one number and could not tell them
- * apart.
+ * customer owns, and it is the thing paid plans sell.
  *
  * Every cap carries a number on every plan — never `null`, never
  * "unlimited" — so no consumer needs an "is it bounded?" branch.
@@ -663,8 +659,13 @@ export interface Account {
   readonly name: string | null;
   /** User profile picture URL, null if not set */
   readonly picture: string | null;
-  /** Account plan status */
+  /** The account's tier. */
   readonly plan: AccountPlanType;
+  /**
+   * True while the operator has suspended the account: reads and deletes
+   * still work, every write is refused. The plan is unchanged underneath.
+   */
+  readonly suspended: boolean;
   /** What the account currently holds — see {@link Caps}. */
   readonly usage: Caps;
   /**
@@ -722,10 +723,10 @@ export interface AccountGetResponse extends Account {
  * {@link DeploymentDeleteResponse} for the law.
  */
 export interface AccountDeleteResponse {
-  /** The account that was marked for termination */
+  /** The account whose deletion was accepted */
   readonly account: string;
-  /** The plan the account is in while cleanup runs */
-  readonly plan: AccountPlanType;
+  /** Unix timestamp (seconds) the deletion was requested; cleanup completes it */
+  readonly deleted: number;
 }
 
 /**
@@ -2723,7 +2724,6 @@ export type ActivityEvent =
   | 'account.key.generate'
   | 'account.plan.paid'
   | 'account.plan.transition'
-  | 'account.suspended'
   // Deployment events
   | 'deployment.create'
   | 'deployment.update'
@@ -2742,6 +2742,7 @@ export type ActivityEvent =
   | 'token.delete'
   // Admin events (not user-visible)
   | 'admin.account.plan.update'
+  | 'admin.account.suspended.update'
   | 'admin.account.ref.update'
   | 'admin.account.labels.update'
   | 'admin.deployment.delete'

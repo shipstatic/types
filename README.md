@@ -90,7 +90,7 @@ Both helpers accept an optional operation-name string for contextual messages (`
 import {
   DeploymentStatus,   // pending | success | failed | deleting
   DomainStatus,       // pending | partial | success | paused
-  AccountPlan,        // free | pro | scale | sponsored | suspended | terminating | terminated
+  AccountPlan,        // free | pro | scale | sponsored — tiers only; suspension and deletion are account facts
   FileValidationStatus, // pending | processing_error | excluded | validation_failed | ready
   AuthMethod,         // session | apiKey | token | agent | oauth | webhook | system
 } from '@shipstatic/types';
