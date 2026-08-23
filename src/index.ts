@@ -730,6 +730,20 @@ export interface Account {
    * must never be sent to Checkout.
    */
   readonly upgrade: AccountPlanType | null;
+  /**
+   * The live Subscription's billing interval — Stripe's
+   * `Price.recurring.interval`, mirrored — or `null` when no Subscription
+   * bills the account (free and granted plans). It is what lets the console
+   * offer the current plan's OTHER interval as a switch.
+   */
+  readonly interval: BillingInterval | null;
+  /**
+   * The pending plan change, or `null`. *Up is now, down is at period end*:
+   * a downgrade is a Stripe Subscription Schedule that applies at `at`, and
+   * until then the account keeps everything it paid for. Reversible —
+   * `DELETE /billing/change` releases it.
+   */
+  readonly scheduled: ScheduledChange | null;
 }
 
 /**
@@ -2706,49 +2720,55 @@ export interface PlansResponse {
 }
 
 /**
- * The body of `POST /billing/checkout` — which plan, at which interval. Both
- * required: with more than one billed plan there is no honest default, and
- * the console always knows which card was clicked. Only a free account
- * checks out, and only onto a plan the menu sells; a billed account changes
- * plan through the Portal ({@link BillingPortalRequest}), because Stripe
- * changes a Subscription in place rather than selling a second one.
+ * The body of `POST /billing/change` — the one door for "get me onto this
+ * plan". Both fields required: with more than one billed plan there is no
+ * honest default, and the console always knows which card was clicked.
+ *
+ * The SERVER decides what the change means — the rule is *up is now, down is
+ * at period end* — so the client holds no copy of the ladder: a free account
+ * is sent to Stripe Checkout, a billed account moving up is sent to the
+ * Portal's confirmation page (money moves now, so Stripe's page takes the
+ * consent), and a billed account moving down gets a Stripe Subscription
+ * Schedule that applies the change at period end. The answer says which
+ * happened ({@link PlanChangeResponse}).
  */
-export interface CheckoutRequest {
+export interface PlanChangeRequest {
   readonly plan: AccountPlanType;
   readonly interval: BillingInterval;
 }
 
 /**
- * The body of `POST /billing/portal` — optional, and when present a
- * DESTINATION: the plan and interval the account wants, which opens the
- * Portal on Stripe's own confirmation page for that Price rather than on its
- * home page. Absent, the Portal opens where it always did: cards, invoices,
- * cancellation, and Stripe's own plan picker.
+ * The pending plan change — a Stripe Subscription Schedule the platform
+ * minted, mirrored onto the account. `at` is when it applies (the current
+ * period's end, Unix seconds). Reversible until then: `DELETE
+ * /billing/change` releases it.
  */
-export interface BillingPortalRequest {
-  readonly plan?: AccountPlanType;
-  readonly interval?: BillingInterval;
+export interface ScheduledChange {
+  readonly plan: AccountPlanType;
+  readonly interval: BillingInterval;
+  readonly at: number;
 }
 
 /**
- * The answer of `POST /billing/checkout` — Stripe's `Checkout.Session`,
- * projected to the one field a client needs.
+ * The answer of `POST /billing/change` — exactly one field is set.
  *
- * There is nothing else to return: the outcome arrives later, as a Stripe
- * webhook. It is its own type rather than a shape shared with
- * {@link BillingPortalSession} because Stripe has two distinct objects here,
- * and naming one of them for both would be the reader's translation to make.
+ * `url` means GO: a Stripe page (Checkout, or the Portal's confirmation page)
+ * finishes the change and the browser must be redirected to it. `scheduled`
+ * means DONE: the downgrade is booked for period end, nothing to visit, and
+ * the account's `scheduled` field now carries it.
  */
-export interface CheckoutSession {
+export interface PlanChangeResponse {
   /** Absolute URL to redirect the browser to. Single use, short-lived. */
-  readonly url: string;
+  readonly url?: string;
+  /** The pending change, when the platform scheduled it instead. */
+  readonly scheduled?: ScheduledChange;
 }
 
 /**
  * The answer of `POST /billing/portal` — Stripe's `BillingPortal.Session`,
- * projected the same way. Identical in shape to {@link CheckoutSession} and
- * deliberately not merged with it: they are two Stripe objects, and either may
- * gain a field the other never has.
+ * projected to the one field a client needs. The Portal home: cards,
+ * invoices, cancellation. Plan changes have their own door
+ * ({@link PlanChangeRequest}).
  */
 export interface BillingPortalSession {
   /** Absolute URL to redirect the browser to. Single use, short-lived. */
