@@ -685,15 +685,16 @@ export interface Account {
    */
   readonly used?: number | null;
   /**
-   * True while the Stripe subscription's status is `past_due` and Stripe is
+   * True while the Stripe Subscription's status is `past_due` and Stripe is
    * still retrying the card. The plan is unchanged — the account keeps
    * everything it has — so this is a banner, not a gate.
    *
-   * A BOOLEAN rather than the status string: one fact for the console to
-   * act on. Stripe's own status word is mirrored on the account row for the
-   * operator surface.
+   * A BOOLEAN rather than the status string: one fact for the console to act
+   * on. It carries STRIPE'S OWN WORD (`past_due` → `pastDue`) rather than a
+   * synonym, so no reader has to hold a translation; the full status string is
+   * mirrored on the account row for the operator surface.
    */
-  readonly overdue: boolean;
+  readonly pastDue: boolean;
 }
 
 /**
@@ -2663,14 +2664,26 @@ export interface PlansResponse {
 }
 
 /**
- * A page Stripe hosts — a Checkout Session or a Customer Portal session — the
- * answer of `POST /billing/checkout` and `POST /billing/portal` alike.
+ * The answer of `POST /billing/checkout` — Stripe's `Checkout.Session`,
+ * projected to the one field a client needs.
  *
- * One shape for both because both say the same thing: the platform is not
- * where this happens, go here. There is nothing else to return — the
- * outcome arrives later, as a Stripe webhook.
+ * There is nothing else to return: the outcome arrives later, as a Stripe
+ * webhook. It is its own type rather than a shape shared with
+ * {@link BillingPortalSession} because Stripe has two distinct objects here,
+ * and naming one of them for both would be the reader's translation to make.
  */
-export interface StripeSession {
+export interface CheckoutSession {
+  /** Absolute URL to redirect the browser to. Single use, short-lived. */
+  readonly url: string;
+}
+
+/**
+ * The answer of `POST /billing/portal` — Stripe's `BillingPortal.Session`,
+ * projected the same way. Identical in shape to {@link CheckoutSession} and
+ * deliberately not merged with it: they are two Stripe objects, and either may
+ * gain a field the other never has.
+ */
+export interface BillingPortalSession {
   /** Absolute URL to redirect the browser to. Single use, short-lived. */
   readonly url: string;
 }
