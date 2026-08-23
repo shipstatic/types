@@ -2636,8 +2636,9 @@ export interface Plan {
   /**
    * What it costs. A union rather than a nullable number, so "free" and
    * "talk to us" are two different answers instead of two readings of the
-   * same `null`. Amounts are integer CENTS in USD — the wire never carries a
-   * formatted price, because formatting is the reader's job.
+   * same `null`. Amounts are integer CENTS in USD, as the API's plan table
+   * states them and as Stripe's Prices are provisioned from it — the wire
+   * never carries a formatted price, because formatting is the reader's job.
    */
   readonly price: 'free' | 'contact' | { readonly month: number; readonly year: number };
   /**
