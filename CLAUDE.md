@@ -517,7 +517,7 @@ capacity, produced and consumed by `cloudflare/api` alone — no SDK reads it,
 and `web/my` declares the admin row shapes itself. Published, it enumerated
 the platform's cap keys to anyone running `npm install`, and it made the cap
 rename a three-repository lock-step for a type with one holder. It lives in
-`cloudflare/api/src/lib/plans.ts` now, beside the table it overrides.
+`cloudflare/shared/plans.ts` now, beside the table it overrides.
 
 **Its siblings never entered.** The per-plan `Limits` (request sizes) and
 `Grants` (may this plan act at all — is it billed, is it paid) have exactly

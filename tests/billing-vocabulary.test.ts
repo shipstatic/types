@@ -22,8 +22,14 @@ const SOURCE = readFileSync(fileURLToPath(new URL('../src/index.ts', import.meta
 const RETIRED_PLANS = ['standard', 'enterprise'];
 
 describe('the plan vocabulary', () => {
-  it('is exactly the four TIERS — no lifecycle state wears the plan field', () => {
-    expect(Object.values(AccountPlan).sort()).toEqual(['free', 'pro', 'scale', 'sponsored']);
+  it('is exactly the five TIERS — no lifecycle state wears the plan field', () => {
+    expect(Object.values(AccountPlan).sort()).toEqual([
+      'free',
+      'pro',
+      'scale',
+      'sponsored',
+      'team',
+    ]);
   });
 
   it('names no retired plan, anywhere in the constitution', () => {

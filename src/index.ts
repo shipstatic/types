@@ -590,11 +590,15 @@ export interface TokenDeleteResponse {
  * account keeps its tier through suspension and into deletion.
  *
  * - **Free** — `free`.
- * - **Billed** — `pro`. The one plan a customer can buy; the only plan Stripe
- *   knows about, and the only one the platform never sets by hand — it is
- *   derived from the Stripe subscription.
+ * - **Billed** — `pro`, `team`. The plans a customer buys; the only plans
+ *   Stripe knows about, and the only ones the platform never sets by hand —
+ *   each is derived from the Stripe Subscription, which names its plan on the
+ *   Price it is on. They form a ladder: a dearer tier is a superset of the one
+ *   below it, and the API says which is next in {@link Account.upgrade}.
  * - **Granted** — `scale`, `sponsored`. Paid plans the operator confers by
- *   hand; no Stripe subscription, no Checkout, no Stripe object at all.
+ *   hand; no Stripe subscription, no Checkout, no Stripe object at all. These
+ *   and `free` are the only plans an operator can set; a billed plan is only
+ *   ever Stripe's to confer.
  *
  * The numbers each plan confers — caps, sizes — are POLICY and are delivered
  * by the API (`GET /plans`, `GET /account`, `GET /limits`), never published
@@ -604,6 +608,7 @@ export interface TokenDeleteResponse {
 export const AccountPlan = {
   FREE: 'free',
   PRO: 'pro',
+  TEAM: 'team',
   SCALE: 'scale',
   SPONSORED: 'sponsored',
 } as const;
@@ -611,18 +616,25 @@ export const AccountPlan = {
 export type AccountPlanType = (typeof AccountPlan)[keyof typeof AccountPlan];
 
 /**
- * The two things an account ACCUMULATES, and therefore the two things a plan
- * caps. One word for the count and for the ceiling: `Account.usage` and
+ * The three things an account ACCUMULATES, and therefore the three things a
+ * plan caps. One word for the count and for the ceiling: `Account.usage` and
  * `Account.caps` are the same shape, so a surface renders "2 of 3" by
  * dividing one by the other and can never divide by a different denominator
  * than the 403 uses.
  *
- * Both are counts paid plans SELL. A platform subdomain (`x.shipstatic.com`)
- * is not among them: the platform owns the name, it costs nothing, and no
- * plan bounds how many an account may hold.
+ * All three are counts plans SELL, and every plan publishes a number for each.
+ * A platform subdomain (`my-app.shipstatic.com`) is among them: the namespace
+ * is the platform's, so every plan bounds how many names one account may take
+ * from it — which is not the address every deployment gets by construction
+ * (`happy-cat-abc1234.shipstatic.com`), one per deployment and bounded by
+ * `deployments` already.
  *
  * Every cap carries a number on every plan — never `null`, never
- * "unlimited" — so no consumer needs an "is it bounded?" branch.
+ * "unlimited" — so no consumer needs an "is it bounded?" branch. A cap of `0`
+ * means the plan does not have the feature at all; a cap of `N` bounds
+ * creation, and what an account already holds above a cap stays until a plan
+ * TRANSITION fits it (excess paused, newest first — a domain is the only kind
+ * that pauses).
  *
  * A count is an aggregate over a collection, so it lives on the summary
  * resource that owns the collection: `GET /account` for one caller, `GET
@@ -636,6 +648,12 @@ export interface Caps {
    * different question asked of a different resource.)
    */
   readonly deployments: number;
+  /**
+   * Names the customer chose under the platform's own suffix
+   * (`my-app.shipstatic.com`) — every row, paused ones included, by the same
+   * rule as custom domains.
+   */
+  readonly platformDomains: number;
   /**
    * Hostnames the customer owns — every row, paused ones included. A paused
    * domain still occupies its slot, so deleting one is what frees capacity.
@@ -695,6 +713,23 @@ export interface Account {
    * mirrored on the account row for the operator surface.
    */
   readonly pastDue: boolean;
+  /**
+   * Does Stripe bill this plan — is there a Subscription behind it? True for
+   * every billed tier, including one no longer on the menu (a grandfathered
+   * row keeps its subscribers), so a console cannot derive it from `/plans`.
+   * It is what sends the account to the Customer Portal rather than to
+   * Checkout, and what a granted plan (`scale`, `sponsored`) never is.
+   */
+  readonly billed: boolean;
+  /**
+   * The next plan up the ladder this account could move to, or `null` when
+   * there is none: the top billed tier, every granted plan, and any plan not
+   * on the menu answer `null`. One server-side fact so that no surface
+   * derives "can this account upgrade, and to what" from the menu — a
+   * grandfathered row has no menu price to compare, and a granted account
+   * must never be sent to Checkout.
+   */
+  readonly upgrade: AccountPlanType | null;
 }
 
 /**
@@ -2611,11 +2646,11 @@ export interface TokenResource {
 // =============================================================================
 
 /**
- * How often a subscription renews. The platform sells one plan at two
- * intervals, so this is the only thing a buyer chooses at checkout.
+ * How often a subscription renews. Every billed plan is sold at both
+ * intervals, so a buyer chooses a plan and an interval, and nothing else.
  *
  * It never branches business logic — monthly and yearly confer identical
- * caps. It exists to be displayed and to pick a price at checkout.
+ * caps. It exists to be displayed and to pick a Price at checkout.
  */
 export type BillingInterval = 'month' | 'year';
 
@@ -2668,6 +2703,31 @@ export interface Plan {
  */
 export interface PlansResponse {
   readonly plans: readonly Plan[];
+}
+
+/**
+ * The body of `POST /billing/checkout` — which plan, at which interval. Both
+ * required: with more than one billed plan there is no honest default, and
+ * the console always knows which card was clicked. Only a free account
+ * checks out, and only onto a plan the menu sells; a billed account changes
+ * plan through the Portal ({@link BillingPortalRequest}), because Stripe
+ * changes a Subscription in place rather than selling a second one.
+ */
+export interface CheckoutRequest {
+  readonly plan: AccountPlanType;
+  readonly interval: BillingInterval;
+}
+
+/**
+ * The body of `POST /billing/portal` — optional, and when present a
+ * DESTINATION: the plan and interval the account wants, which opens the
+ * Portal on Stripe's own confirmation page for that Price rather than on its
+ * home page. Absent, the Portal opens where it always did: cards, invoices,
+ * cancellation, and Stripe's own plan picker.
+ */
+export interface BillingPortalRequest {
+  readonly plan?: AccountPlanType;
+  readonly interval?: BillingInterval;
 }
 
 /**
