@@ -744,6 +744,16 @@ export interface Account {
    * `DELETE /billing/change` releases it.
    */
   readonly scheduled: ScheduledChange | null;
+  /**
+   * When the Subscription is set to END — Stripe's `cancel_at`, mirrored
+   * (Unix seconds) — or `null` while it renews. Set by a cancellation in the
+   * Customer Portal; the Portal is also where it is resumed. The console
+   * needs it to ACT: no "cancel" offered to an account already cancelling,
+   * and no plan change offered until it is resumed (the API refuses one).
+   * Mirrored on the rule that survives: what the console must act on is
+   * mirrored, what it would merely display is not.
+   */
+  readonly cancelAt: number | null;
 }
 
 /**
