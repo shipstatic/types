@@ -2635,13 +2635,20 @@ export interface Plan {
   /** Display name, as the marketing site and the console should print it. */
   readonly name: string;
   /**
-   * What it costs. A union rather than a nullable number, so "free" and
-   * "talk to us" are two different answers instead of two readings of the
-   * same `null`. Amounts are integer CENTS in USD, as the API's plan table
-   * states them and as Stripe's Prices are provisioned from it — the wire
-   * never carries a formatted price, because formatting is the reader's job.
+   * What it costs, per interval — integer CENTS in USD, as the API's plan
+   * table states them and as Stripe's Prices are provisioned from it. The wire
+   * never carries a formatted price: formatting is the reader's job.
+   *
+   * **A free plan costs `{ month: 0, year: 0 }`, not a sentinel.** Free IS
+   * zero, so it is a number like any other and every reader formats it with
+   * the same call; a `'free'` member bought one thing — a branch in each
+   * consumer that mapped it straight back to `$0`.
+   *
+   * `'contact'` stays, and the asymmetry is the point: "not sold at a list
+   * price" is genuinely a different KIND of answer, not a different number, so
+   * it is a different shape. Two shapes, and each earns its own.
    */
-  readonly price: 'free' | 'contact' | { readonly month: number; readonly year: number };
+  readonly price: 'contact' | { readonly month: number; readonly year: number };
   /**
    * The caps this plan publishes, or `null` where the menu deliberately says
    * nothing (a plan sold by conversation publishes no numbers).
