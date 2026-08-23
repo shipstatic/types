@@ -2750,19 +2750,20 @@ export interface ScheduledChange {
 }
 
 /**
- * The answer of `POST /billing/change` — exactly one field is set.
+ * The answer of `POST /billing/change` — exactly one field is set, and the
+ * UNION is what holds that: an answer carrying both, or neither, does not
+ * compile, so "which door was taken" is structural rather than prose.
  *
  * `url` means GO: a Stripe page (Checkout, or the Portal's confirmation page)
  * finishes the change and the browser must be redirected to it. `scheduled`
  * means DONE: the downgrade is booked for period end, nothing to visit, and
  * the account's `scheduled` field now carries it.
  */
-export interface PlanChangeResponse {
-  /** Absolute URL to redirect the browser to. Single use, short-lived. */
-  readonly url?: string;
-  /** The pending change, when the platform scheduled it instead. */
-  readonly scheduled?: ScheduledChange;
-}
+export type PlanChangeResponse =
+  /** GO: a Stripe page finishes the change. Absolute URL, single use, short-lived. */
+  | { readonly url: string; readonly scheduled?: never }
+  /** DONE: the downgrade is booked for period end; nothing to visit. */
+  | { readonly url?: never; readonly scheduled: ScheduledChange };
 
 /**
  * The answer of `POST /billing/portal` — Stripe's `BillingPortal.Session`,
