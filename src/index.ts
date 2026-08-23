@@ -611,17 +611,15 @@ export const AccountPlan = {
 export type AccountPlanType = (typeof AccountPlan)[keyof typeof AccountPlan];
 
 /**
- * The three things an account ACCUMULATES, and therefore the three things a
- * plan caps. One word for the count and for the ceiling: `Account.usage` and
+ * The two things an account ACCUMULATES, and therefore the two things a plan
+ * caps. One word for the count and for the ceiling: `Account.usage` and
  * `Account.caps` are the same shape, so a surface renders "2 of 3" by
  * dividing one by the other and can never divide by a different denominator
  * than the 403 uses.
  *
- * The split that matters is the last two, and it is commercial rather than
- * technical: a **platform domain** is a name under the platform's own suffix
- * (`x.shipstatic.com`) — the platform owns it, it costs nothing, and its cap
- * is an anti-squatting sanity number. A **custom domain** is a hostname the
- * customer owns, and it is the thing paid plans sell.
+ * Both are counts paid plans SELL. A platform subdomain (`x.shipstatic.com`)
+ * is not among them: the platform owns the name, it costs nothing, and no
+ * plan bounds how many an account may hold.
  *
  * Every cap carries a number on every plan — never `null`, never
  * "unlimited" — so no consumer needs an "is it bounded?" branch.
@@ -638,8 +636,6 @@ export interface Caps {
    * different question asked of a different resource.)
    */
   readonly deployments: number;
-  /** Domains under the platform's own suffix. */
-  readonly platformDomains: number;
   /**
    * Hostnames the customer owns — every row, paused ones included. A paused
    * domain still occupies its slot, so deleting one is what frees capacity.
@@ -2646,10 +2642,9 @@ export interface Plan {
   readonly price: 'free' | 'contact' | { readonly month: number; readonly year: number };
   /**
    * The caps this plan publishes, or `null` where the menu deliberately says
-   * nothing (a plan sold by conversation publishes no numbers). Only the two
-   * SOLD counts appear — platform-domain sanity numbers are not menu items.
+   * nothing (a plan sold by conversation publishes no numbers).
    */
-  readonly caps: { readonly customDomains: number; readonly deployments: number } | null;
+  readonly caps: Caps | null;
 }
 
 /**
@@ -2677,6 +2672,17 @@ export interface PlansResponse {
 export interface StripeSession {
   /** Absolute URL to redirect the browser to. Single use, short-lived. */
   readonly url: string;
+}
+
+/**
+ * The answer of `POST /billing/sync` — the account's plan after the platform
+ * re-read Stripe. The success page calls it once on arrival from Checkout,
+ * instead of polling for the webhook: a card payment is settled by the time
+ * Stripe redirects, so one read makes the plan current before anything
+ * renders.
+ */
+export interface BillingSyncResponse {
+  readonly plan: AccountPlanType;
 }
 
 // =============================================================================
