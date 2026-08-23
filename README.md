@@ -102,7 +102,8 @@ import {
 import type {
   PlatformLimits,        // per-request size limits from /limits (file size, file count, total size)
   Plan, PlansResponse,   // the public plan menu from /plans
-  BillingInterval, StripeSession,
+  BillingInterval,       // 'month' | 'year' — Stripe's own recurring interval
+  CheckoutSession, BillingPortalSession,  // the two hosted Stripe pages
   ActivityListResponse,
   PingResponse,
 } from '@shipstatic/types';
