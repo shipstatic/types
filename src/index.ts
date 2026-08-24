@@ -2805,6 +2805,12 @@ export interface BillingSyncResponse {
 /**
  * All activity event types logged in the system.
  * Uses dot notation consistently: {resource}.{action}
+ *
+ * Retention: events are swept 90 days after creation unless they record
+ * money, platform enforcement/access, or ownership transfer — those three
+ * ledgers are permanent (and shed their IP at the same 90-day line).
+ * Permanence is granted only in the retention sweep's own list, so a new
+ * event added here is swept until granted there.
  */
 export type ActivityEvent =
   // Account events
