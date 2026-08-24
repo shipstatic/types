@@ -2814,7 +2814,6 @@ export interface BillingSyncResponse {
 export type ActivityEvent =
   // Account events
   | 'account.create'
-  | 'account.update'
   | 'account.delete'
   | 'account.key.generate'
   | 'account.plan.transition'
@@ -2853,7 +2852,6 @@ export type ActivityEvent =
  */
 export type UserVisibleActivityEvent =
   | 'account.create'
-  | 'account.update'
   | 'account.delete'
   | 'account.key.generate'
   | 'account.plan.transition'
