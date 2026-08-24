@@ -2714,6 +2714,20 @@ export interface Plan {
    * nothing (a plan sold by conversation publishes no numbers).
    */
   readonly caps: Caps | null;
+  /**
+   * Why this row cannot be ordered right now — the closed door's own sentence,
+   * verbatim — or absent when the way is open. A menu lists what can be
+   * ordered, and a row that is sold but not yet orderable (its door is closed:
+   * checkout unbuilt, a feature unfinished) SAYS SO on the menu instead of
+   * only at the order.
+   *
+   * Clients branch on PRESENCE and render the sentence unchanged — they know
+   * *that* the row is closed, never *which* door or *when it lifts*; the
+   * vocabulary of doors stays server-side. The same rule the refusal follows:
+   * `POST /billing/change` onto a closed row answers 400 with
+   * `details.closed`, and its `message` is this sentence.
+   */
+  readonly closed?: string;
 }
 
 /**
