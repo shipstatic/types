@@ -1898,8 +1898,10 @@ export const SIGN_IN_RETURN_PARAM = 'signing-in';
  * Client populations: `SESSION` (first-party cookie), `API_KEY` (`ship-`
  * key), `TOKEN` (`deploy-` deploy token), `AGENT` (anonymous public deploy —
  * no credential; the platform grants the public-account identity per
- * request), `OAUTH` (delegated access token). Server populations: `WEBHOOK`
- * (signed webhook processing), `SYSTEM` (scheduled/background jobs).
+ * request), `OAUTH` (delegated access token). The one server population:
+ * `SYSTEM` (scheduled/background jobs). Webhook receipt is deliberately not
+ * a population: a signed delivery is verified, never authorized — it acts
+ * as no one and audits as no one.
  */
 export const AuthMethod = {
   SESSION: 'session',
@@ -1907,7 +1909,6 @@ export const AuthMethod = {
   TOKEN: 'token',
   AGENT: 'agent',
   OAUTH: 'oauth',
-  WEBHOOK: 'webhook',
   SYSTEM: 'system',
 } as const;
 
@@ -2811,7 +2812,6 @@ export type ActivityEvent =
   | 'account.update'
   | 'account.delete'
   | 'account.key.generate'
-  | 'account.plan.paid'
   | 'account.plan.transition'
   // Deployment events
   | 'deployment.create'
