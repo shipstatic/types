@@ -2763,10 +2763,16 @@ export interface PlanChangeRequest {
 }
 
 /**
- * The pending plan change — a Stripe Subscription Schedule the platform
- * minted, mirrored onto the account. `at` is when it applies (the current
- * period's end, Unix seconds). Reversible until then: `DELETE
- * /billing/change` releases it.
+ * The pending plan change — a Stripe Subscription Schedule, mirrored onto the
+ * account. `at` is when it applies (the current period's end, Unix seconds).
+ *
+ * WHO minted the schedule is deliberately not part of this shape, and both
+ * kinds mirror here identically: Stripe mints one when a customer confirms a
+ * cadence downgrade on its own hosted page, and the platform mints one for a
+ * cheaper TIER, the single move Stripe's Customer Portal cannot express.
+ *
+ * Reversible until it applies, and `DELETE /billing/change` is the only way:
+ * Stripe's Portal displays a pending change but offers no control to undo it.
  */
 export interface ScheduledChange {
   readonly plan: AccountPlanType;
@@ -2780,9 +2786,15 @@ export interface ScheduledChange {
  * compile, so "which door was taken" is structural rather than prose.
  *
  * `url` means GO: a Stripe page (Checkout, or the Portal's confirmation page)
- * finishes the change and the browser must be redirected to it. `scheduled`
- * means DONE: the downgrade is booked for period end, nothing to visit, and
- * the account's `scheduled` field now carries it.
+ * finishes the change and the browser must be redirected to it. A `url` does
+ * NOT imply money moves — on the confirmation page Stripe decides whether to
+ * charge now or defer the change to period end, and says which. `scheduled`
+ * means DONE: the change is booked for period end by the platform itself,
+ * nothing to visit, and the account's `scheduled` field now carries it.
+ *
+ * A client branches on the SHAPE and holds no copy of which move takes which
+ * door — which is what let the server move that boundary without a wire
+ * change (2026-08-25).
  */
 export type PlanChangeResponse =
   /** GO: a Stripe page finishes the change. Absolute URL, single use, short-lived. */
