@@ -147,7 +147,7 @@ absence of a wire message rather than a disagreement with one:**
 **Everything else is relayed, including 5xx.** A server fault has nothing to
 withhold: the API's global handler emits either a deliberately authored
 sentence (a 503 naming what is unavailable) or a flat generic, and sends the
-raw failure to Slack rather than to the client. A surface may **add** its own
+raw failure to its operator channel rather than to the client. A surface may **add** its own
 chrome around a relayed message — a toast title, a status-page pointer — but
 never replaces it. The CLI discarded every 5xx message until 2026-07-29, which
 is what this clause exists to prevent: the platform authored a sentence for the
