@@ -2832,10 +2832,12 @@ export interface BillingSyncResponse {
  * All activity event types logged in the system.
  * Uses dot notation consistently: {resource}.{action}
  *
- * Retention: activity rows are permanent — the account's own history and
- * the platform's audit ledgers are one table, kept for the life of the
- * account (deletion removes them). Only the personal payload is
- * time-bounded: past 90 days each row sheds its IP.
+ * Retention: activity rows age out. An account keeps a recent window and,
+ * beneath it, never fewer than its most recent handful — so a dormant
+ * account's history is never empty — and a row that outlives the window
+ * keeps no IP address. Activity from deploys made without an account ages
+ * out sooner, and deleting an account removes its rows outright, at any age.
+ * The published privacy policy carries the periods.
  */
 export type ActivityEvent =
   // Account events
