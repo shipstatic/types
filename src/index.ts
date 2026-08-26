@@ -2837,7 +2837,6 @@ export interface BillingSyncResponse {
  * account's history is never empty — and a row that outlives the window
  * keeps no IP address. Activity from deploys made without an account ages
  * out sooner, and deleting an account removes its rows outright, at any age.
- * The published privacy policy carries the periods.
  */
 export type ActivityEvent =
   // Account events
