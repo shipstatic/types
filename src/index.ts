@@ -2860,6 +2860,10 @@ export type ActivityEvent =
   | 'token.create'
   | 'token.consume'
   | 'token.delete'
+  // Billing events (internal: the operator's stream, never the customer's
+  // feed — the feed's copy of this fact is the `account.plan.transition` it
+  // may become)
+  | 'checkout.open'
   // Admin events (not user-visible)
   | 'admin.account.plan.update'
   | 'admin.account.suspended.update'
@@ -2869,10 +2873,17 @@ export type ActivityEvent =
   | 'admin.domain.delete'
   | 'admin.impersonate';
 
-// A subscription's own history is not logged here. What a plan change MEANS
-// is recorded once, as `account.plan.transition`; everything behind it
-// (invoices, refunds, disputes, retries) belongs to Stripe, which owns the
-// record and shows it to the customer in the Customer Portal.
+// The billing boundary: the stream records the PLATFORM'S own acts, and
+// Stripe records the subscription's life. `checkout.open` is ours — the
+// platform mints the Session, and it is the one billing act that exists
+// before Stripe holds anything. `account.plan.transition` is ours — what a
+// change MEANS, entitlement crossing our threshold. Everything between those
+// two edges (invoices, refunds, disputes, retries, scheduled changes) is the
+// subscription's own history, which belongs to Stripe as merchant of record
+// and is shown to the customer in the Customer Portal; none of it is
+// restated here. Refusals write no history either: the stream records what
+// happened to resources, never what was declined — a detection
+// (`deployment.flagged`) is a fact discovered about content, not a refusal.
 
 /**
  * Activity events visible to users in the dashboard
