@@ -1896,9 +1896,10 @@ export const SIGN_IN_RETURN_PARAM = 'signing-in';
  * How a request (or recorded activity) was authorized.
  *
  * Client populations: `SESSION` (first-party cookie), `API_KEY` (`ship-`
- * key), `TOKEN` (`deploy-` deploy token), `AGENT` (anonymous public deploy —
- * no credential; the platform grants the public-account identity per
- * request), `OAUTH` (delegated access token). The one server population:
+ * key), `TOKEN` (`deploy-` deploy token), `AGENT` (anonymous, no credential:
+ * public deploys are granted the public-account identity per request, and a
+ * captcha-verified share-link setup open audits as this population),
+ * `OAUTH` (delegated access token). The one server population:
  * `SYSTEM` (scheduled/background jobs). Webhook receipt is deliberately not
  * a population: a signed delivery is verified, never authorized — it acts
  * as no one and audits as no one.
@@ -2856,6 +2857,7 @@ export type ActivityEvent =
   | 'domain.update'
   | 'domain.delete'
   | 'domain.verify'
+  | 'domain.setup.open' // Internal: DNS setup instructions were opened, by the owner or through the share link (not user-visible)
   // Token events
   | 'token.create'
   | 'token.consume'
