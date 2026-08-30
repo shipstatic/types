@@ -368,8 +368,13 @@ export interface DomainDnsResponse {
 }
 
 /**
- * Response for `GET /domains/:domain/share` — the domain plus the salted
- * hash that lets someone else complete its DNS setup without an account.
+ * Response for `GET /domains/:domain/share`: the domain plus the link that
+ * lets someone else complete its DNS setup without an account.
+ *
+ * The link is FINISHED, on the deployment claim's grammar: the API composes
+ * it from the salted setup hash and the one environment dimension it owns,
+ * and no client ever parses or assembles one. What a client receives is the
+ * setup URL, ready to hand off.
  *
  * `/admin/domains/:domain/share` answers the same shape, which is the admin
  * law working: the operator surface is the public grammar with a prefix.
@@ -380,8 +385,8 @@ export interface DomainDnsResponse {
 export interface DomainShareResponse {
   /** The domain the setup link is for */
   readonly domain: string;
-  /** The salted setup hash that authorizes the share */
-  readonly hash: string;
+  /** The shareable setup link, carrying the salted hash that authorizes the share */
+  readonly url: string;
 }
 
 /**
