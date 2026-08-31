@@ -29,6 +29,7 @@ import {
   PASSWORD_CONSTRAINTS,
   type PlatformLimits,
   readBearerValue,
+  SHIP_VIA_ENV,
   TokenKind,
   type TokenListResponse,
   type TokenResource,
@@ -846,6 +847,24 @@ describe('DeploymentVia — the origin vocabulary', () => {
     expect(DeploymentVia.CRS).toBe('crs');
     expect(normalizeVia('CLD')).toBe(DeploymentVia.CLD);
     expect(normalizeVia(' crs ')).toBe(DeploymentVia.CRS);
+  });
+
+  it('carries the wrapper-declared members, pinned by name with their env slot', () => {
+    // `git` and `gmn` are declared by first-party WRAPPERS through the
+    // SHIP_VIA_ENV variable rather than by code any compiler links: the
+    // GitHub Action relabels the CLI, the Gemini extension relabels the
+    // stdio MCP bin, and both live in files (YAML, a JSON manifest) that can
+    // import nothing. Deleting either member, or respelling the variable,
+    // would drop their attribution silently: the readers normalize an
+    // unknown value to their own default by design. `drp` is pinned beside
+    // them because the drop widget names itself in code, so its loss WOULD
+    // be a compile error there, but only after a convoy delivers it.
+    expect(SHIP_VIA_ENV).toBe('SHIP_VIA');
+    expect(DeploymentVia.GIT).toBe('git');
+    expect(DeploymentVia.GMN).toBe('gmn');
+    expect(DeploymentVia.DRP).toBe('drp');
+    expect(normalizeVia(' GMN ')).toBe(DeploymentVia.GMN);
+    expect(normalizeVia('Drp')).toBe(DeploymentVia.DRP);
   });
 
   it('carries both fallbacks', () => {
