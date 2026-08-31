@@ -856,15 +856,11 @@ describe('DeploymentVia — the origin vocabulary', () => {
     // stdio MCP bin, and both live in files (YAML, a JSON manifest) that can
     // import nothing. Deleting either member, or respelling the variable,
     // would drop their attribution silently: the readers normalize an
-    // unknown value to their own default by design. `drp` is pinned beside
-    // them because the drop widget names itself in code, so its loss WOULD
-    // be a compile error there, but only after a convoy delivers it.
+    // unknown value to their own default by design.
     expect(SHIP_VIA_ENV).toBe('SHIP_VIA');
     expect(DeploymentVia.GIT).toBe('git');
     expect(DeploymentVia.GMN).toBe('gmn');
-    expect(DeploymentVia.DRP).toBe('drp');
     expect(normalizeVia(' GMN ')).toBe(DeploymentVia.GMN);
-    expect(normalizeVia('Drp')).toBe(DeploymentVia.DRP);
   });
 
   it('carries both fallbacks', () => {

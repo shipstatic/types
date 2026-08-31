@@ -33,12 +33,20 @@ export type DeploymentStatusType = (typeof DeploymentStatus)[keyof typeof Deploy
  * member here and every future one:
  *
  * - **Where the platform ships CODE, the code declares it.** `web`, `sdk`,
- *   `cli`, `git`, `n8n`, `vsc`, `gmn` and `drp` are surfaces this platform
- *   authors, so each names itself in its own source and nothing external is
- *   needed to tell them apart. A first-party WRAPPER counts as code even when
- *   it is a manifest: the GitHub Action and the Gemini extension each compose
- *   an invocation of a platform executable and relabel it through
+ *   `cli`, `git`, `n8n`, `vsc` and `gmn` are surfaces this platform authors,
+ *   so each names itself in its own source and nothing external is needed to
+ *   tell them apart. A first-party WRAPPER counts as code even when it is a
+ *   manifest: the GitHub Action and the Gemini extension each compose an
+ *   invocation of a platform executable and relabel it through
  *   {@link SHIP_VIA_ENV}.
+ *
+ * **And only a surface that DEPLOYS gets a member — `@shipstatic/drop` is the
+ * recorded refusal.** The widget collects and validates files and hands raw
+ * `File[]` to its embedder, whose own SDK call is the deploy; drop makes no
+ * upload call anywhere, so a `drp` member would be a word nothing can emit.
+ * Those deploys read `sdk`, which is the truth: the embedder is a program
+ * embedding the SDK directly. Mint the member the day drop grows an upload
+ * arm, not before.
  * - **Where the platform ships only a URL, the URL declares it.** A
  *   marketplace listing runs somebody else's client against a bare endpoint —
  *   every one of them the same server speaking the same protocol, and
@@ -81,8 +89,6 @@ export const DeploymentVia = {
   CRS: 'crs',
   /** The Gemini CLI extension. */
   GMN: 'gmn',
-  /** The `@shipstatic/drop` browser widget. */
-  DRP: 'drp',
   /**
    * A deploy that reached the REST API naming no origin at all — the
    * platform-wide fallback, one altitude below `mcp`'s family fallback.
