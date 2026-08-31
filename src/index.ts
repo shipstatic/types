@@ -33,9 +33,12 @@ export type DeploymentStatusType = (typeof DeploymentStatus)[keyof typeof Deploy
  * member here and every future one:
  *
  * - **Where the platform ships CODE, the code declares it.** `web`, `sdk`,
- *   `cli`, `git`, `n8n` and `vsc` are surfaces this platform authors, so each
- *   names itself in its own source and nothing external is needed to tell them
- *   apart.
+ *   `cli`, `git`, `n8n`, `vsc`, `gmn` and `drp` are surfaces this platform
+ *   authors, so each names itself in its own source and nothing external is
+ *   needed to tell them apart. A first-party WRAPPER counts as code even when
+ *   it is a manifest: the GitHub Action and the Gemini extension each compose
+ *   an invocation of a platform executable and relabel it through
+ *   {@link SHIP_VIA_ENV}.
  * - **Where the platform ships only a URL, the URL declares it.** A
  *   marketplace listing runs somebody else's client against a bare endpoint —
  *   every one of them the same server speaking the same protocol, and
@@ -76,6 +79,10 @@ export const DeploymentVia = {
   CLD: 'cld',
   /** Channel: the Cursor marketplace listing → `mcp.<domain>/crs`. */
   CRS: 'crs',
+  /** The Gemini CLI extension. */
+  GMN: 'gmn',
+  /** The `@shipstatic/drop` browser widget. */
+  DRP: 'drp',
   /**
    * A deploy that reached the REST API naming no origin at all — the
    * platform-wide fallback, one altitude below `mcp`'s family fallback.
@@ -2463,10 +2470,11 @@ export const DEFAULT_API = 'https://api.shipstatic.com';
  * values — as the VS Code extension's child-process env block does — picks
  * up a grown contract at the next pin bump instead of by remembered prose.
  *
- * Browser builds read no environment at all, and the CLI-only variables
- * (`SHIP_PASSWORD`, `SHIP_VIA`) are deliberately NOT here: they are the
- * CLI's operational levers, not the SDK's ambient contract — see
- * `npm/ship/CLAUDE.md`, "CLI-only env vars".
+ * Browser builds read no environment at all, and the wrapper-tier variables
+ * are deliberately NOT here: `SHIP_PASSWORD` stays the CLI's own operational
+ * lever (see `npm/ship/CLAUDE.md`, "CLI-only env vars"), and the origin
+ * relabel slot has its own owner beside this object ({@link SHIP_VIA_ENV})
+ * because two executables read it and neither reading is the SDK's.
  */
 export const SHIP_ENV = {
   /** The one credential slot — any platform token. */
@@ -2474,6 +2482,23 @@ export const SHIP_ENV = {
   /** The API endpoint override. */
   API_URL: 'SHIP_API_URL',
 } as const;
+
+/**
+ * The origin-relabel slot for integrations that wrap a first-party
+ * executable as a subprocess. A wrapper composes an argv and an env it does
+ * not otherwise reach, so this variable is its one way to name the surface
+ * the traffic is really from. Two executables read it through
+ * {@link normalizeVia}: the `ship` CLI (default `cli`; the GitHub Action
+ * sets `git`) and the stdio MCP bin (default `mcp`; the Gemini CLI
+ * extension sets `gmn`). In-process SDK consumers pass the programmatic
+ * `via` option instead: same destination, different mechanism.
+ *
+ * Deliberately not a member of {@link SHIP_ENV}, which is the SDK's ambient
+ * contract; the SDK never reads this. The name earned an owner the day the
+ * stdio bin became its second reader: one spelling, two executables, and a
+ * misspelling on either side drops attribution silently.
+ */
+export const SHIP_VIA_ENV = 'SHIP_VIA';
 
 /**
  * Where a human creates an API key — the console deep link quoted by every
