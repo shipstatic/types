@@ -697,18 +697,15 @@ export interface Account {
   readonly name: string | null;
   /** User profile picture URL, null if not set */
   readonly picture: string | null;
-  /** The account's plan: the row it is on. */
-  readonly plan: AccountPlanType;
   /**
-   * The billed tier the account STANDS AT: its plan for a billed or free
-   * account, and the plan a gift copies for a sponsored one (`sponsored`
-   * stands at `pro`). Every question of position, which row is "current",
-   * which rows are above, is asked of this rather than of `plan`, so a
-   * sponsored account sees exactly what a Pro account sees. Optional on the
-   * type by the additive-evolution law: published SDK versions may predate
-   * the field, so consumers read it when present and fall back to `plan`.
+   * The tier the account stands at. A sponsored account is Pro that nobody
+   * bills, so it reports `pro` here with {@link billed} false; the grant
+   * itself is the operator's fact, seen on the operator's surfaces and never
+   * here. A console therefore treats a sponsored account exactly as a Pro one
+   * everywhere, and the one difference it can see is the one that is real:
+   * there is no Subscription.
    */
-  readonly tier?: AccountPlanType;
+  readonly plan: AccountPlanType;
   /**
    * True while the operator has suspended the account: reads and deletes
    * still work, every write is refused. The plan is unchanged underneath.
@@ -758,9 +755,7 @@ export interface Account {
   /**
    * The next plan up the ladder this account could move to, or `null` when
    * there is none: the top billed tier, a plan sold by conversation, and any
-   * plan not on the menu answer `null`. Asked from where the account stands
-   * ({@link tier}), so a sponsored account is offered Team as a Pro account
-   * is. One server-side fact so that no surface derives "can this account
+   * plan not on the menu answer `null`. One server-side fact so that no surface derives "can this account
    * upgrade, and to what" from the menu — a grandfathered row has no menu
    * price to compare, and a conversation plan must never be sent to Checkout.
    */
