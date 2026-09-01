@@ -966,7 +966,7 @@ export const ErrorType = {
    * purpose, and deployed sites keep serving throughout.
    *
    * Distinct from `Api` at 503, which the platform already uses for a
-   * dependency that failed (moderation unavailable). A consumer has to tell
+   * dependency that failed. A consumer has to tell
    * "we closed the door" from "something broke": the two get opposite words
    * and opposite retry behaviour.
    */
