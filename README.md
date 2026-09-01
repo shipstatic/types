@@ -16,7 +16,7 @@ npm install @shipstatic/types
 
 ## What's included
 
-### Core Entities
+### Core entities
 
 ```typescript
 import type {
@@ -38,7 +38,7 @@ survives, otherwise the `*DeleteResponse` shape: the resource noun carrying
 the canonical key, plus the resource's own state field where the resource is
 mid-transition. No `message`, no `success`, no constant flags.
 
-### Error System
+### Error system
 
 ```typescript
 import { ShipError, ErrorType, isShipError } from '@shipstatic/types';
@@ -84,7 +84,7 @@ catch (cause) { throw ShipError.fromFetchError(cause, 'Get account'); }
 
 Both helpers accept an optional operation-name string for contextual messages (`"Get account was cancelled"`, `"Get account failed: ..."`).
 
-### Status Constants
+### Status constants
 
 ```typescript
 import {
@@ -109,7 +109,7 @@ import type {
 } from '@shipstatic/types';
 ```
 
-### Resource Contracts
+### Resource contracts
 
 SDK interface definitions:
 
@@ -122,7 +122,7 @@ import type {
 } from '@shipstatic/types';
 ```
 
-### Validation Utilities
+### Validation utilities
 
 ```typescript
 import {
@@ -146,7 +146,7 @@ const limits = await ship.getLimits();
 isBlockedExtension('virus.exe', limits.blockedExtensions ?? []);
 ```
 
-### File Upload Types
+### File upload types
 
 ```typescript
 import type {
@@ -157,7 +157,7 @@ import type {
 } from '@shipstatic/types';
 ```
 
-### Domain Utilities
+### Domain utilities
 
 ```typescript
 import {
@@ -169,7 +169,7 @@ import {
 } from '@shipstatic/types';
 ```
 
-### Label Utilities
+### Label utilities
 
 ```typescript
 import {
@@ -180,7 +180,7 @@ import {
 } from '@shipstatic/types';
 ```
 
-### Password Utilities
+### Password utilities
 
 ```typescript
 import {
