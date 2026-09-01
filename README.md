@@ -7,14 +7,14 @@ Single source of truth for types used across API, SDK, CLI, and web applications
 ## Installation
 
 ```bash
-# Included with Ship SDK
+# Included with the ShipStatic SDK
 npm install @shipstatic/ship
 
 # Direct installation
 npm install @shipstatic/types
 ```
 
-## What's Included
+## What's included
 
 ### Core Entities
 
@@ -211,6 +211,12 @@ function processDeployment(deployment: Deployment) {
   }
 }
 ```
+
+## Also available
+
+Part of [ShipStatic](https://shipstatic.com). This package is a building
+block; the ways to actually deploy something are listed at
+[shipstatic.com](https://shipstatic.com).
 
 ## License
 
