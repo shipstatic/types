@@ -344,6 +344,27 @@ passing while `TokenResource.list` was live with the drift they target.
 it.** After adding one, prove it fires — introduce the drift, watch the
 typecheck fail, restore.
 
+## `pnpm check:package` and the one rule it ignores
+
+`publint && attw --pack . --ignore-rules cjs-resolves-to-esm` — the npm
+field's own quality gate, the same one `npm/ship`, `npm/drop`, the two
+wrappers and `@shipstatic/mcp` run. Added 2026-09-01 by the coherence
+program, which found this package and the mcp publishing without the check
+four siblings had.
+
+**The ignored rule is a decided property, not a suppression.** This package is
+ESM-only (`"type": "module"`, one `exports` condition), so a CJS consumer
+resolving it gets `attw`'s CJSResolvesToESM warning by construction. Two
+things make that safe rather than latent: no published CJS artifact requires
+it at runtime (every first-party consumer takes it as a devDependency and
+BUNDLES it, which is why a compiled-in constant here would ship stale — see
+the `getLimits` note in `npm/ship/CLAUDE.md`), and the platform's
+`engines.node >=20.19.0` floor is exactly the version where `require(esm)`
+was backported, measured AT the floor rather than assumed.
+
+If a consumer ever requires this package from real CJS, the ignore is the
+thing to revisit first.
+
 ## Adding New Types
 
 1. Find the right section in `src/index.ts` (keep section order above)
