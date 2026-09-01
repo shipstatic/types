@@ -45,7 +45,7 @@ Single file: `src/index.ts`, organized into named sections in this order:
 pnpm build      # TypeScript compilation validates all types
 pnpm test --run # Runtime tests: validation constants, blocked extensions, label patterns
 pnpm typecheck  # tsc -p tsconfig.check.json — src AND tests
-
+pnpm check:package  # publint + attw over the built artifact
 ```
 
 ## Key Patterns
