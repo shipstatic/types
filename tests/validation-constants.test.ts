@@ -7,6 +7,7 @@ import {
   CALLER,
   classifyToken,
   DEPLOY_FIELDS,
+  DEPLOY_FILE_GRAMMAR,
   DEPLOY_TOKEN,
   type DeploymentListResponse,
   type DeploymentResource,
@@ -964,5 +965,19 @@ describe('validateTtl — one lifetime grammar, two resources', () => {
     // `ttl` on the multipart body and `ttl` in the options object are one
     // fact; DEPLOY_FIELDS is where the wire spelling lives.
     expect(DEPLOY_FIELDS.TTL).toBe('ttl');
+  });
+
+  it('the JSON deploy file grammar is the wire the API parses: three names, two encodings, utf-8 by default', () => {
+    // Planted literals, not a re-read of the object: this is the owner three
+    // repos compare their copies against (the API's zod schema, the hosted
+    // MCP's tool input, the n8n node's fenced table), so the values here are
+    // the contract, stated once.
+    expect(DEPLOY_FILE_GRAMMAR.PATH).toBe('path');
+    expect(DEPLOY_FILE_GRAMMAR.CONTENT).toBe('content');
+    expect(DEPLOY_FILE_GRAMMAR.ENCODING).toBe('encoding');
+    expect(DEPLOY_FILE_GRAMMAR.DEFAULT_ENCODING).toBe('utf-8');
+    expect([...DEPLOY_FILE_GRAMMAR.ENCODINGS]).toEqual(['utf-8', 'base64']);
+    // The default is a member of the set, or an entry that names nothing is invalid.
+    expect(DEPLOY_FILE_GRAMMAR.ENCODINGS).toContain(DEPLOY_FILE_GRAMMAR.DEFAULT_ENCODING);
   });
 });

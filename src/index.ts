@@ -936,6 +936,50 @@ export const DEPLOY_FIELDS = {
   CAPTCHA: 'captcha',
 } as const;
 
+/**
+ * The JSON deploy body's file grammar: the OTHER body `POST /upload` accepts,
+ * beside the multipart one {@link DEPLOY_FIELDS} names. A JSON caller sends
+ * `{ files: [{ path, content, encoding? }] }`, and this is the whole of what
+ * one entry may say: three field names, two encodings, one default.
+ *
+ * Declared once because the grammar has three independent holders that the
+ * wire forces to restate it: the API's zod schema (the original), the hosted
+ * MCP's tool input, and the n8n community node, which cannot import this
+ * under n8n Cloud's zero-dependency rule and fences its copy against this
+ * object instead. Each had its own literal table until 2.24.0; the last two
+ * types convoys walked without minting the owner, which is exactly the drift
+ * the No-Fourth-Category Law's deferral clause names.
+ *
+ * `content` is the file's bytes as text: raw for `utf-8` (the default, and
+ * the right choice for HTML, CSS, JS, JSON and SVG), base64 for binary.
+ */
+export const DEPLOY_FILE_GRAMMAR = {
+  /** Relative path within the site, no leading slash. */
+  PATH: 'path',
+  /** The file's bytes, as text in the entry's encoding. */
+  CONTENT: 'content',
+  /** Optional; one of {@link DEPLOY_FILE_GRAMMAR.ENCODINGS}. */
+  ENCODING: 'encoding',
+  /** What an entry that names no encoding means. */
+  DEFAULT_ENCODING: 'utf-8',
+  /** The closed set. `utf-8` is raw text; `base64` is for binary only. */
+  ENCODINGS: ['utf-8', 'base64'],
+} as const;
+
+/** One of the two encodings a JSON deploy entry may name. */
+export type DeployFileEncoding = (typeof DEPLOY_FILE_GRAMMAR.ENCODINGS)[number];
+
+/**
+ * One file entry of a JSON deploy, in the grammar above. The wire shape the
+ * API parses and the hosted MCP's tool input decodes; `encoding` absent means
+ * {@link DEPLOY_FILE_GRAMMAR.DEFAULT_ENCODING}.
+ */
+export interface DeployFileSpec {
+  path: string;
+  content: string;
+  encoding?: DeployFileEncoding;
+}
+
 // =============================================================================
 // ERROR SYSTEM
 // =============================================================================
