@@ -4,6 +4,7 @@ import {
   API_KEY,
   AUTH_BASE_PATH,
   AuthMethod,
+  BUILD_SETTINGS,
   CALLER,
   classifyToken,
   DEPLOY_FIELDS,
@@ -37,7 +38,9 @@ import {
   TTL_CONSTRAINTS,
   UNBUILT_PROJECT_MARKERS,
   UNSAFE_FILENAME_CHARS,
+  validateBuildCommand,
   validateCaller,
+  validateOutputDir,
   validatePassword,
   validateToken,
   validateTtl,
@@ -979,5 +982,60 @@ describe('validateTtl — one lifetime grammar, two resources', () => {
     expect([...DEPLOY_FILE_GRAMMAR.ENCODINGS]).toEqual(['utf-8', 'base64']);
     // The default is a member of the set, or an entry that names nothing is invalid.
     expect(DEPLOY_FILE_GRAMMAR.ENCODINGS).toContain(DEPLOY_FILE_GRAMMAR.DEFAULT_ENCODING);
+  });
+});
+
+describe('build settings', () => {
+  // The two per-deploy build settings share the file's format/policy split:
+  // these are shape rules the console and the API apply identically; whether
+  // a command builds anything is the build's own verdict.
+  it('the wire names them beside the build flag they qualify', () => {
+    expect(DEPLOY_FIELDS.BUILD_COMMAND).toBe('buildCommand');
+    expect(DEPLOY_FIELDS.OUTPUT_DIR).toBe('outputDir');
+  });
+
+  describe('validateBuildCommand', () => {
+    it('absent or empty is undefined, present is trimmed', () => {
+      expect(validateBuildCommand(undefined)).toBeUndefined();
+      expect(validateBuildCommand(null)).toBeUndefined();
+      expect(validateBuildCommand('')).toBeUndefined();
+      expect(validateBuildCommand('  npm run build:site  ')).toBe('npm run build:site');
+    });
+
+    it('refuses a second line, a non-string, whitespace only, and the bound', () => {
+      expect(() => validateBuildCommand('npm run build\nrm -rf /')).toThrow(/single line/);
+      expect(() => validateBuildCommand(42)).toThrow(/string/);
+      expect(() => validateBuildCommand('   ')).toThrow(/between 1 and/);
+      expect(() => validateBuildCommand('x'.repeat(BUILD_SETTINGS.COMMAND_MAX_LENGTH + 1))).toThrow(
+        /between 1 and/,
+      );
+      expect(validateBuildCommand('x'.repeat(BUILD_SETTINGS.COMMAND_MAX_LENGTH))).toHaveLength(
+        BUILD_SETTINGS.COMMAND_MAX_LENGTH,
+      );
+    });
+  });
+
+  describe('validateOutputDir', () => {
+    it('absent or empty is undefined; a relative folder is kept, trailing slash dropped', () => {
+      expect(validateOutputDir(undefined)).toBeUndefined();
+      expect(validateOutputDir('')).toBeUndefined();
+      expect(validateOutputDir('dist')).toBe('dist');
+      expect(validateOutputDir('dist/site/')).toBe('dist/site');
+      expect(validateOutputDir('.output/public')).toBe('.output/public');
+      expect(validateOutputDir(' build ')).toBe('build');
+    });
+
+    it('keeps the folder inside the project: no parent segments, no absolute path, no odd characters', () => {
+      expect(() => validateOutputDir('../etc')).toThrow(/inside the project/);
+      expect(() => validateOutputDir('dist/../..')).toThrow(/inside the project/);
+      expect(() => validateOutputDir('/var/www')).toThrow(/inside the project/);
+      expect(() => validateOutputDir('./dist')).toThrow(/inside the project/);
+      expect(() => validateOutputDir('dist site')).toThrow(/inside the project/);
+      expect(() => validateOutputDir('dist;rm')).toThrow(/inside the project/);
+      expect(() => validateOutputDir(7)).toThrow(/string/);
+      expect(() => validateOutputDir('a'.repeat(BUILD_SETTINGS.OUTPUT_DIR_MAX_LENGTH + 1))).toThrow(
+        /between 1 and/,
+      );
+    });
   });
 });
