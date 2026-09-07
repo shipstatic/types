@@ -494,7 +494,7 @@ a lockstep SDK release. `Account.used` is the precedent. A field may become
 required at the entity's next natural break (major bump) once every
 published consumer carries it.
 
-**New error types:** Add to `ErrorType` enum + a static factory on `ShipError`.
+**New error types:** Add to `ErrorType` (its JSDoc says who produces it and what it is distinct from), a static factory on `ShipError`, and its category in `ERROR_CATEGORIES` (every 4xx-carrying type belongs in `client`; a fault or a state belongs nowhere). Name any `details` shape a human surface renders (`BuildFailureDetails` is the precedent), and add the factory, category and wire round-trip cases to `tests/errors.test.ts`.
 
 ### Admin types
 
