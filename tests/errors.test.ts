@@ -78,13 +78,26 @@ describe('ShipError factories', () => {
   });
 
   it('maintenance → type=Maintenance, status fixed at 503, preserves details', () => {
-    // The only factory with a FIXED status rather than a defaulted one: a
+    // The first factory with a FIXED status rather than a defaulted one: a
     // maintenance refusal is 503 or it is not this error.
     const err = ShipError.maintenance('Back at 14:30 UTC.', { window: 'db-migration' });
     expect(err.type).toBe(ErrorType.Maintenance);
     expect(err.message).toBe('Back at 14:30 UTC.');
     expect(err.status).toBe(503);
     expect(err.details).toEqual({ window: 'db-migration' });
+  });
+
+  it('build → type=Build, status fixed at 422, the log rides in details', () => {
+    // The second fixed-status factory, on Maintenance's reasoning: a build
+    // verdict is 422 or it is not this error. The sentence is the builder's
+    // and the log is the evidence; neither is optional.
+    const err = ShipError.build('package.json has no build script.', {
+      log: '[build] Installing dependencies with npm...',
+    });
+    expect(err.type).toBe(ErrorType.Build);
+    expect(err.message).toBe('package.json has no build script.');
+    expect(err.status).toBe(422);
+    expect(err.details).toEqual({ log: '[build] Installing dependencies with npm...' });
   });
 
   it('network → type=Network, no status, cause stored in details', () => {
@@ -147,6 +160,7 @@ describe('semantic categories', () => {
       ShipError.rateLimit(),
       ShipError.authentication(),
       ShipError.business('b'),
+      ShipError.build('b', { log: '' }),
       ShipError.config('c'),
       ShipError.file('f'),
     ];
@@ -187,6 +201,17 @@ describe('semantic categories', () => {
       expect(err.isAuthError()).toBe(false);
       expect(err.isNetworkError()).toBe(false);
     }
+  });
+
+  it("classifies a build verdict as the client's, by type and by status alike", () => {
+    // Both arms hold it: the type is in the client set, and 422 is a 4xx.
+    // Either alone would do; both is what keeps a consumer that reads only
+    // one axis (the SDK's retry predicate reads status, the CLI's message
+    // chain reads the category) from ever calling this a server fault.
+    const err = ShipError.build('The build script failed.', { log: 'error TS5083' });
+    expect(err.isClientError()).toBe(true);
+    expect(err.isAuthError()).toBe(false);
+    expect(err.isNetworkError()).toBe(false);
   });
 
   it("leaves maintenance uncategorised — it is a state, not anyone's fault", () => {
@@ -410,6 +435,29 @@ describe('ShipError.fromHttpResponse', () => {
       expect(err.type).toBe(ErrorType.Maintenance);
       expect(err.status).toBe(503);
       expect(err.isClientError()).toBe(false);
+    });
+
+    it('preserves Build type and its log when body.error is "build_failed" (status 422)', async () => {
+      // The type is what lets a surface show the log as a block; the details
+      // are the log. Without the round-trip a verdict would arrive as a
+      // status-derived `Api` at 422, and the evidence would be an untyped blob.
+      const err = await ShipError.fromHttpResponse(
+        jsonResponse(
+          {
+            error: ErrorType.Build,
+            message: 'The build script failed.',
+            status: 422,
+            details: { log: 'error TS5083: Cannot read file tsconfig.json' },
+          },
+          422,
+        ),
+      );
+      expect(err.type).toBe(ErrorType.Build);
+      expect(err.status).toBe(422);
+      expect(err.isClientError()).toBe(true);
+      expect((err.details as { log?: string } | undefined)?.log).toBe(
+        'error TS5083: Cannot read file tsconfig.json',
+      );
     });
 
     it('falls back to status-derived type when body.error is unknown', async () => {

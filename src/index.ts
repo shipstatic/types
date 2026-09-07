@@ -983,6 +983,21 @@ export const ErrorType = {
    * and opposite retry behaviour.
    */
   Maintenance: 'maintenance',
+  /**
+   * The project could not be built as submitted (422). The platform ran the
+   * caller's own instructions, the dependency install and then the build
+   * script, and they failed. So the verdict is the caller's: deterministic,
+   * not worth a retry, and answered with the evidence. `details` is a
+   * `BuildFailureDetails`, and the message is the one sentence the builder
+   * authored for the person who will fix the project.
+   *
+   * Distinct from `Api` at 500, which is what the platform answers when it
+   * could not RUN the build at all (the sandbox failed to start, a host
+   * fault). A consumer has to tell "your project cannot be built" from "we
+   * could not build it": the two get opposite words, opposite retry
+   * behaviour, and only the second pages an operator.
+   */
+  Build: 'build_failed',
   /** Network/connection error. Client-side only — set by HTTP clients on fetch failure; never produced server-side. */
   Network: 'network_error',
   /**
@@ -1053,6 +1068,7 @@ const ERROR_CATEGORIES = {
    * a second attempt.
    */
   client: new Set<ErrorType>([
+    ErrorType.Build,
     ErrorType.Business,
     ErrorType.Cancelled,
     ErrorType.Config,
@@ -1191,6 +1207,24 @@ export interface ErrorResponse {
   status?: number;
   /** Optional additional error details. Untyped by design — narrow at the read site. */
   details?: unknown;
+}
+
+/**
+ * `details` of an `ErrorType.Build` error: the evidence behind the verdict.
+ *
+ * The one `details` shape this file names, because it is the one a HUMAN
+ * surface renders rather than a machine reads. The sentence in `message`
+ * says what went wrong; the log is how the person fixing the project sees
+ * where. A surface that builds shows both, the log as a block rather than
+ * as prose.
+ */
+export interface BuildFailureDetails {
+  /**
+   * The tail of the build's own output, install and build script alike, as
+   * the builder wrote it. Bounded by the builder, so a consumer need not cap
+   * it again.
+   */
+  log: string;
 }
 
 /**
@@ -1464,11 +1498,26 @@ export class ShipError extends Error {
    * `message` is REQUIRED and has no default here. The API is the only
    * producer of that sentence, and a default in this file would be a second
    * owner of one fact — see CLAUDE.md, "The Constellation Law" (stopping
-   * rule). It is also the one factory whose status is fixed rather than
-   * defaulted: a maintenance refusal is 503 or it is not this error.
+   * rule). It is also the first factory whose status is fixed rather than
+   * defaulted: a maintenance refusal is 503 or it is not this error
+   * (`build` is the second, on the same reasoning).
    */
   static maintenance(message: string, details?: unknown): ShipError {
     return new ShipError(ErrorType.Maintenance, message, 503, details);
+  }
+
+  /**
+   * The project could not be built as submitted (422).
+   *
+   * The second factory with a FIXED status, on Maintenance's reasoning: a
+   * build verdict is 422 or it is not this error. `message` is the builder's
+   * own sentence, relayed rather than rewritten, since the builder is the
+   * throw site and the only party that knows why; `details` carries the log
+   * (`BuildFailureDetails`), which is required for the same reason a verdict
+   * without evidence is an opinion.
+   */
+  static build(message: string, details: BuildFailureDetails): ShipError {
+    return new ShipError(ErrorType.Build, message, 422, details);
   }
 
   // Semantic-category guards. For specific-type checks, use

@@ -70,6 +70,7 @@ ShipError.file(message, details?)               // pass `{ filePath }` for the p
 ShipError.config(message, details?)
 ShipError.api(message, status?, details?)       // status defaults to 500
 ShipError.maintenance(message, details?)        // status FIXED at 503; message required
+ShipError.build(message, { log })               // status FIXED at 422; the builder's sentence + its log (BuildFailureDetails)
 
 // The five CLIENT-ONLY factories above (`network`, `timeout`, `cancelled`,
 // `file`, `config`) are exactly the statusless ones, and that pairing is load-bearing:
