@@ -932,6 +932,14 @@ export const DEPLOY_FIELDS = {
   PRERENDER: 'prerender',
   /** @internal Server-processing flag — first-party `/upload` only. */
   SPA: 'spa',
+  /**
+   * @internal The build settings, first-party `/upload` only and meaningful
+   * only with `BUILD`: the command to run instead of the manifest's build
+   * script, and the folder the site lands in. See {@link BUILD_SETTINGS}.
+   */
+  BUILD_COMMAND: 'buildCommand',
+  /** @internal See {@link DEPLOY_FIELDS.BUILD_COMMAND}. */
+  OUTPUT_DIR: 'outputDir',
   /** @internal reCAPTCHA proof — `web/www`'s public uploader only. */
   CAPTCHA: 'captcha',
 } as const;
@@ -2705,6 +2713,20 @@ export interface DeploymentUploadOptions {
   prerender?: boolean;
   /** @internal Trigger server-side SPA detection. Only available via /upload endpoint. */
   spa?: boolean;
+  /**
+   * @internal The command the build runs instead of the manifest's own
+   * `build` script (`npm run build:site`, `hugo`, …). Only with `build`, only
+   * via /upload; format in {@link BUILD_SETTINGS}, checked by
+   * {@link validateBuildCommand}.
+   */
+  buildCommand?: string;
+  /**
+   * @internal The folder the built site lands in (`public`, `dist/site`),
+   * relative to the project root, for projects whose output the builder does
+   * not find on its own. Only with `build`, only via /upload; format in
+   * {@link BUILD_SETTINGS}, checked by {@link validateOutputDir}.
+   */
+  outputDir?: string;
   /** @internal reCAPTCHA proof for the anonymous human deploy channel. Only available via /upload endpoint. */
   captcha?: string;
   /**
@@ -3342,6 +3364,84 @@ export function deserializeLabels(labelsJson: string | null): string[] {
   } catch {
     return [];
   }
+}
+
+// =============================================================================
+// BUILD SETTINGS
+// =============================================================================
+
+/**
+ * The format of the two per-deploy build settings a caller may name when the
+ * builder's own detection is not enough: the command to run and the folder
+ * the site lands in. Format rules only, the format/policy split this file
+ * keeps everywhere: WHAT a value may look like lives here so both the console
+ * (fast feedback) and the API (the boundary) refuse the same strings; whether
+ * the command builds anything is the build's verdict, not a rule.
+ *
+ * Both are read only by first-party `/upload`, only with `build`, and both
+ * run inside the throwaway container that already runs the project's own
+ * arbitrary code, which is why the command's format is a shape rule (one
+ * line, bounded) and not a safety rule. The folder's rule is what keeps it a
+ * folder OF the project: relative, no parent segments, no leading slash.
+ */
+export const BUILD_SETTINGS = {
+  /** A build command is one line, non-empty, and bounded. */
+  COMMAND_MAX_LENGTH: 200,
+  /** An output folder is a bounded relative path. */
+  OUTPUT_DIR_MAX_LENGTH: 100,
+  /** Path segments and separators only: `dist`, `dist/site`, `.output/public`. */
+  OUTPUT_DIR_PATTERN: /^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/,
+} as const;
+
+/**
+ * Validate an optional build command and return it normalized (trimmed).
+ * Absent → `undefined`. Present → one line, 1 to
+ * {@link BUILD_SETTINGS.COMMAND_MAX_LENGTH} characters, no control characters.
+ */
+export function validateBuildCommand(value: unknown): string | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value !== 'string') {
+    throw ShipError.validation('Build command must be a string');
+  }
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed.length > BUILD_SETTINGS.COMMAND_MAX_LENGTH) {
+    throw ShipError.validation(
+      `Build command must be between 1 and ${BUILD_SETTINGS.COMMAND_MAX_LENGTH} characters`,
+    );
+  }
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: a command is one line; a newline or any other control character is a second one
+  if (/[\x00-\x1f\x7f]/.test(trimmed)) {
+    throw ShipError.validation('Build command must be a single line');
+  }
+  return trimmed;
+}
+
+/**
+ * Validate an optional output folder and return it normalized (trimmed, no
+ * trailing slash). Absent → `undefined`. Present → a relative path of plain
+ * segments, no `..`, no leading slash, at most
+ * {@link BUILD_SETTINGS.OUTPUT_DIR_MAX_LENGTH} characters.
+ */
+export function validateOutputDir(value: unknown): string | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value !== 'string') {
+    throw ShipError.validation('Output folder must be a string');
+  }
+  const trimmed = value.trim().replace(/\/+$/, '');
+  if (trimmed.length === 0 || trimmed.length > BUILD_SETTINGS.OUTPUT_DIR_MAX_LENGTH) {
+    throw ShipError.validation(
+      `Output folder must be between 1 and ${BUILD_SETTINGS.OUTPUT_DIR_MAX_LENGTH} characters`,
+    );
+  }
+  if (
+    !BUILD_SETTINGS.OUTPUT_DIR_PATTERN.test(trimmed) ||
+    trimmed.split('/').some((segment) => segment === '..' || segment === '.')
+  ) {
+    throw ShipError.validation(
+      'Output folder must be a relative path inside the project, like dist or dist/site',
+    );
+  }
+  return trimmed;
 }
 
 // =============================================================================
