@@ -1,6 +1,6 @@
 {
   "name": "@shipstatic/types",
-  "version": "2.24.0",
+  "version": "2.25.0-beta.1",
   "description": "Shared TypeScript types for the ShipStatic platform.",
   "type": "module",
   "main": "./dist/index.js",
@@ -9,6 +9,17 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./schemas": {
+      "types": "./dist/schemas.d.ts",
+      "default": "./dist/schemas.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "schemas": [
+        "./dist/schemas.d.ts"
+      ]
     }
   },
   "scripts": {
@@ -50,6 +61,9 @@
   },
   "engines": {
     "node": ">=20.19.0"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",
