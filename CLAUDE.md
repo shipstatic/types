@@ -12,7 +12,10 @@ Claude Code instructions for the **Types** package.
 
 ## Architecture
 
-Single file: `src/index.ts`, organized into named sections in this order:
+Two files. `src/index.ts` holds the types, organized into named sections in
+the order below; `src/schemas.ts` holds the wire schemas (see "Wire
+schemas") and is published as the subpath `@shipstatic/types/schemas`, so a
+consumer that never imports it carries no zod.
 
 | Section | Purpose |
 |---------|---------|
@@ -38,6 +41,45 @@ Single file: `src/index.ts`, organized into named sections in this order:
 | Domain Utilities | `isPlatformDomain`, `isCustomDomain`, `extractSubdomain`, `generate*Url` |
 | Label Utilities | `LABEL_CONSTRAINTS`, `LABEL_PATTERN`, `serializeLabels`, `deserializeLabels` |
 | Password Utilities | `PASSWORD_CONSTRAINTS`, `validatePassword` |
+
+## Wire schemas (`src/schemas.ts`, `@shipstatic/types/schemas`)
+
+**The interfaces own the types; the schemas restate them as data, fenced.**
+Added 2026-09-13 so that a tool can publish an `outputSchema` and a consumer
+can validate a response without writing a twin of the constitution: the
+hosted MCP carried one such hand-written twin of `Deployment` for a year,
+with a "keep in sync" comment as its only fence, and fourteen more were
+refused three times for exactly that reason. The answer was to give the
+constitution the schemas, as imports.
+
+Why a restatement rather than schema-first: `z.infer` cannot carry per-field
+JSDoc into an editor, and it makes every field mutable or every field
+readonly, where the entities deliberately mix the two. So `index.ts` stays
+the declaration a developer reads and `schemas.ts` is the one a wire reads,
+and `tests/schemas.test.ts` holds each pair at compile time (the same keys,
+and the interface assignable to the schema's output). A key added to one
+side fails `pnpm typecheck` of this package, which every release runs.
+
+**A schema promises what the wire promises ACROSS versions**, which is why
+it is looser than the type in one place, on purpose. A vocabulary the
+platform grows (`status`, `plan`, `via`) is a string whose description names
+today's members, derived from the constant: a consumer validates a response
+with the schema it shipped with, and an enum would turn the platform's next
+word into a validation failure on every older client (the VS Code extension
+bundles its server for months; `via` gained three members in one month). A
+vocabulary that is not ours to grow (a DNS record type, Stripe's billing
+interval) is an enum. The fence admits this: assignable, not equal.
+
+**Every field is described, and that is fenced too** (a walk of the
+published JSON Schema): the descriptions are what an agent reads when a tool
+publishes the schema. They restate the interfaces' JSDoc, shortened to what
+a reader of a RESULT needs; the two live thirty lines apart in one package
+and move in one commit, which is the honest scope for prose.
+
+zod is a real dependency of the constitution since 2.25.0, at the estate's
+own range (`^4.4.3`) so every consumer resolves one copy. `typesVersions`
+carries the subpath for the node10 resolver `check:package` probes; the
+platform's engines floor never uses it.
 
 ## Quick Reference
 
