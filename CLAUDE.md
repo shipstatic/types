@@ -403,10 +403,12 @@ span.
 the measurement is the record. Imported from the main entry, the functions
 carry the entry's top-level constants that esbuild cannot prove unused
 (arithmetic, `new Set`, property reads); from a subpath they do not. The
-difference is **about 0.5 KB gzipped, in one consumer**: the deploy card, at
-3.8 KB against an 8 KB budget. Every other consumer already carries those
-constants through `@shipstatic/ship`'s bundle, and `sideEffects: false` changes
-nothing (measured: identical bytes). A subpath is a second address for the
+difference is **0.8 KB gzipped, in one consumer**: the deploy card, which reads
+5.1 KB from the main entry and would read 4.3 KB from a subpath, against an 8 KB
+budget (measured on the real card build; the beta.2 commit's "about 0.5 KB" was
+a probe outside it). Every other consumer already carries those constants
+through `@shipstatic/ship`'s bundle, and `sideEffects: false` changes nothing
+(measured: identical bytes). A subpath is a second address for the
 constitution, a `typesVersions` row, and a question every future helper would
 have to answer. **A subpath is earned by a dependency boundary** (`/schemas`
 keeps zod out of every bundle that does not validate), never by bytes of this
