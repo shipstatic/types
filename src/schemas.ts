@@ -94,7 +94,7 @@ export const DeploymentSchema = z.object({
   screenshot: z
     .url()
     .describe(
-      'Full URL to the deployment screenshot. Captured asynchronously after deploy; the URL is returned immediately but the image may take a few seconds to become available.',
+      'Full URL to the deployment screenshot. Rendered on the first request for it, so the URL is returned immediately and the first request takes a few seconds; every request after that is served immediately.',
     ),
 });
 
