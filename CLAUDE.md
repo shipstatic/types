@@ -12,10 +12,12 @@ Claude Code instructions for the **Types** package.
 
 ## Architecture
 
-Two files. `src/index.ts` holds the types, organized into named sections in
+Three files. `src/index.ts` holds the types, organized into named sections in
 the order below; `src/schemas.ts` holds the wire schemas (see "Wire
 schemas") and is published as the subpath `@shipstatic/types/schemas`, so a
-consumer that never imports it carries no zod.
+consumer that never imports it carries no zod; `src/time.ts` holds how long a
+deployment has left, in words (see "Time remaining"), published as
+`@shipstatic/types/time`.
 
 | Section | Purpose |
 |---------|---------|
@@ -80,6 +82,55 @@ zod is a real dependency of the constitution since 2.25.0, at the estate's
 own range (`^4.4.3`) so every consumer resolves one copy. `typesVersions`
 carries the subpath for the node10 resolver `check:package` probes; the
 platform's engines floor never uses it.
+
+## Time remaining (`src/time.ts`, `@shipstatic/types/time`)
+
+**One deadline, one reading.** `formatTimeRemaining(expires, now?)` is the time
+left before a deployment's `expires`, in words (`"3 days"`), or `null` once it
+has passed; `formatDuration(seconds)` spells any span the same way. Added
+2026-09-17, when one deadline was being told four ways: the deploy card counted
+from now, the CLI and `web/www` from the deployment's creation, the VS Code
+palette quoted the anonymous tier's lifetime as a constant, and the dashboard
+truncated, so a deployment made a second ago read "2d" there and "3 days"
+everywhere else.
+
+**It qualifies under the stopping rule on both clauses.** Five holders in five
+repos, and drift that was silent every time it happened: the card's
+seconds-read-as-a-date defect showed the same three days on every deployment
+for months, and nothing anywhere compared the card's ladder with the
+dashboard's.
+
+**The ladder**: minutes under two hours, hours under two days, days beyond,
+each rounded to the nearest. The unit changes exactly where the larger one
+rounds to two, so the number never jumps as time passes, and "1 hour" and
+"1 day", the two vaguest things a rounded clock can say, are never said.
+Rounding rather than truncating is what lets a fresh deployment read the
+lifetime it was given. `tests/time-remaining.test.ts` plants the boundaries and
+holds two properties against an independent reading of the words (less time
+left never reads as more, and neither vague phrase appears), each drilled
+against the plausible wrong ladders: truncation at every rung, a threshold on
+the larger unit's count, the deadline counted as time left, and the unreadable
+span.
+
+**What is NOT owned here, on purpose:**
+
+- **The sentence around the words.** The card says "Expires in", `web/www` says
+  "It stays live for", the CLI speaks lowercase. Each surface's register is its
+  own, and so is what it says once the deadline has passed, which is why that
+  case is `null` rather than a sentence.
+- **A compact form** (`2d`, `5h`) for tables. Its one reader, the dashboard, is
+  not converted yet; the form joins here as a minor when it is, and the ladder
+  it abbreviates is already this one.
+- **Locale.** English, like every other surface today. When localisation
+  lands, this is where a locale parameter goes, and `Intl.RelativeTimeFormat`
+  is the likely shape.
+
+**A subpath, and measured rather than tidy.** Imported from the main entry,
+the deploy card's esbuild carried about 1 KB gzipped of unrelated constants
+(error-type sets, the picker extension list) that a bundler cannot prove are
+unused, against the card's 8 KB budget. From `/time` it carries the two
+functions. It is NOT re-exported from the main entry: one fact, one address,
+so no consumer imports it two ways.
 
 ## Quick Reference
 
@@ -364,6 +415,7 @@ Use `readonly` for stable fields (`id`, `created`, `url`). Leave mutable fields 
 | `cloudflare/api` | All entity types, ShipError, constants |
 | `cloudflare/consumer` | `AccountPlanType`, `DeploymentStatus` directly (ShipError arrives via `cloudflare/shared`) |
 | `web/my` | Entity types, response types |
+| `@shipstatic/ship` (the CLI), `@shipstatic/mcp`, `cloudflare/mcp`, `integrations/vscode`, `web/www` | `/time`: the time a deployment has left (`PUBLIC_EXPIRY` spells the anonymous lifetime with `formatDuration`) |
 
 ## The typecheck covers `tests/` too
 
