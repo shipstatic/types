@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDuration, formatTimeRemaining } from '../src/time';
+import { formatDuration, formatTimeRemaining } from '../src/index';
 
 const MINUTE = 60;
 const HOUR = 3_600;

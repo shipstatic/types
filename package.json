@@ -1,6 +1,6 @@
 {
   "name": "@shipstatic/types",
-  "version": "2.26.0-beta.1",
+  "version": "2.26.0-beta.2",
   "description": "Shared TypeScript types for the ShipStatic platform.",
   "type": "module",
   "main": "./dist/index.js",
@@ -13,19 +13,12 @@
     "./schemas": {
       "types": "./dist/schemas.d.ts",
       "default": "./dist/schemas.js"
-    },
-    "./time": {
-      "types": "./dist/time.d.ts",
-      "default": "./dist/time.js"
     }
   },
   "typesVersions": {
     "*": {
       "schemas": [
         "./dist/schemas.d.ts"
-      ],
-      "time": [
-        "./dist/time.d.ts"
       ]
     }
   },
