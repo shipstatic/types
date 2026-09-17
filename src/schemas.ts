@@ -218,10 +218,18 @@ export const DomainShareResponseSchema = z.object({
 });
 
 export const DomainValidateResponseSchema = z.object({
-  valid: z.boolean().describe('Whether the domain name is valid.'),
+  valid: z.boolean().describe("Whether the domain's shape is usable."),
   normalized: z.string().nullable().describe('The normalized domain name; null when invalid.'),
-  available: z.boolean().nullable().describe('Whether the domain is available; null when invalid.'),
-  reason: z.string().nullable().describe('Why the name is unusable, for display; null when valid.'),
+  available: z
+    .boolean()
+    .nullable()
+    .describe(
+      'Whether nobody has registered the name yet; null when invalid. Creating it would be new; re-pointing your own domain is a write, not a create.',
+    ),
+  reason: z
+    .string()
+    .nullable()
+    .describe('Why the name is unusable, for display; null when it is usable.'),
 });
 
 // =============================================================================

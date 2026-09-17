@@ -538,13 +538,28 @@ export interface SetupInstructionsResponse {
  * one key cannot mean both. See {@link DeploymentDeleteResponse} for the law.
  */
 export interface DomainValidateResponse {
-  /** Whether the domain is valid */
+  /** Whether the domain's SHAPE is usable: format, and the caller's own rules. */
   valid: boolean;
   /** Normalized domain name, null when invalid */
   normalized: string | null;
-  /** Whether the domain is available, null when invalid */
+  /**
+   * Whether nobody has registered the name yet; null when invalid.
+   *
+   * It answers "would creating this be new", not "would a write succeed": `PUT
+   * /domains/:domain` is an upsert, which is how a domain is re-pointed, so a
+   * caller's OWN domain is unavailable here and writable there. Availability
+   * does not depend on the kind of name; a custom domain answered `true`
+   * whoever owned it until 2026-09-18.
+   */
   available: boolean | null;
-  /** Why the name is unusable, null when valid — displayed verbatim. */
+  /**
+   * Why the name is unusable, null when it IS usable — displayed verbatim.
+   *
+   * A name is unusable when it is invalid OR unavailable, and both carry a
+   * reason. This said "null when valid" until 2026-09-18, which was already
+   * untrue of the endpoint it described: a registered name is valid, is
+   * unusable, and had no reason at all, which is why every client invented one.
+   */
   reason: string | null;
 }
 
