@@ -549,14 +549,14 @@ export interface DomainValidateResponse {
    * /domains/:domain` is an upsert, which is how a domain is re-pointed, so a
    * caller's OWN domain is unavailable here and writable there. Availability
    * does not depend on the kind of name; a custom domain answered `true`
-   * whoever owned it until 2026-09-18.
+   * whoever owned it until 2026-09-17.
    */
   available: boolean | null;
   /**
    * Why the name is unusable, null when it IS usable — displayed verbatim.
    *
    * A name is unusable when it is invalid OR unavailable, and both carry a
-   * reason. This said "null when valid" until 2026-09-18, which was already
+   * reason. This said "null when valid" until 2026-09-17, which was already
    * untrue of the endpoint it described: a registered name is valid, is
    * unusable, and had no reason at all, which is why every client invented one.
    */
