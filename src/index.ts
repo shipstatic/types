@@ -548,17 +548,14 @@ export interface DomainValidateResponse {
    * It answers "would creating this be new", not "would a write succeed": `PUT
    * /domains/:domain` is an upsert, which is how a domain is re-pointed, so a
    * caller's OWN domain is unavailable here and writable there. Availability
-   * does not depend on the kind of name; a custom domain answered `true`
-   * whoever owned it until 2026-09-17.
+   * does not depend on the kind of name.
    */
   available: boolean | null;
   /**
-   * Why the name is unusable, null when it IS usable — displayed verbatim.
-   *
-   * A name is unusable when it is invalid OR unavailable, and both carry a
-   * reason. This said "null when valid" until 2026-09-17, which was already
-   * untrue of the endpoint it described: a registered name is valid, is
-   * unusable, and had no reason at all, which is why every client invented one.
+   * Why the name is unusable, displayed verbatim; null exactly when it IS
+   * usable. A name is unusable when it is invalid OR unavailable, and both
+   * carry a reason, so a client reads this field alone for the verdict and
+   * invents no copy of its own.
    */
   reason: string | null;
 }
@@ -2714,6 +2711,26 @@ export function formatTimeRemaining(
 
 function countOf(count: number, unit: string): string {
   return `${count} ${unit}${count === 1 ? '' : 's'}`;
+}
+
+// =============================================================================
+// FILE SIZE
+// =============================================================================
+
+/**
+ * A byte count as a person reads it: `"180 KB"`, `"2.5 MB"`, `"0 Bytes"`.
+ *
+ * Binary units, one decimal by default, and `decimals` for a surface with its
+ * own density (a dense table reads `"3 MB"` at 0). A deployment's size reads
+ * this way on every surface that states one: the console, the CLI, the deploy
+ * card and the API's own refusals, so one deployment is one number everywhere.
+ */
+export function formatFileSize(bytes: number, decimals: number = 1): string {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${Number.parseFloat((bytes / k ** i).toFixed(decimals))} ${sizes[i]}`;
 }
 
 // =============================================================================

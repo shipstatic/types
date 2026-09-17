@@ -34,6 +34,7 @@ consumer that never imports it carries no zod.
 | SPA Check Types | `SPACheckRequest`, `SPACheckResponse` |
 | Static File | `StaticFile` (cross-environment file representation) |
 | Time Remaining | `formatTimeRemaining`, `formatDuration`: how long a deployment has left, in words (see "Time remaining") |
+| File Size | `formatFileSize`: a byte count as a person reads it (see "File size") |
 | Platform Constants | `DEFAULT_API`, `PUBLIC_DEPLOYMENT_TTL_SECONDS` (the anonymous-deploy lifetime — the API stamps `expires` and the claim window from it, and both MCP transports derive the duration they quote to agents; it was four restatements until 2026-08-06), `SHIP_ENV` (the Node SDK's ambient pair `SHIP_TOKEN`/`SHIP_API_URL` — the COMPLETE scrub list for embedding hosts; CLI-only vars deliberately excluded), `SHIP_VIA_ENV` (the subprocess-wrapper origin-relabel slot, read by the CLI and the stdio MCP bin; deliberately outside `SHIP_ENV` because the SDK never reads it), `MY_API_KEY_URL` (the console deep link every authentication-teaching surface quotes — five files, three repos, until 2.5.0-beta.21) |
 | Resource Contracts | `DeployInput`, `DeploymentUploadOptions`, `*Resource` interfaces |
 | Billing Types | `BillingInterval`, `Plan`, `PlansResponse`, `CheckoutSession`, `BillingPortalSession` — the vocabulary only, spelled as Stripe spells it. No price and no cap is published: they are policy, delivered by `GET /plans` (see "Validation: format vs policy"). The platform runs on Stripe and its vocabulary says so (`StripeSession`); the plan vocabulary is fenced by `tests/billing-vocabulary.test.ts` |
@@ -419,6 +420,18 @@ keeps zod out of every bundle that does not validate), never by bytes of this
 package's own code. If the card's budget ever binds, the fix is making the main
 entry's constants tree-shakeable, which serves every helper at once.
 
+### File size: one number, one reading
+
+**`formatFileSize(bytes, decimals = 1)`** spells a byte count (`"180 KB"`,
+`"2.5 MB"`). Binary units; `decimals` is the one thing a surface chooses,
+because density is presentation (the console's tables read at 0). Every surface
+that states a deployment's size reads it from here: the console (through
+`@shipstatic/ship`, which re-exports it), the CLI's lists and details, the deploy
+card, and the API's own size refusals. It qualifies under the stopping rule the
+same way the deadline does: several holders, and drift between them silent
+(a table saying `180.0Kb` beside a card saying `180 KB` is not an error anything
+raises).
+
 ## Consumers
 
 | Package | Uses |
@@ -429,6 +442,7 @@ entry's constants tree-shakeable, which serves every helper at once.
 | `cloudflare/consumer` | `AccountPlanType`, `DeploymentStatus` directly (ShipError arrives via `cloudflare/shared`) |
 | `web/my` | Entity types, response types |
 | `@shipstatic/ship` (the CLI), `@shipstatic/mcp`, `cloudflare/mcp`, `integrations/vscode`, `web/www`, `web/my` | `formatTimeRemaining` / `formatDuration`: the time a deployment has left (`PUBLIC_EXPIRY` spells the anonymous lifetime with `formatDuration`) |
+| `@shipstatic/ship` (re-exported; the CLI), `cloudflare/api`, `cloudflare/mcp`, `web/my` | `formatFileSize`: a deployment's size |
 
 ## The typecheck covers `tests/` too
 
