@@ -365,7 +365,8 @@ when one deadline was being told four ways: the deploy card counted from now,
 the CLI and `web/www` from the deployment's creation, the VS Code palette
 quoted the anonymous tier's lifetime as a constant, and the dashboard
 truncated, so a deployment made a second ago read "2d" there and "3 days"
-everywhere else.
+everywhere else. The dashboard converted the same day, so every reader is a
+consumer now.
 
 **It qualifies under the stopping rule on both clauses.** Five holders in five
 repos, and drift that was silent every time it happened: the card's
@@ -391,9 +392,12 @@ span.
   "It stays live for", the CLI speaks lowercase. Each surface's register is its
   own, and so is what it says once the deadline has passed, which is why that
   case is `null` rather than a sentence.
-- **A compact form** (`2d`, `5h`) for tables. Its one reader, the dashboard, is
-  not converted yet; the form joins here as a minor when it is, and the ladder
-  it abbreviates is already this one.
+- **A compact form** (`2d`, `5h`) for tables: REFUSED, by the zeroth option
+  (2026-09-17, the same afternoon). The dashboard was its one reader, with a
+  truncating ladder of its own, and it converted to the words instead
+  (`web/my/src/components/TimeRemaining.tsx`): a dense table has room for
+  "3 days", and a second spelling here would have been two readings of one
+  deadline under one owner, which is what this function exists to end.
 - **Locale.** English, like every other surface today. When localisation
   lands, this is where a locale parameter goes, and `Intl.RelativeTimeFormat`
   is the likely shape.
@@ -424,7 +428,7 @@ entry's constants tree-shakeable, which serves every helper at once.
 | `cloudflare/api` | All entity types, ShipError, constants |
 | `cloudflare/consumer` | `AccountPlanType`, `DeploymentStatus` directly (ShipError arrives via `cloudflare/shared`) |
 | `web/my` | Entity types, response types |
-| `@shipstatic/ship` (the CLI), `@shipstatic/mcp`, `cloudflare/mcp`, `integrations/vscode`, `web/www` | `formatTimeRemaining` / `formatDuration`: the time a deployment has left (`PUBLIC_EXPIRY` spells the anonymous lifetime with `formatDuration`) |
+| `@shipstatic/ship` (the CLI), `@shipstatic/mcp`, `cloudflare/mcp`, `integrations/vscode`, `web/www`, `web/my` | `formatTimeRemaining` / `formatDuration`: the time a deployment has left (`PUBLIC_EXPIRY` spells the anonymous lifetime with `formatDuration`) |
 
 ## The typecheck covers `tests/` too
 
