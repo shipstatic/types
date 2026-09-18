@@ -3122,6 +3122,7 @@ export type ActivityEvent =
   | 'admin.account.ref.update'
   | 'admin.account.labels.update'
   | 'admin.deployment.delete'
+  | 'admin.deployment.review' // Internal: an operator reviewed an account's outstanding deployments in one act (not user-visible)
   | 'admin.domain.delete'
   | 'admin.impersonate';
 
