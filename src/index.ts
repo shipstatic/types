@@ -249,42 +249,143 @@ export interface DeploymentDeleteResponse {
 // =============================================================================
 
 /**
- * Domain status constants
+ * A domain's STANDING: the one derived word, and what it asks of the owner.
  *
- * - PENDING: DNS not configured
- * - PARTIAL: DNS partially configured
- * - SUCCESS: DNS fully verified
- * - PAUSED: Domain paused due to plan enforcement (billing)
+ * Not a DNS state and not a lifecycle. It answers the only question a reader
+ * of a domain actually has, which is "what, if anything, do I have to do about
+ * this one":
+ *
+ * - `live`: it serves the linked deployment. Nothing to do. Open it.
+ * - `unlinked`: DNS is verified and nothing is published there, so a visitor
+ *   meets the platform's reserved page. Link a deployment.
+ * - `unverified`: the required DNS records are not all in place yet, in full
+ *   or in part. Configure DNS.
+ * - `paused`: the plan no longer has room for it. DNS is intact and the
+ *   platform has stopped serving it; nothing DNS-shaped will help.
+ *
+ * **Derived, with exactly one owner: `domainStatus(row)` in the platform's
+ * `shared/db/domains.ts`, beside `domainMapping(row)`.** The precedence is
+ * policy rather than arithmetic, and it is stated here ONCE so that no
+ * consumer has to restate it:
+ *
+ * ```
+ * paused !== null               -> 'paused'
+ * verification !== 'verified'   -> 'unverified'   (DNS comes first)
+ * deployment === null           -> 'unlinked'
+ * otherwise                     -> 'live'
+ * ```
+ *
+ * This constant is the PUBLISHED RECORD of that rule, not a second
+ * implementation of it. A consumer reads the word off the wire and switches
+ * on it; a consumer that recomputes it from `deployment` and `verification`
+ * has become the fourth copy of a precedence that drifts, which is exactly
+ * how an unlinked domain wore a green "success" dot for months.
+ *
+ * The raw facts are still on the row, each said once, for a reader who wants
+ * one of them specifically: {@link Domain.verification}, {@link Domain.verified},
+ * {@link Domain.deployment}, {@link Domain.paused}.
+ *
+ * Note this is a repurposing of a wire name, which the API compatibility law
+ * otherwise forbids: until types 3.0.0 `status` carried the DNS enum
+ * (`pending`, `partial`, `success`) with `paused` glued on at the API's
+ * projection. The exception was granted deliberately on 2026-09-20, on the
+ * grounds that `status` is the right name for this and a `standing` beside a
+ * deprecated `status` would preserve the half-design forever. It is recorded
+ * beside the law it bends and is not precedent.
  */
 export const DomainStatus = {
-  PENDING: 'pending',
-  PARTIAL: 'partial',
-  SUCCESS: 'success',
+  LIVE: 'live',
+  UNLINKED: 'unlinked',
+  UNVERIFIED: 'unverified',
   PAUSED: 'paused',
 } as const;
 
 export type DomainStatusType = (typeof DomainStatus)[keyof typeof DomainStatus];
 
 /**
- * Core domain object - used in both API responses and SDK
+ * The DNS fact: how far the platform's one verifying act has got.
+ *
+ * - `pending`: none of the required records point at the platform.
+ * - `partial`: some do. For a `www` domain that is the CNAME without the
+ *   apex A record, or the other way round.
+ * - `verified`: all of them do. Platform names are born here, having no
+ *   records to configure.
+ *
+ * Written by the DNS verifier and at birth, and by nothing else. A reader who
+ * only wants to know whether to go and fix DNS reads {@link Domain.status};
+ * this field is the diagnostic underneath it, and it is the ONLY place
+ * `partial` is distinguishable from `pending`. Do not fold that distinction
+ * into `status`: the standing says what to do, and "configure DNS" is the
+ * same instruction either way.
+ *
+ * **On the noun, decided twice (2026-09-20), with the refusals recorded here
+ * because an unrecorded one gets re-proposed forever.** `records` was the
+ * first choice and is refused: on this same resource it would be a state word
+ * on {@link Domain} and an array of DNS records on `DomainRecordsResponse`,
+ * and the audience reading both schemas is largely agents. `dns` is refused
+ * because it is taken twice over, by the provider lookup on
+ * `GET /domains/:domain/dns` and by the column of that name. `verification`
+ * is the platform's own family noun, shared by the `verify_dns` job, the
+ * `POST /domains/:domain/verify` route, the {@link Domain.verified} instant
+ * and the {@link Domain.verifications} count, so the three read as one act.
+ * Its near-twin with `verifications` survives only in prose: in code the
+ * compiler separates a string from a number.
+ */
+export const DomainVerification = {
+  PENDING: 'pending',
+  PARTIAL: 'partial',
+  VERIFIED: 'verified',
+} as const;
+
+export type DomainVerificationType = (typeof DomainVerification)[keyof typeof DomainVerification];
+
+/**
+ * Core domain object - used in both API responses and SDK.
+ *
+ * Read as four groups, which is the order the fields are in, because that
+ * order is what a reader sees (`ship domains get` renders the wire's own key
+ * order). Identity, then the one derived word, then each raw fact said once:
+ *
+ * - **identity**: `domain`, `url`
+ * - **the standing**: `status`, derived from the three facts below and owned
+ *   in one place ({@link DomainStatus})
+ * - **the link fact**: `deployment` (what), `linked` (when), `links` (how many)
+ * - **the DNS fact**: `verification` (what), `verified` (when it reached its
+ *   terminal state), `verifications` (how many attempts)
+ * - **the plan fact**: `paused`, an instant
+ * - and the housekeeping every resource carries: `labels`, `created`
+ *
+ * The two trios are the same shape on purpose. Two words double as an
+ * instant's name on the same object (`status: 'paused'` beside `paused`,
+ * `verification: 'verified'` beside `verified`); the one-instant law forbids
+ * an `At` suffix, so this is the honest shape, and it reads as a sentence:
+ * paused, and when.
  */
 export interface Domain {
   /** The domain name */
   readonly domain: string;
   /** Full URL to the domain (e.g., 'https://www.example.com') */
   readonly url: string;
+  /** What this domain needs from its owner: the one word to read. See {@link DomainStatus} for the precedence and its owner. */
+  status: DomainStatusType;
   /** The deployment hostname this domain points to (null = domain added but not yet linked) */
   deployment: string | null; // Mutable - can be updated to point to different deployment
-  /** Current domain status */
-  status: DomainStatusType; // Mutable - can be updated
-  /** Labels for categorization and filtering (lowercase, alphanumeric with separators). Always present, empty array when none. */
-  labels: string[];
-  /** Unix timestamp (seconds) when domain was created */
-  readonly created: number;
   /** Unix timestamp (seconds) when deployment was last linked, null if never linked */
   linked: number | null;
   /** Total deployment links */
   links: number;
+  /** How far DNS verification has got. See {@link DomainVerification}. */
+  verification: DomainVerificationType;
+  /** Unix timestamp (seconds) when DNS verified, null while it is not. Cleared if the records later move away. */
+  verified: number | null;
+  /** Total DNS verification attempts */
+  verifications: number;
+  /** Unix timestamp (seconds) when plan enforcement paused serving, null while the plan has room for it */
+  paused: number | null;
+  /** Labels for categorization and filtering (lowercase, alphanumeric with separators). Always present, empty array when none. */
+  labels: string[];
+  /** Unix timestamp (seconds) when domain was created */
+  readonly created: number;
 }
 
 /**

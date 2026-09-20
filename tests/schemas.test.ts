@@ -105,12 +105,16 @@ const deployment: Deployment = {
 const domain: Domain = {
   domain: 'www.example.com',
   url: 'https://www.example.com',
+  status: 'live',
   deployment: deployment.deployment,
-  status: 'pending',
-  labels: [],
-  created: 1_700_000_000,
   linked: 1_700_000_100,
   links: 1,
+  verification: 'verified',
+  verified: 1_700_000_050,
+  verifications: 2,
+  paused: null,
+  labels: [],
+  created: 1_700_000_000,
 };
 
 const caps: Caps = { deployments: 2, platformDomains: 0, customDomains: 1 };

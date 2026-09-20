@@ -44,6 +44,7 @@ import {
   DeploymentStatus,
   DeploymentVia,
   DomainStatus,
+  DomainVerification,
   PUBLIC_DEPLOYMENT_TTL_SECONDS,
 } from './index.js';
 
@@ -123,18 +124,16 @@ export const DeploymentDeleteResponseSchema = z.object({
 export const DomainSchema = z.object({
   domain: z.string().describe('The domain name, e.g. "www.example.com".'),
   url: z.url().describe('Full URL to the domain.'),
+  status: grown(
+    DomainStatus,
+    'What this domain needs from its owner, derived: "live" serves the linked deployment and needs nothing; "unlinked" is verified with nothing published there, so link a deployment; "unverified" needs its DNS records configured; "paused" means the plan no longer has room for it. Read this word rather than recomputing it.',
+  ),
   deployment: z
     .string()
     .nullable()
     .describe(
       'The deployment hostname this domain points to; null when reserved but not yet linked.',
     ),
-  status: grown(
-    DomainStatus,
-    'DNS verification state; "success" means the domain serves the linked deployment.',
-  ),
-  labels: z.array(z.string()).describe('Labels attached to the domain; empty when none.'),
-  created: unixSeconds('when the domain was created'),
   linked: z
     .int()
     .nullable()
@@ -143,6 +142,28 @@ export const DomainSchema = z.object({
     .int()
     .nonnegative()
     .describe('How many times a deployment has been linked to this domain.'),
+  verification: grown(
+    DomainVerification,
+    'How far DNS verification has got: "pending" is no required record pointing here, "partial" is some of them, "verified" is all. The diagnostic under "unverified"; platform domains are born verified.',
+  ),
+  verified: z
+    .int()
+    .nullable()
+    .describe(
+      'Unix timestamp (seconds) when DNS verified; null while it is not, and cleared if the records later move away.',
+    ),
+  verifications: z
+    .int()
+    .nonnegative()
+    .describe('How many DNS verification attempts this domain has had.'),
+  paused: z
+    .int()
+    .nullable()
+    .describe(
+      'Unix timestamp (seconds) when plan enforcement paused serving; null while the plan has room for it.',
+    ),
+  labels: z.array(z.string()).describe('Labels attached to the domain; empty when none.'),
+  created: unixSeconds('when the domain was created'),
 });
 
 /** `Domain` plus the SDK's own create-versus-update flag; the wire body is a plain `Domain`. */
@@ -164,7 +185,7 @@ export const DomainVerifyResponseSchema = z.object({
   domain: z
     .string()
     .describe(
-      'The domain whose DNS verification was queued, normalized. The check runs asynchronously; the domain status updates once DNS propagates.',
+      "The domain whose DNS verification was queued, normalized. The check runs asynchronously; the domain's `verification` and `status` update once DNS propagates, so read the domain again rather than trusting this acknowledgement for a verdict.",
     ),
 });
 

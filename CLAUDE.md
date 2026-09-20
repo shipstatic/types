@@ -334,6 +334,54 @@ AccountResource    : get
 
 `upload`'s wide input is `DeployInput` (`File[] | string | string[]`). Each platform's SDK narrows its `Ship.deploy()` shortcut to the relevant subset (`File[]` in Browser, `string | string[]` in Node) and runtime-validates the resource-layer call. There is no `BillingResource` or `KeysResource` in the shared contract — the `web/my` app talks to billing endpoints directly via its API client.
 
+### A domain says one derived word, and three raw facts once each
+
+`Domain` is the constitution's worked example of separating a STANDING from
+the facts it is derived from, and it is worth reading before adding a
+status-shaped field to anything else.
+
+| Field | Kind | Values |
+|---|---|---|
+| `status` | the one DERIVED word: what this domain needs from its owner | `live`, `unlinked`, `unverified`, `paused` |
+| `verification` | the DNS fact | `pending`, `partial`, `verified` |
+| `verified` / `verifications` | when it reached its terminal state / how many attempts | instant or null / count |
+| `deployment` / `linked` / `links` | the link fact, in the same trio shape | hostname or null / instant or null / count |
+| `paused` | the plan fact | instant or null |
+
+**`status` has exactly ONE owner, and it is not in this package.**
+`domainStatus(row)` lives in the platform's `cloudflare/shared/db/domains.ts`,
+beside `domainMapping(row)`, and the two are held to each other by a fence
+that plants implications as literals. The `DomainStatus` constant here states
+the precedence in its docblock as the PUBLISHED RECORD of that rule, never as
+a second implementation: a consumer reads the word and switches on it. A
+consumer that recomputes it from `deployment` and `verification` has become
+the next copy of a precedence that drifts, which is how an unlinked domain
+wore a green "success" dot for months.
+
+**Why `status` is a repurposed name, once.** Until 3.0.0 it carried the DNS
+enum (`pending`, `partial`, `success`) with `paused` glued on at the API's
+projection, and the fourth standing existed only inside the console. The API
+compatibility law forbids repurposing a wire name, and the operator granted
+this the one exception on 2026-09-20: `status` is the right name for a
+standing, and a `standing` field beside a deprecated `status` would have
+preserved the half-design forever. Hence one breaking release across the
+whole constellation rather than a deprecation window. The reasoning is
+recorded beside the law it bends in `cloudflare/api/CLAUDE.md`, "API
+Evolution", and it is NOT precedent.
+
+**The blast radius was measured rather than assumed**, which matters because
+the first draft of that record named two fences that cannot fire.
+`DomainStatusSchema` is `grown()`, a described `z.string()`, so no pinned MCP
+output schema refuses a new value; and the n8n node carries zero status
+literals. What actually broke was every consumer's own comparison against
+`'success'` and every published sentence that taught it.
+
+**Field ORDER is part of the contract here**, unusually: the CLI's
+`formatDetails` renders the wire's own key order, so `ship domains get` shows
+these fields in the order this interface declares them. They are grouped
+identity, standing, link trio, DNS trio, plan fact, housekeeping. Keep new
+fields in their group.
+
 ### Status Constants Pattern
 
 `as const` object + derived union type. Two naming variants depending on whether the entity name already ends in something like "Type":
@@ -350,7 +398,7 @@ export type ErrorType = typeof ErrorType[keyof typeof ErrorType];
 ```
 
 Used by:
-- Standard variant: `DeploymentStatus`, `DomainStatus`, `AccountPlan`, `FileValidationStatus`, `AuthMethod`, `TokenKind`
+- Standard variant: `DeploymentStatus`, `DomainStatus`, `DomainVerification`, `AccountPlan`, `FileValidationStatus`, `AuthMethod`, `TokenKind`
 - Shared-name variant: `ErrorType` (would be `ErrorTypeType` under the standard variant — clearly worse)
 
 ### Readonly vs Mutable

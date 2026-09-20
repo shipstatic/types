@@ -89,7 +89,8 @@ Both helpers accept an optional operation-name string for contextual messages (`
 ```typescript
 import {
   DeploymentStatus,   // pending | success | failed | deleting
-  DomainStatus,       // pending | partial | success | paused
+  DomainStatus,       // live | unlinked | unverified | paused — the domain's standing, derived
+  DomainVerification, // pending | partial | verified — the DNS fact under it
   AccountPlan,        // free | pro | scale | sponsored — tiers only; suspension and deletion are account facts
   FileValidationStatus, // pending | processing_error | excluded | validation_failed | ready
   AuthMethod,         // session | apiKey | token | agent | oauth | webhook | system
