@@ -150,7 +150,7 @@ export const DomainSchema = z.object({
     .int()
     .nullable()
     .describe(
-      'Unix timestamp (seconds) when DNS verified; null while it is not, and cleared if the records later move away.',
+      'When DNS last became verified; null if it never has, and never cleared, so a domain whose records moved away keeps it. Read `verification` for whether DNS is right now.',
     ),
   verifications: z
     .int()

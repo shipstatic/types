@@ -383,6 +383,8 @@ export interface Domain {
    *
    * MONOTONIC: nothing clears it, so a domain whose records later move away
    * keeps the stamp it earned and reads "not verified now, last was <date>".
+   * A domain that comes back is RE-STAMPED, which is what makes the word
+   * "last" true rather than aspirational.
    * It answers a HISTORY question and decides nothing — {@link verification}
    * is the present tense and is what every DNS decision reads. A consumer
    * testing this for null to mean "not verified" gets the wrong answer for
