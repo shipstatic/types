@@ -311,8 +311,10 @@ export type DomainStatusType = (typeof DomainStatus)[keyof typeof DomainStatus];
  * - `verified`: all of them do. Platform names are born here, having no
  *   records to configure.
  *
- * Written by the DNS verifier and at birth, and by nothing else. A reader who
- * only wants to know whether to go and fix DNS reads {@link Domain.status};
+ * Written by the DNS verifier and at birth, and by nothing else. **It is the
+ * only field that says whether DNS is verified NOW**: its sibling instant
+ * {@link Domain.verified} is monotonic and answers when it last was. A reader
+ * who only wants to know whether to go and fix DNS reads {@link Domain.status};
  * this field is the diagnostic underneath it, and it is the ONLY place
  * `partial` is distinguishable from `pending`. Do not fold that distinction
  * into `status`: the standing says what to do, and "configure DNS" is the
@@ -376,7 +378,16 @@ export interface Domain {
   links: number;
   /** How far DNS verification has got. See {@link DomainVerification}. */
   verification: DomainVerificationType;
-  /** Unix timestamp (seconds) when DNS verified, null while it is not. Cleared if the records later move away. */
+  /**
+   * When DNS LAST became verified, or null if it never has.
+   *
+   * MONOTONIC: nothing clears it, so a domain whose records later move away
+   * keeps the stamp it earned and reads "not verified now, last was <date>".
+   * It answers a HISTORY question and decides nothing — {@link verification}
+   * is the present tense and is what every DNS decision reads. A consumer
+   * testing this for null to mean "not verified" gets the wrong answer for
+   * exactly the domain that needs attention.
+   */
   verified: number | null;
   /** Total DNS verification attempts */
   verifications: number;

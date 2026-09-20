@@ -344,7 +344,7 @@ status-shaped field to anything else.
 |---|---|---|
 | `status` | the one DERIVED word: what this domain needs from its owner | `live`, `unlinked`, `unverified`, `paused` |
 | `verification` | the DNS fact | `pending`, `partial`, `verified` |
-| `verified` / `verifications` | when it reached its terminal state / how many attempts | instant or null / count |
+| `verified` / `verifications` | when it LAST became verified (monotonic) / how many attempts | instant or null / count |
 | `deployment` / `linked` / `links` | the link fact, in the same trio shape | hostname or null / instant or null / count |
 | `paused` | the plan fact | instant or null |
 
@@ -357,6 +357,17 @@ a second implementation: a consumer reads the word and switches on it. A
 consumer that recomputes it from `deployment` and `verification` has become
 the next copy of a precedence that drifts, which is how an unlinked domain
 wore a green "success" dot for months.
+
+**The instant decides NOTHING, and that is the sharper half of the split.**
+`verified` is monotonic: no verdict clears it, so a domain whose records move
+away keeps the stamp and reads "not verified now, last was <date>". It answers
+a HISTORY question (has this ever verified) where `verification` answers the
+present one, and the platform read the instant as a boolean at eight decision
+points until 2026-09-21 — which made it contradict itself on a drifted row,
+calling the domain `unverified` on the wire while every DNS door refused it as
+already verified. Clearing the stamp instead was refused because the verifier
+gates four once-only consequences of a first verification on it; the record is
+`cloudflare/CLAUDE.md`, "Domain rows and their KV mapping".
 
 **Why `status` is a repurposed name, once.** Until 3.0.0 it carried the DNS
 enum (`pending`, `partial`, `success`) with `paused` glued on at the API's
