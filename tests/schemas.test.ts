@@ -218,6 +218,7 @@ describe('every schema accepts its own shape', () => {
     // The fixture above carries neither, which is every response before 3.1.
     const withSeats: Account = {
       ...account,
+      account: 'org0000000000001',
       role: 'member',
       usage: { ...caps, seats: 3 },
       caps: { ...account.caps, seats: 5 },

@@ -833,6 +833,13 @@ export type AccountRole = 'owner' | 'member';
  * All fields are readonly to prevent accidental mutations
  */
 export interface Account {
+  /**
+   * The account this response describes, by id. A person may belong to
+   * several accounts and a browser session selects one, so a client names
+   * the one it means on every request (`X-Account`) and this is where it
+   * learns the name. Optional by the additive-evolution law.
+   */
+  readonly account?: string;
   /** User email address */
   readonly email: string;
   /** User display name, null if not set */
