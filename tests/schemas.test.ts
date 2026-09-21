@@ -38,6 +38,7 @@ import type {
   DomainValidateResponse,
   DomainVerifyResponse,
   ListResponse,
+  PlanDestination,
   ScheduledChange,
 } from '../src/index.js';
 import * as S from '../src/schemas.js';
@@ -77,6 +78,7 @@ const _domainShare: Held<DomainShareResponse, typeof S.DomainShareResponseSchema
 const _domainValidate: Held<DomainValidateResponse, typeof S.DomainValidateResponseSchema> = true;
 const _caps: Held<Caps, typeof S.CapsSchema> = true;
 const _scheduled: Held<ScheduledChange, typeof S.ScheduledChangeSchema> = true;
+const _destination: Held<PlanDestination, typeof S.PlanDestinationSchema> = true;
 const _account: Held<Account, typeof S.AccountSchema> = true;
 
 // The fence can fail: a shape missing a key, or with an extra one, is `never`.
@@ -228,6 +230,27 @@ describe('every schema accepts its own shape', () => {
     // platform makes reachable.
     expect(S.AccountSchema.safeParse({ ...account, role: 'admin' }).success).toBe(false);
     expect(S.CapsSchema.safeParse({ ...caps, seats: -1 }).success).toBe(false);
+  });
+
+  it('destinations are additive, and a destination always names at least one interval', () => {
+    const withDestinations: Account = {
+      ...account,
+      destinations: [{ plan: 'team', intervals: ['year'] }],
+    };
+    expect(S.AccountSchema.safeParse(withDestinations).success).toBe(true);
+    expect(S.AccountSchema.safeParse({ ...account, destinations: [] }).success).toBe(true);
+    // A plan with no legal cadence is absent from the list, never listed empty.
+    expect(
+      S.AccountSchema.safeParse({ ...account, destinations: [{ plan: 'team', intervals: [] }] })
+        .success,
+    ).toBe(false);
+    // The plan vocabulary is grown, so a future tier parses; the interval one is Stripe's and closed.
+    expect(
+      S.PlanDestinationSchema.safeParse({ plan: 'enterprise', intervals: ['month'] }).success,
+    ).toBe(true);
+    expect(S.PlanDestinationSchema.safeParse({ plan: 'team', intervals: ['week'] }).success).toBe(
+      false,
+    );
   });
 
   it('a closed vocabulary that is not ours stays closed', () => {

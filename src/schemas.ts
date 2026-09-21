@@ -288,6 +288,14 @@ export const ScheduledChangeSchema = z.object({
   at: unixSeconds('when the change applies'),
 });
 
+export const PlanDestinationSchema = z.object({
+  plan: grown(AccountPlan, 'A plan the account may move to.'),
+  intervals: z
+    .array(z.enum(['month', 'year']))
+    .min(1)
+    .describe('The billing intervals that move is legal with, from where the account stands.'),
+});
+
 export const AccountSchema = z.object({
   account: z
     .string()
@@ -348,4 +356,10 @@ export const AccountSchema = z.object({
     .int()
     .nullable()
     .describe('Unix timestamp (seconds) when the subscription ends; null while it renews.'),
+  destinations: z
+    .array(PlanDestinationSchema)
+    .optional()
+    .describe(
+      'Where the account may move, as the change door would accept it; absent on responses that predate it.',
+    ),
 });

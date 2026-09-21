@@ -941,6 +941,28 @@ export interface Account {
    * mirrored, what it would merely display is not.
    */
   readonly cancelAt: number | null;
+  /**
+   * Where this account may MOVE, as the change door would accept it: every
+   * sold plan whose door is open, with the billing intervals that are legal
+   * from where the account stands. It excludes the plan and cadence the
+   * account already holds and the one move the door refuses, a dearer tier
+   * at a shorter interval (an immediate move would mint a proration credit,
+   * a deferred one would make a customer asking for more wait a year). The
+   * rule's owner is the platform's plan table; a console feeds these
+   * intervals into its own move model instead of restating it. Additive:
+   * absent on responses that predate it, and a client then derives as it did.
+   */
+  readonly destinations?: PlanDestination[];
+}
+
+/**
+ * One row of `Account.destinations`: a plan the account may move to, and the
+ * intervals it may move to it with. `intervals` is never empty; a plan with
+ * no legal cadence is simply absent from the list.
+ */
+export interface PlanDestination {
+  readonly plan: AccountPlanType;
+  readonly intervals: BillingInterval[];
 }
 
 /**
