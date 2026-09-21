@@ -2309,6 +2309,20 @@ export const CALLER = {
 } as const;
 
 /**
+ * The account a session request MEANS.
+ *
+ * A browser session selects one account for every tab at once, so a tab that
+ * switched leaves its siblings acting for an account they no longer show. A
+ * session caller may name the account it means in this header; the API
+ * answers 409 `details.account: 'select'` when it differs from the account the
+ * session resolves to, and the client re-selects. A precondition check the
+ * client volunteers, never authority: a request without it resolves exactly as
+ * before, and machine credentials never send it. One owner for the name, since
+ * the API's CORS allowlist and every browser transport spell it.
+ */
+export const ACCOUNT_HEADER = 'X-Account';
+
+/**
  * Token populations distinguishable by shape. The platform carries every
  * client token in one wire slot (`Authorization: Bearer <value>`) and
  * classifies by value, never by a side channel — this is the classifier.

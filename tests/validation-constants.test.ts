@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ACCOUNT_HEADER,
   type ActivityListResponse,
   API_KEY,
   AUTH_BASE_PATH,
@@ -555,6 +556,12 @@ describe('Validation Constants - @shipstatic/types', () => {
       expect(TokenKind.DEPLOY_TOKEN).toBe('token');
       expect(TokenKind.OAUTH).toBe('oauth');
       expect(TokenKind.OPAQUE).toBe('opaque');
+    });
+  });
+
+  describe('ACCOUNT_HEADER', () => {
+    it('is the one spelling of the header a session request names its account in', () => {
+      expect(ACCOUNT_HEADER).toBe('X-Account');
     });
   });
 
