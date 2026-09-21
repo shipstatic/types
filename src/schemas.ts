@@ -267,7 +267,20 @@ export const CapsSchema = z.object({
     .int()
     .nonnegative()
     .describe('Hostnames the customer owns, paused ones included.'),
+  seats: z
+    .int()
+    .nonnegative()
+    .optional()
+    .describe(
+      'People with a seat: the owner and every member. Absent on responses that predate seats, which then mean one seat.',
+    ),
 });
+
+export const AccountRoleSchema = z
+  .enum(['owner', 'member'])
+  .describe(
+    'The standing in the account: the founder, or an invited person who uses its resources.',
+  );
 
 export const ScheduledChangeSchema = z.object({
   plan: grown(AccountPlan, 'The plan the account moves to.'),
@@ -287,7 +300,10 @@ export const AccountSchema = z.object({
     ),
   usage: CapsSchema.describe('What the account currently holds.'),
   caps: CapsSchema.describe(
-    'What the account is allowed to hold: the same three keys as usage, so the pair divides.',
+    'What the account is allowed to hold: the same keys as usage, so the pair divides.',
+  ),
+  role: AccountRoleSchema.optional().describe(
+    "The credential's standing in this account. Absent on responses that predate seats, which then mean owner.",
   ),
   created: unixSeconds('when the account was created'),
   activated: z

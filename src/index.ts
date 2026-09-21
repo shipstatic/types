@@ -810,7 +810,23 @@ export interface Caps {
    * A downgraded account therefore reads honestly as "3 of 0".
    */
   readonly customDomains: number;
+  /**
+   * People with a seat in the account: the owner and every member, each a
+   * membership row; a pending invitation holds no seat. As `usage` it is the
+   * current member count, as `caps` the plan's ceiling. Optional by the
+   * additive-evolution law: responses older than 3.1 carry no seats, and a
+   * consumer reads one seat and one owner where the field is absent.
+   */
+  readonly seats?: number;
 }
+
+/**
+ * A person's standing in an account. `owner` founded it and alone manages
+ * billing, credentials, people and deletion; `member` uses its resources
+ * exactly as the owner does. These are Better Auth's own organization roles,
+ * and the only two the platform makes reachable.
+ */
+export type AccountRole = 'owner' | 'member';
 
 /**
  * Core account object - used in both API responses and SDK
@@ -846,6 +862,14 @@ export interface Account {
    * individually.
    */
   readonly caps: Caps;
+  /**
+   * The credential's standing in this account. Optional by the
+   * additive-evolution law: a response that predates seats names no role,
+   * and a consumer reads `owner`, because every account then had exactly one
+   * person. A key or a deploy token carries the owner's authority and reports
+   * `owner` too.
+   */
+  readonly role?: AccountRole;
   /** Unix timestamp (seconds) when account was created */
   readonly created: number;
   /** Unix timestamp (seconds) when account was activated (first deployment), null if not yet activated */
@@ -3226,6 +3250,13 @@ export type ActivityEvent =
   | 'token.create'
   | 'token.consume'
   | 'token.delete'
+  // Membership events: who joined and who left an account. `activities.user`
+  // is the actor (the person who accepted, the owner who removed, the member
+  // who left) and `meta.member` the subject, so the two removal shapes are one
+  // event told apart by whether actor and subject coincide. Invitations write
+  // no history: they concern an address that may never become a person.
+  | 'member.join'
+  | 'member.leave'
   // Billing events (internal: the operator's stream, never the customer's
   // feed — the feed's copy of this fact is the `account.plan.transition` it
   // may become)
@@ -3270,7 +3301,9 @@ export type UserVisibleActivityEvent =
   | 'domain.verify'
   | 'token.create'
   | 'token.consume'
-  | 'token.delete';
+  | 'token.delete'
+  | 'member.join'
+  | 'member.leave';
 
 /**
  * Activity record returned from the API

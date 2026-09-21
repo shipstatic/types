@@ -214,6 +214,21 @@ describe('every schema accepts its own shape', () => {
     expect(S.AccountSchema.safeParse({ ...account, plan: 'enterprise' }).success).toBe(true);
   });
 
+  it('seats and role are additive: absent on an old response, accepted on a new one', () => {
+    // The fixture above carries neither, which is every response before 3.1.
+    const withSeats: Account = {
+      ...account,
+      role: 'member',
+      usage: { ...caps, seats: 3 },
+      caps: { ...account.caps, seats: 5 },
+    };
+    expect(S.AccountSchema.safeParse(withSeats).success).toBe(true);
+    // The role vocabulary is Better Auth's and closed: only the two the
+    // platform makes reachable.
+    expect(S.AccountSchema.safeParse({ ...account, role: 'admin' }).success).toBe(false);
+    expect(S.CapsSchema.safeParse({ ...caps, seats: -1 }).success).toBe(false);
+  });
+
   it('a closed vocabulary that is not ours stays closed', () => {
     expect(S.DnsRecordSchema.safeParse({ type: 'TXT', name: '@', value: 'x' }).success).toBe(false);
   });
