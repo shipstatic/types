@@ -3396,6 +3396,12 @@ export interface ActivityMeta {
    */
   via?: DeploymentViaType;
 
+  // People events (`member.join`, `member.leave`)
+  /** The person the event is about, by user id: who joined, who left, who was removed. */
+  subject?: string;
+  /** On `member.leave` only, and only when somebody else acted: the remover's user id. A leave names nobody here. */
+  by?: string;
+
   // Domain events
   /** Whether this was an update (vs create) */
   isUpdate?: boolean;
