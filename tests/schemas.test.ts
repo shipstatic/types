@@ -216,19 +216,22 @@ describe('every schema accepts its own shape', () => {
     expect(S.AccountSchema.safeParse({ ...account, plan: 'enterprise' }).success).toBe(true);
   });
 
-  it('seats and role are additive: absent on an old response, accepted on a new one', () => {
-    // The fixture above carries neither, which is every response before 3.1.
+  it('seats, role and access are additive: absent on an old response, accepted on a new one', () => {
+    // The fixture above carries none of them, which is every response before 3.1.
     const withSeats: Account = {
       ...account,
       account: 'org0000000000001',
       role: 'member',
-      usage: { ...caps, seats: 3 },
+      access: 'paused',
+      usage: { ...caps, seats: 6 },
       caps: { ...account.caps, seats: 5 },
     };
     expect(S.AccountSchema.safeParse(withSeats).success).toBe(true);
     // The role vocabulary is Better Auth's and closed: only the two the
     // platform makes reachable.
     expect(S.AccountSchema.safeParse({ ...account, role: 'admin' }).success).toBe(false);
+    // So is the access vocabulary: derived on every request, two values.
+    expect(S.AccountSchema.safeParse({ ...account, access: 'suspended' }).success).toBe(false);
     expect(S.CapsSchema.safeParse({ ...caps, seats: -1 }).success).toBe(false);
   });
 

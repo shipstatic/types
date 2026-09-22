@@ -829,6 +829,18 @@ export interface Caps {
 export type AccountRole = 'owner' | 'member';
 
 /**
+ * Whether the credential's standing currently admits it to the account's
+ * resources. The owner is always `active`; a member is `active` while the
+ * account fits its seat cap and `paused` while it holds more people than
+ * the plan allows, until the owner upgrades or removes people. The state
+ * is derived on every request and never stored, and a paused member still
+ * reads the account, switches accounts and leaves; every other request is
+ * refused (403, `details.account: 'paused'`). A key or a deploy token is
+ * account automation, not a person, and is always `active`.
+ */
+export type AccountAccess = 'active' | 'paused';
+
+/**
  * Core account object - used in both API responses and SDK
  * All fields are readonly to prevent accidental mutations
  */
@@ -877,6 +889,14 @@ export interface Account {
    * `owner` too.
    */
   readonly role?: AccountRole;
+  /**
+   * Whether that standing admits the credential today: see
+   * {@link AccountAccess}. The API derives it from the same row that yields
+   * {@link role}, so a console reads it here rather than re-deriving it from
+   * the seat numbers. Optional by the additive-evolution law: a response
+   * that predates seats is always `active`.
+   */
+  readonly access?: AccountAccess;
   /** Unix timestamp (seconds) when account was created */
   readonly created: number;
   /** Unix timestamp (seconds) when account was activated (first deployment), null if not yet activated */
@@ -3295,8 +3315,9 @@ export type ActivityEvent =
   | 'token.delete'
   // Membership events: who joined and who left an account. `activities.user`
   // is the actor (the person who accepted, the owner who removed, the member
-  // who left) and `meta.member` the subject, so the two removal shapes are one
-  // event told apart by whether actor and subject coincide. Invitations write
+  // who left) and `meta.subject` the person it is about, so the two removal
+  // shapes are one event told apart by `meta.by`, the remover, which a leave
+  // and the termination fan-out never carry. Invitations write
   // no history: they concern an address that may never become a person.
   | 'member.join'
   | 'member.leave'

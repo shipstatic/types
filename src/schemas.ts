@@ -282,6 +282,12 @@ export const AccountRoleSchema = z
     'The standing in the account: the founder, or an invited person who uses its resources.',
   );
 
+export const AccountAccessSchema = z
+  .enum(['active', 'paused'])
+  .describe(
+    'Whether that standing admits the credential today: paused while the account holds more people than its plan allows.',
+  );
+
 export const ScheduledChangeSchema = z.object({
   plan: grown(AccountPlan, 'The plan the account moves to.'),
   interval: z.enum(['month', 'year']).describe('The billing interval the change applies with.'),
@@ -318,6 +324,9 @@ export const AccountSchema = z.object({
   ),
   role: AccountRoleSchema.optional().describe(
     "The credential's standing in this account. Absent on responses that predate seats, which then mean owner.",
+  ),
+  access: AccountAccessSchema.optional().describe(
+    'Whether that standing admits the credential today. Absent on responses that predate seats, which then mean active.',
   ),
   created: unixSeconds('when the account was created'),
   activated: z
