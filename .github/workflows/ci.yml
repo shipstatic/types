@@ -6,14 +6,9 @@ name: CI
 
 on:
   push:
-    # `team` is the Team wave's integration branch (root plan-team.md): its
-    # prerelease versions publish to the beta dist-tag exactly as
-    # development's do, the version picking the channel and the branch
-    # granting the right through the npm-beta environment's branch policy,
-    # which names it. Deleted with the branch when the wave merges.
-    branches: [main, development, team]
+    branches: [main, development]
   pull_request:
-    branches: [main, development, team]
+    branches: [main, development]
   workflow_dispatch:
 
 jobs:
