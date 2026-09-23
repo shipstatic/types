@@ -859,12 +859,10 @@ export interface Account {
   /** User profile picture URL, null if not set */
   readonly picture: string | null;
   /**
-   * The tier the account stands at. A sponsored account is Pro that nobody
-   * bills, so it reports `pro` here with {@link billed} false; the grant
-   * itself is the operator's fact, seen on the operator's surfaces and never
-   * here. A console therefore treats a sponsored account exactly as a Pro one
-   * everywhere, and the one difference it can see is the one that is real:
-   * there is no Subscription.
+   * The plan the account is on, by its own name. A granted plan names
+   * itself: a sponsored account reports `sponsored` and a scale one `scale`,
+   * each with {@link billed} false. So a billed plan's name is a promise:
+   * `pro` or `team` here always means a Subscription bills the account.
    */
   readonly plan: AccountPlanType;
   /**
@@ -931,10 +929,12 @@ export interface Account {
   readonly billed: boolean;
   /**
    * The next plan up the ladder this account could move to, or `null` when
-   * there is none: the top billed tier, a plan sold by conversation, and any
-   * plan not on the menu answer `null`. One server-side fact so that no surface derives "can this account
-   * upgrade, and to what" from the menu — a grandfathered row has no menu
-   * price to compare, and a conversation plan must never be sent to Checkout.
+   * there is none: the top billed tier and a plan sold by conversation answer
+   * `null`, and a plan below the ladder (free, sponsored) is offered its
+   * first sold row. One server-side fact so that no surface derives "can this
+   * account upgrade, and to what" from the menu — a grandfathered row has no
+   * menu price to compare, and a conversation plan must never be sent to
+   * Checkout.
    */
   readonly upgrade: AccountPlanType | null;
   /**

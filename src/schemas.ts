@@ -312,7 +312,7 @@ export const AccountSchema = z.object({
   email: z.string().describe('The account email address.'),
   name: z.string().nullable().describe('Display name; null if not set.'),
   picture: z.url().nullable().describe('Profile picture URL; null if not set.'),
-  plan: grown(AccountPlan, 'The tier the account stands at.'),
+  plan: grown(AccountPlan, 'The plan the account is on.'),
   suspended: z
     .boolean()
     .describe(
