@@ -3274,6 +3274,13 @@ export interface BillingPortalSession {
  */
 export interface BillingSyncResponse {
   readonly plan: AccountPlanType;
+  /**
+   * Does Stripe bill that plan? The same fact as {@link Account.billed}, for
+   * the plan named beside it. A purchase lands on a billed plan, so this is
+   * what tells a Checkout arrival that the payment has landed: a plan that is
+   * paid but granted (sponsored) is where the buyer stood before paying.
+   */
+  readonly billed: boolean;
 }
 
 // =============================================================================
