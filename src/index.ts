@@ -746,9 +746,9 @@ export interface TokenDeleteResponse {
  *   Price it is on. They form a ladder: a dearer tier is a superset of the one
  *   below it, and the API says which is next in {@link Account.upgrade}.
  * - **Granted** — `scale`, `sponsored`. Paid plans the operator confers by
- *   hand; no Stripe subscription, no Checkout, no Stripe object at all. These
- *   and `free` are the only plans an operator can set; a billed plan is only
- *   ever Stripe's to confer.
+ *   hand, never reached through Checkout: no Stripe subscription and no
+ *   Stripe object behind them. These and `free` are the only plans an
+ *   operator can set; a billed plan is only ever Stripe's to confer.
  *
  * The numbers each plan confers — caps, sizes — are POLICY and are delivered
  * by the API (`GET /plans`, `GET /account`, `GET /limits`), never published
@@ -928,13 +928,12 @@ export interface Account {
    */
   readonly billed: boolean;
   /**
-   * The next plan up the ladder this account could move to, or `null` when
-   * there is none: the top billed tier and a plan sold by conversation answer
-   * `null`, and a plan below the ladder (free, sponsored) is offered its
-   * first sold row. One server-side fact so that no surface derives "can this
-   * account upgrade, and to what" from the menu — a grandfathered row has no
-   * menu price to compare, and a conversation plan must never be sent to
-   * Checkout.
+   * The next plan up this account could move to: the cheapest sold plan that
+   * offers more than its own, or `null` when none does (the top billed tier)
+   * or the account cannot buy (a plan sold by conversation). One server-side
+   * fact so that no surface derives "can this account upgrade, and to what"
+   * from the menu — a grandfathered row has no menu price to compare, and a
+   * conversation plan must never be sent to Checkout.
    */
   readonly upgrade: AccountPlanType | null;
   /**
