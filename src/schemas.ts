@@ -328,6 +328,9 @@ export const AccountSchema = z.object({
   access: AccountAccessSchema.optional().describe(
     'Whether that standing admits the credential today. Absent on responses that predate seats, which then mean active.',
   ),
+  members: AccountAccessSchema.optional().describe(
+    "Whether the account's members are admitted today: paused while it holds more people than its plan allows. Absent on older responses, which then mean active.",
+  ),
   created: unixSeconds('when the account was created'),
   activated: z
     .int()

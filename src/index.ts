@@ -895,6 +895,16 @@ export interface Account {
    * that predates seats is always `active`.
    */
   readonly access?: AccountAccess;
+  /**
+   * Whether the account's MEMBERS are admitted today: `paused` while it holds
+   * more people than its plan's seats, until the owner upgrades or removes
+   * people. It is {@link access} for everyone who is not the owner, published
+   * for the account so the one person it never pauses can be told; the API
+   * derives both from one rule, so a console reads the pause here rather than
+   * re-deriving it from the seat numbers. Optional by the additive-evolution
+   * law: a response that predates it is `active`.
+   */
+  readonly members?: AccountAccess;
   /** Unix timestamp (seconds) when account was created */
   readonly created: number;
   /** Unix timestamp (seconds) when account was activated (first deployment), null if not yet activated */
