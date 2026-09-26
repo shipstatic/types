@@ -517,7 +517,10 @@ export interface DomainDnsResponse {
  * and no client ever parses or assembles one. What a client receives is the
  * setup URL, ready to hand off. The one thing a client may add is a fragment
  * naming a section of the page it opens, {@link SETUP_TROUBLESHOOTING_ANCHOR}:
- * that addresses a place in the instructions, not the instructions.
+ * that addresses a place in the instructions, not the instructions. Refused
+ * (2026-09-26): answering the section's link as a second field here. It would
+ * be one more field on every surface that relays this response (the SDK, the
+ * CLI, both MCPs, n8n) to carry one anchor that only the console reads.
  *
  * `/admin/domains/:domain/share` answers the same shape, which is the admin
  * law working: the operator surface is the public grammar with a prefix.
