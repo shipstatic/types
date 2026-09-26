@@ -2236,8 +2236,7 @@ export const SIGN_IN_RETURN_PARAM = 'signing-in';
  *
  * Client populations: `SESSION` (first-party cookie), `API_KEY` (`ship-`
  * key), `TOKEN` (`deploy-` deploy token), `AGENT` (anonymous, no credential:
- * public deploys are granted the public-account identity per request, and a
- * captcha-verified share-link setup open audits as this population),
+ * public deploys are granted the public-account identity per request),
  * `OAUTH` (delegated access token). The one server population:
  * `SYSTEM` (scheduled/background jobs). Webhook receipt is deliberately not
  * a population: a signed delivery is verified, never authorized — it acts
