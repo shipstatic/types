@@ -3324,7 +3324,7 @@ export type ActivityEvent =
   | 'domain.update'
   | 'domain.delete'
   | 'domain.verify'
-  | 'domain.setup.open' // Internal: DNS setup instructions were opened, by the owner or through the share link (not user-visible)
+  | 'domain.setup.open' // Internal, RETIRED 2026-09-26: no longer written (the operator's pulse is the observation). Kept so rows written before then stay typed until retention ages them out (90 days); delete it in the first release after 2026-12-25
   // Token events
   | 'token.create'
   | 'token.consume'
