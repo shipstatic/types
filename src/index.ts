@@ -305,11 +305,19 @@ export type DomainStatusType = (typeof DomainStatus)[keyof typeof DomainStatus];
 /**
  * The DNS fact: how far the platform's one verifying act has got.
  *
- * - `pending`: none of the required records point at the platform.
- * - `partial`: some do. For a `www` domain that is the CNAME without the
- *   apex A record, or the other way round.
- * - `verified`: all of them do. Platform names are born here, having no
- *   records to configure.
+ * - `pending`: the site's CNAME does not point at the platform.
+ * - `partial`: it does, and the rest does not. Only a `www` domain has a
+ *   rest, the apex A record, which serves nothing but the redirect to `www`.
+ * - `verified`: every required record does. Platform names are born here,
+ *   having no records to configure.
+ *
+ * **The CNAME divides the three because it is the record that serves the
+ * site.** `partial` says the site is served and only the redirect is missing;
+ * an apex A record without the CNAME serves nothing, so it is `pending`. The
+ * verifier's drift line depends on exactly that: on a domain that has verified
+ * before, a move into `pending` is the site no longer being served, and it is
+ * the drift the operator is told about (`cloudflare/consumer`'s
+ * `verifyDnsMapping`).
  *
  * Written by the DNS verifier and at birth, and by nothing else. **It is the
  * only field that says whether DNS is verified NOW**: its sibling instant
@@ -507,7 +515,9 @@ export interface DomainDnsResponse {
  * The link is FINISHED, on the deployment claim's grammar: the API composes
  * it from the salted setup hash and the one environment dimension it owns,
  * and no client ever parses or assembles one. What a client receives is the
- * setup URL, ready to hand off.
+ * setup URL, ready to hand off. The one thing a client may add is a fragment
+ * naming a section of the page it opens, {@link SETUP_TROUBLESHOOTING_ANCHOR}:
+ * that addresses a place in the instructions, not the instructions.
  *
  * `/admin/domains/:domain/share` answers the same shape, which is the admin
  * law working: the operator surface is the public grammar with a prefix.
@@ -521,6 +531,21 @@ export interface DomainShareResponse {
   /** The shareable setup link, carrying the salted hash that authorizes the share */
   readonly url: string;
 }
+
+/**
+ * The anchor of the troubleshooting section on a domain's setup instructions
+ * page, so a link can open the page there: `${share.url}#troubleshooting`.
+ *
+ * The API's instructions template gives the section this id and the console's
+ * connect page links to it: two repos, one spelling, which is why it lives
+ * here. The section is written for the domain's own DNS provider, which is why
+ * the console sends a stuck reader to it rather than to the general docs. If
+ * the spellings ever diverged, nothing would fail: the link would open the page
+ * at its top and nobody would be told, the silent-drift class this
+ * constitution exists to delete ({@link SIGN_IN_RETURN_PARAM} is the same shape
+ * one domain over).
+ */
+export const SETUP_TROUBLESHOOTING_ANCHOR = 'troubleshooting';
 
 /**
  * Response for domain DNS records

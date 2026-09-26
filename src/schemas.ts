@@ -144,7 +144,7 @@ export const DomainSchema = z.object({
     .describe('How many times a deployment has been linked to this domain.'),
   verification: grown(
     DomainVerification,
-    'How far DNS verification has got: "pending" is no required record pointing here, "partial" is some of them, "verified" is all. The diagnostic under "unverified"; platform domains are born verified.',
+    'How far DNS verification has got: "pending" is the site\'s CNAME not pointing here, "partial" is a www domain\'s CNAME pointing here without its apex A record (the redirect), "verified" is every required record. The diagnostic under "unverified"; platform domains are born verified.',
   ),
   verified: z
     .int()

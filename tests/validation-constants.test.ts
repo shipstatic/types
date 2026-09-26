@@ -32,6 +32,7 @@ import {
   PASSWORD_CONSTRAINTS,
   type PlatformLimits,
   readBearerValue,
+  SETUP_TROUBLESHOOTING_ANCHOR,
   SHIP_VIA_ENV,
   TokenKind,
   type TokenListResponse,
@@ -562,6 +563,12 @@ describe('Validation Constants - @shipstatic/types', () => {
   describe('ACCOUNT_HEADER', () => {
     it('is the one spelling of the header a session request names its account in', () => {
       expect(ACCOUNT_HEADER).toBe('X-Account');
+    });
+  });
+
+  describe('SETUP_TROUBLESHOOTING_ANCHOR', () => {
+    it('is the one spelling of the setup page section the console links to', () => {
+      expect(SETUP_TROUBLESHOOTING_ANCHOR).toBe('troubleshooting');
     });
   });
 
