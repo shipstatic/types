@@ -119,7 +119,7 @@ const domain: Domain = {
   created: 1_700_000_000,
 };
 
-const caps: Caps = { deployments: 2, platformDomains: 0, customDomains: 1 };
+const caps: Caps = { deployments: 2, platformDomains: 0, customDomains: 1, members: 1 };
 
 const account: Account = {
   email: 'who@example.com',
@@ -128,7 +128,7 @@ const account: Account = {
   plan: 'pro',
   suspended: false,
   usage: caps,
-  caps: { deployments: 100, platformDomains: 10, customDomains: 3 },
+  caps: { deployments: 100, platformDomains: 10, customDomains: 3, members: 1 },
   created: 1_700_000_000,
   activated: 1_700_000_050,
   hint: 'ab12',
@@ -216,25 +216,30 @@ describe('every schema accepts its own shape', () => {
     expect(S.AccountSchema.safeParse({ ...account, plan: 'enterprise' }).success).toBe(true);
   });
 
-  it('seats, role, access and members are additive: absent on an old response, accepted on a new one', () => {
+  it('role, access and members are additive: absent on an old response, accepted on a new one', () => {
     // The fixture above carries none of them, which is every response before 3.1.
-    const withSeats: Account = {
+    const inATeam: Account = {
       ...account,
       account: 'org0000000000001',
       role: 'member',
       access: 'paused',
       members: 'paused',
-      usage: { ...caps, seats: 6 },
-      caps: { ...account.caps, seats: 5 },
+      usage: { ...caps, members: 6 },
+      caps: { ...account.caps, members: 5 },
     };
-    expect(S.AccountSchema.safeParse(withSeats).success).toBe(true);
+    expect(S.AccountSchema.safeParse(inATeam).success).toBe(true);
     // The role vocabulary is Better Auth's and closed: only the two the
     // platform makes reachable.
     expect(S.AccountSchema.safeParse({ ...account, role: 'admin' }).success).toBe(false);
     // So is the access vocabulary: derived on every request, two values.
     expect(S.AccountSchema.safeParse({ ...account, access: 'suspended' }).success).toBe(false);
     expect(S.AccountSchema.safeParse({ ...account, members: 'suspended' }).success).toBe(false);
-    expect(S.CapsSchema.safeParse({ ...caps, seats: -1 }).success).toBe(false);
+  });
+
+  it('counts members like every other cap: required, and never negative', () => {
+    expect(S.CapsSchema.safeParse({ ...caps, members: -1 }).success).toBe(false);
+    const { members: _, ...withoutMembers } = caps;
+    expect(S.CapsSchema.safeParse(withoutMembers).success).toBe(false);
   });
 
   it('destinations are additive, and a destination always names at least one interval', () => {

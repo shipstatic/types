@@ -839,18 +839,16 @@ export interface Caps {
    */
   readonly customDomains: number;
   /**
-   * People with a seat in the account: the owner and every member, each a
-   * membership row; a pending invitation holds no seat. As `usage` it is the
-   * current member count, as `caps` the plan's ceiling. Optional by the
-   * additive-evolution law: responses older than 3.1 carry no seats, and a
-   * consumer reads one seat and one owner where the field is absent.
+   * Members of the account, the owner included: one membership row each, so
+   * a pending invitation is not yet a member. As `usage` it is how many the
+   * account has, as `caps` how many its plan allows.
    */
-  readonly seats?: number;
+  readonly members: number;
 }
 
 /**
  * A person's standing in an account. `owner` founded it and alone manages
- * billing, credentials, people and deletion; `member` uses its resources
+ * billing, credentials, members and deletion; `member` uses its resources
  * exactly as the owner does. These are Better Auth's own organization roles,
  * and the only two the platform makes reachable.
  */
@@ -859,8 +857,8 @@ export type AccountRole = 'owner' | 'member';
 /**
  * Whether the credential's standing currently admits it to the account's
  * resources. The owner is always `active`; a member is `active` while the
- * account fits its seat cap and `paused` while it holds more people than
- * the plan allows, until the owner upgrades or removes people. The state
+ * account fits its members cap and `paused` while it holds more members than
+ * the plan allows, until the owner upgrades or removes members. The state
  * is derived on every request and never stored, and a paused member still
  * reads the account, switches accounts and leaves; every other request is
  * refused (403, `details.account: 'paused'`). A key or a deploy token is
@@ -901,7 +899,7 @@ export interface Account {
   /** What the account currently holds — see {@link Caps}. */
   readonly usage: Caps;
   /**
-   * What the account is allowed to hold — the same three keys as
+   * What the account is allowed to hold, under the same keys as
    * {@link usage}, so the pair divides. These are the account's EFFECTIVE
    * caps: its plan's numbers, plus whatever the operator granted it
    * individually.
@@ -909,9 +907,9 @@ export interface Account {
   readonly caps: Caps;
   /**
    * The credential's standing in this account. Optional by the
-   * additive-evolution law: a response that predates seats names no role,
-   * and a consumer reads `owner`, because every account then had exactly one
-   * person. A key or a deploy token carries the owner's authority and reports
+   * additive-evolution law: a response that predates members names no
+   * role, and a consumer reads `owner`, because every account then had
+   * exactly one member. A key or a deploy token carries the owner's authority and reports
    * `owner` too.
    */
   readonly role?: AccountRole;
@@ -919,17 +917,17 @@ export interface Account {
    * Whether that standing admits the credential today: see
    * {@link AccountAccess}. The API derives it from the same row that yields
    * {@link role}, so a console reads it here rather than re-deriving it from
-   * the seat numbers. Optional by the additive-evolution law: a response
-   * that predates seats is always `active`.
+   * the member counts. Optional by the additive-evolution law: a response
+   * that predates members is always `active`.
    */
   readonly access?: AccountAccess;
   /**
    * Whether the account's MEMBERS are admitted today: `paused` while it holds
-   * more people than its plan's seats, until the owner upgrades or removes
-   * people. It is {@link access} for everyone who is not the owner, published
+   * more members than its plan allows, until the owner upgrades or removes
+   * members. It is {@link access} for everyone who is not the owner, published
    * for the account so the one person it never pauses can be told; the API
    * derives both from one rule, so a console reads the pause here rather than
-   * re-deriving it from the seat numbers. Optional by the additive-evolution
+   * re-deriving it from the member counts. Optional by the additive-evolution
    * law: a response that predates it is `active`.
    */
   readonly members?: AccountAccess;
@@ -3460,7 +3458,7 @@ export interface ActivityMeta {
    */
   via?: DeploymentViaType;
 
-  // People events (`member.join`, `member.leave`)
+  // Member events (`member.join`, `member.leave`)
   /** The person the event is about, by user id: who joined, who left, who was removed. */
   subject?: string;
   /** On `member.leave` only, and only when somebody else acted: the remover's user id. A leave names nobody here. */

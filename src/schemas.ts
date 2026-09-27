@@ -267,13 +267,10 @@ export const CapsSchema = z.object({
     .int()
     .nonnegative()
     .describe('Hostnames the customer owns, paused ones included.'),
-  seats: z
+  members: z
     .int()
     .nonnegative()
-    .optional()
-    .describe(
-      'People with a seat: the owner and every member. Absent on responses that predate seats, which then mean one seat.',
-    ),
+    .describe('Members of the account, the owner included; a pending invitation is not one.'),
 });
 
 export const AccountRoleSchema = z
@@ -285,7 +282,7 @@ export const AccountRoleSchema = z
 export const AccountAccessSchema = z
   .enum(['active', 'paused'])
   .describe(
-    'Whether that standing admits the credential today: paused while the account holds more people than its plan allows.',
+    'Whether that standing admits the credential today: paused while the account holds more members than its plan allows.',
   );
 
 export const ScheduledChangeSchema = z.object({
@@ -306,9 +303,7 @@ export const AccountSchema = z.object({
   account: z
     .string()
     .optional()
-    .describe(
-      'The account this response describes, by id; absent on responses that predate seats.',
-    ),
+    .describe('The account this response describes, by id; absent on older responses.'),
   email: z.string().describe('The account email address.'),
   name: z.string().nullable().describe('Display name; null if not set.'),
   picture: z.url().nullable().describe('Profile picture URL; null if not set.'),
@@ -323,13 +318,13 @@ export const AccountSchema = z.object({
     'What the account is allowed to hold: the same keys as usage, so the pair divides.',
   ),
   role: AccountRoleSchema.optional().describe(
-    "The credential's standing in this account. Absent on responses that predate seats, which then mean owner.",
+    "The credential's standing in this account. Absent on older responses, which then mean owner.",
   ),
   access: AccountAccessSchema.optional().describe(
-    'Whether that standing admits the credential today. Absent on responses that predate seats, which then mean active.',
+    'Whether that standing admits the credential today. Absent on older responses, which then mean active.',
   ),
   members: AccountAccessSchema.optional().describe(
-    "Whether the account's members are admitted today: paused while it holds more people than its plan allows. Absent on older responses, which then mean active.",
+    "Whether the account's members are admitted today: paused while it holds more members than its plan allows. Absent on older responses, which then mean active.",
   ),
   created: unixSeconds('when the account was created'),
   activated: z
