@@ -880,7 +880,10 @@ export interface Account {
   readonly account?: string;
   /** User email address */
   readonly email: string;
-  /** User display name, null if not set */
+  /**
+   * The person's name, null where they have none (a magic-link signup);
+   * the account is called by a name of its own, which is not on this wire.
+   */
   readonly name: string | null;
   /** User profile picture URL, null if not set */
   readonly picture: string | null;
