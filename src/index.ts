@@ -1070,6 +1070,42 @@ export interface AccountKeyResponse {
 }
 
 // =============================================================================
+// PERSON NAME
+// =============================================================================
+
+/**
+ * The name a person is ADDRESSED by: their name, else their address. A
+ * person always has an email and only sometimes a name (a magic-link signup
+ * has none), so every surface that addresses one needs the same fallback,
+ * and it lives here because two independent holders applied it, the API in
+ * its letters and pulses and the console in its labels, with nothing but
+ * their docblocks holding the copies together. The console cannot avoid
+ * deriving it: a roster's rows come from the identity provider's own member
+ * list, not from this wire.
+ *
+ * Coalesced with `||` rather than `??` deliberately: a provider that hands
+ * back an empty or whitespace-only name is a name nobody can be called by.
+ *
+ * This is the ADDRESSING register. A surface that STATES the name as a fact
+ * (an operator table, a CLI printout, a machine payload) shows it as stored
+ * and marks absence its own way, and does not call this.
+ */
+export function personName(person: { name?: string | null; email: string }): string {
+  return person.name?.trim() || person.email;
+}
+
+/**
+ * The short form, where the room is narrow: the first word of the name, else
+ * the address. The whole address rather than its local part, since a
+ * truncated address still reads as an address while a bare local part reads
+ * as a username the platform does not have. The sidebar, a greeting, and the
+ * name an account is born with all read this.
+ */
+export function personShortName(person: { name?: string | null; email: string }): string {
+  return person.name?.trim().split(' ')[0] || person.email;
+}
+
+// =============================================================================
 // WIRE SURFACE
 // =============================================================================
 
