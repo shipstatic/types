@@ -799,35 +799,35 @@ describe('ShipError.fromFetchError', () => {
 
     // ── transport failures: every engine, one type ───────────────────────────
     it.each([
-      ['node 22 · refused', undici('ECONNREFUSED', 'connect ECONNREFUSED 127.0.0.1:45999')],
-      ['node 22 · dns', undici('ENOTFOUND', 'getaddrinfo ENOTFOUND no-such-host.invalid')],
-      ['node 22 · reset', undici('ECONNRESET', 'read ECONNRESET')],
+      ['node 22 • refused', undici('ECONNREFUSED', 'connect ECONNREFUSED 127.0.0.1:45999')],
+      ['node 22 • dns', undici('ENOTFOUND', 'getaddrinfo ENOTFOUND no-such-host.invalid')],
+      ['node 22 • reset', undici('ECONNRESET', 'read ECONNRESET')],
       // Bun rejects with a plain Error carrying a system code — not the spec's
       // TypeError — and collapses DNS failure into the refused shape.
-      ['bun 1.3.14 · refused', shape('Error', UNABLE, 'ConnectionRefused')],
-      ['bun 1.3.14 · dns', shape('Error', UNABLE, 'ConnectionRefused')],
+      ['bun 1.3.14 • refused', shape('Error', UNABLE, 'ConnectionRefused')],
+      ['bun 1.3.14 • dns', shape('Error', UNABLE, 'ConnectionRefused')],
       [
-        'bun 1.3.14 · reset',
+        'bun 1.3.14 • reset',
         shape('Error', 'The socket connection was closed unexpectedly.', 'ECONNRESET'),
       ],
       // The row that rules out an allowlist of codes: covering it that way
       // would mean enumerating BoringSSL's certificate table.
       [
-        'bun 1.3.14 · tls',
+        'bun 1.3.14 • tls',
         shape('Error', 'unknown certificate verification error', 'UNKNOWN_CERTIFICATE_ERROR'),
       ],
-      ['chromium 151 · refused', shape('TypeError', 'Failed to fetch')],
-      ['chromium 151 · dns', shape('TypeError', 'Failed to fetch')],
+      ['chromium 151 • refused', shape('TypeError', 'Failed to fetch')],
+      ['chromium 151 • dns', shape('TypeError', 'Failed to fetch')],
       [
-        'firefox 153 · refused',
+        'firefox 153 • refused',
         shape('TypeError', 'NetworkError when attempting to fetch resource.'),
       ],
       // WebKit is why this table exists. `Load failed` carries no code and no
       // "fetch", so the previous message test read it as `Api` — every browser
       // SDK and `@shipstatic/drop` user on Safari was told a server answered
       // when nothing was exchanged.
-      ['webkit 26.5 · refused', shape('TypeError', 'Load failed')],
-      ['webkit 26.5 · dns', shape('TypeError', 'Load failed')],
+      ['webkit 26.5 • refused', shape('TypeError', 'Load failed')],
+      ['webkit 26.5 • dns', shape('TypeError', 'Load failed')],
     ])('%s → ErrorType.Network', (_label, thrown) => {
       const err = ShipError.fromFetchError(thrown, 'Ping');
       expect(err.type).toBe(ErrorType.Network);
@@ -849,7 +849,7 @@ describe('ShipError.fromFetchError', () => {
       ['firefox 153', shape('TypeError', 'Window.fetch: ship is not a valid URL.')],
       ['webkit 26.5', shape('TypeError', 'URL is not valid or contains user credentials.')],
       ['workerd', shape('TypeError', 'Invalid URL: ship')],
-    ])('%s · malformed URL → ErrorType.Api, on every engine', (_label, thrown) => {
+    ])('%s • malformed URL → ErrorType.Api, on every engine', (_label, thrown) => {
       // These SIX AGREEING is the point. The previous rule tested the message
       // for "fetch", and chromium's and firefox's URL complaints both contain
       // it — so one mistake was `Network` on three engines and `Api` on three.

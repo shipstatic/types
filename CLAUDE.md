@@ -232,9 +232,9 @@ Errors flow through the platform along a single, symmetric path. Every HTTP clie
 │  Path 2 — fetch itself failed (offline, abort, CORS):                  │
 │    catch (cause) {                                                     │
 │      throw ShipError.fromFetchError(cause, operationName)              │
-│      // ShipError pass-through · AbortError→Cancelled                  │
-│      // TimeoutError→Timeout · transport→Network (see below)           │
-│      // other Error→Api · unknown→Api                                  │
+│      // ShipError pass-through • AbortError→Cancelled                  │
+│      // TimeoutError→Timeout • transport→Network (see below)           │
+│      // other Error→Api • unknown→Api                                  │
 │    }                                                                   │
 │                                                                        │
 │  Either way, consumer code sees a typed ShipError:                     │
