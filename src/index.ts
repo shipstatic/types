@@ -3378,6 +3378,15 @@ export type ActivityEvent =
   | 'account.delete'
   | 'account.key.generate'
   | 'account.plan.transition'
+  // Person events (internal). `session.create` is a sign-in: a session born
+  // to a person, on their own account, with the request's address and
+  // country beside it; a session ending writes nothing, since expiry ends
+  // most of them and nobody acted. `user.update` is a person renaming
+  // themselves (`meta.name`), on their own account; the account that still
+  // wears its birth name follows by rule, and that follow is derivable
+  // rather than a second row.
+  | 'session.create'
+  | 'user.update'
   // Deployment events
   | 'deployment.create'
   | 'deployment.update'
@@ -3412,6 +3421,12 @@ export type ActivityEvent =
   | 'invitation.create'
   | 'invitation.cancel'
   | 'invitation.reject'
+  // Consent events: a person connected an app to the account they were
+  // shown (`meta.client` its id, `meta.app` its name, `meta.scopes` what it
+  // may do). A declined consent writes nothing; tokens are the grant's
+  // mechanics and write nothing; the grant's end is the connected-apps
+  // surface's to record when it exists.
+  | 'consent.grant'
   // Billing events (internal: the operator's stream, never the customer's
   // feed — the feed's copy of this fact is the `account.plan.transition` it
   // may become)
@@ -3459,7 +3474,8 @@ export type UserVisibleActivityEvent =
   | 'token.consume'
   | 'token.delete'
   | 'member.join'
-  | 'member.leave';
+  | 'member.leave'
+  | 'consent.grant';
 
 /**
  * Activity record returned from the API
@@ -3530,8 +3546,16 @@ export interface ActivityMeta {
   provider?: string;
   /** The owner's address on `account.create`; the invited address on `invitation.*`; the person's on `member.*`. */
   email?: string;
-  /** The owner's display name on `account.create`; the account's new name on `account.update`. */
+  /** The owner's display name on `account.create`; the account's new name on `account.update`; the person's new name on `user.update`. */
   name?: string;
+
+  // Consent events (`consent.grant`)
+  /** The connected app's client id. */
+  client?: string;
+  /** The connected app's name, as it registered it. */
+  app?: string;
+  /** The scopes the person granted. */
+  scopes?: string[];
 
   // Plan transition events
   /** Previous plan */
