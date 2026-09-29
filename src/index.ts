@@ -3371,8 +3371,10 @@ export interface BillingSyncResponse {
  * out sooner, and deleting an account removes its rows outright, at any age.
  */
 export type ActivityEvent =
-  // Account events
+  // Account events. `account.update` is the owner renaming the account:
+  // `meta.name` is the new name, and the row's actor is the owner.
   | 'account.create'
+  | 'account.update'
   | 'account.delete'
   | 'account.key.generate'
   | 'account.plan.transition'
@@ -3397,10 +3399,19 @@ export type ActivityEvent =
   // is the actor (the person who accepted, the owner who removed, the member
   // who left) and `meta.subject` the person it is about, so the two removal
   // shapes are one event told apart by `meta.by`, the remover, which a leave
-  // and the termination fan-out never carry. Invitations write
-  // no history: they concern an address that may never become a person.
+  // and the termination fan-out never carry.
   | 'member.join'
   | 'member.leave'
+  // Invitation events (internal: the operator's stream, never the feed,
+  // because an invitation concerns an address that may never become a
+  // person, and the feed shows people). `meta.email` is the invited address;
+  // the actor is the owner who invited or withdrew, or the person who
+  // declined. Accepting is `member.join`. A resend writes nothing, since it
+  // is the same invitation again, and expiry writes nothing, since nobody
+  // acted.
+  | 'invitation.create'
+  | 'invitation.cancel'
+  | 'invitation.reject'
   // Billing events (internal: the operator's stream, never the customer's
   // feed — the feed's copy of this fact is the `account.plan.transition` it
   // may become)
@@ -3432,6 +3443,7 @@ export type ActivityEvent =
  */
 export type UserVisibleActivityEvent =
   | 'account.create'
+  | 'account.update'
   | 'account.delete'
   | 'account.key.generate'
   | 'account.plan.transition'
@@ -3513,12 +3525,12 @@ export interface ActivityMeta {
   /** Labels that were set/updated */
   labels?: string[];
 
-  // Account events
+  // Account and invitation events
   /** OAuth provider name */
   provider?: string;
-  /** Account email */
+  /** The owner's address on `account.create`; the invited address on `invitation.*`; the person's on `member.*`. */
   email?: string;
-  /** Account display name */
+  /** The owner's display name on `account.create`; the account's new name on `account.update`. */
   name?: string;
 
   // Plan transition events
