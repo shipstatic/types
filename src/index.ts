@@ -3387,6 +3387,10 @@ export type ActivityEvent =
   // rather than a second row.
   | 'session.create'
   | 'user.update'
+  // `identity.create` is a sign-in provider linked to a person (`meta.provider`),
+  // on their own account: the first at sign-up beside `account.create`, and
+  // every later one a new way into that person's accounts.
+  | 'identity.create'
   // Deployment events
   | 'deployment.create'
   | 'deployment.update'
@@ -3454,28 +3458,36 @@ export type ActivityEvent =
 // (`deployment.flagged`) is a fact discovered about content, not a refusal.
 
 /**
- * Activity events visible to users in the dashboard
+ * The events an account's own feed shows: curated meaning, where everything
+ * else in the stream is the operator's forensics. One list, the owner of
+ * both the API's filter and the type; the retention floor covers exactly
+ * these, since the floor exists to keep a dormant account's feed from
+ * reading empty.
  */
-export type UserVisibleActivityEvent =
-  | 'account.create'
-  | 'account.update'
-  | 'account.delete'
-  | 'account.key.generate'
-  | 'account.plan.transition'
-  | 'deployment.create'
-  | 'deployment.update'
-  | 'deployment.delete'
-  | 'deployment.claim'
-  | 'domain.create'
-  | 'domain.update'
-  | 'domain.delete'
-  | 'domain.verify'
-  | 'token.create'
-  | 'token.consume'
-  | 'token.delete'
-  | 'member.join'
-  | 'member.leave'
-  | 'consent.grant';
+export const USER_VISIBLE_EVENTS = [
+  'account.create',
+  'account.update',
+  'account.delete',
+  'account.key.generate',
+  'account.plan.transition',
+  'deployment.create',
+  'deployment.update',
+  'deployment.delete',
+  'deployment.claim',
+  'domain.create',
+  'domain.update',
+  'domain.delete',
+  'domain.verify',
+  'token.create',
+  'token.consume',
+  'token.delete',
+  'member.join',
+  'member.leave',
+  'consent.grant',
+] as const satisfies readonly ActivityEvent[];
+
+/** An event the feed shows: derived from {@link USER_VISIBLE_EVENTS}, never restated. */
+export type UserVisibleActivityEvent = (typeof USER_VISIBLE_EVENTS)[number];
 
 /**
  * Activity record returned from the API
