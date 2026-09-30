@@ -3444,8 +3444,8 @@ export type ActivityEvent =
   | 'admin.deployment.review' // Internal: an operator reviewed an account's outstanding deployments in one act (not user-visible)
   | 'admin.domain.delete'
   | 'admin.impersonate'
-  // An operator set a person's password (`meta.subject` the person), on that
-  // person's own account. The platform is passwordless: a password exists
+  // An operator set a person's password, on that person's own account, with
+  // the operator as actor. The platform is passwordless: a password exists
   // only where an operator set one, for a directory reviewer's account.
   | 'admin.user.password.update';
 
