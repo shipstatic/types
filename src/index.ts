@@ -3,6 +3,10 @@
  * This package is the single source of truth for all shared data structures.
  */
 
+import { consolePaths } from './console-paths.js';
+
+export * from './console-paths.js';
+
 // =============================================================================
 // DEPLOYMENT TYPES
 // =============================================================================
@@ -867,17 +871,35 @@ export type AccountRole = 'owner' | 'member';
 export type AccountAccess = 'active' | 'paused';
 
 /**
+ * The word a refusal about the account carries in `details.account`, so a
+ * client can tell the two apart without reading the sentence:
+ *
+ * - `paused`: a 403. The person is a member, and the account holds more
+ *   members than its plan allows (see {@link AccountAccess}).
+ * - `unknown`: a 404. The account the request names ({@link ACCOUNT_HEADER})
+ *   is one the person is not a member of, or one that does not exist; the
+ *   two are indistinguishable by design. A tab whose person was removed from
+ *   the account meets it on its next request.
+ */
+export const AccountRefusal = {
+  PAUSED: 'paused',
+  UNKNOWN: 'unknown',
+} as const;
+
+export type AccountRefusalType = (typeof AccountRefusal)[keyof typeof AccountRefusal];
+
+/**
  * Core account object - used in both API responses and SDK
  * All fields are readonly to prevent accidental mutations
  */
 export interface Account {
   /**
-   * The account this response describes, by id. A person may belong to
-   * several accounts and a browser session selects one, so a client names
-   * the one it means on every request (`X-Account`) and this is where it
-   * learns the name. Optional by the additive-evolution law.
+   * The account this response describes, by id: the name the console's URL
+   * carries (`/<account>/`) and a session request sends in
+   * {@link ACCOUNT_HEADER}. A machine credential IS its account, so the
+   * response names the account the credential belongs to.
    */
-  readonly account?: string;
+  readonly account: string;
   /** User email address */
   readonly email: string;
   /**
@@ -1021,21 +1043,6 @@ export interface Account {
 export interface PlanDestination {
   readonly plan: AccountPlanType;
   readonly intervals: BillingInterval[];
-}
-
-/**
- * Account as returned by `GET /account` — the entity plus how the request
- * was authorized, so `whoami` can answer "what credential am I holding?".
- * Request-scoped fields live on the response type, never on the entity
- * (the `DeploymentCreateResponse` pattern).
- */
-export interface AccountGetResponse extends Account {
-  /** How the request that produced this response was authorized. */
-  readonly authMethod: AuthMethodType;
-  /** Present (and true) only when the caller is an operator acting as themselves. */
-  readonly isAdmin?: true;
-  /** Present only during read-only admin impersonation: the operator's account id. */
-  readonly impersonatedBy?: string;
 }
 
 /**
@@ -2402,16 +2409,18 @@ export const CALLER = {
 } as const;
 
 /**
- * The account a session request MEANS.
+ * The account a session request is about.
  *
- * A browser session selects one account for every tab at once, so a tab that
- * switched leaves its siblings acting for an account they no longer show. A
- * session caller may name the account it means in this header; the API
- * answers 409 `details.account: 'select'` when it differs from the account the
- * session resolves to, and the client re-selects. A precondition check the
- * client volunteers, never authority: a request without it resolves exactly as
- * before, and machine credentials never send it. One owner for the name, since
- * the API's CORS allowlist and every browser transport spell it.
+ * A person may belong to several accounts, so a request made with a browser
+ * session names the one it means, on every request to an account route; the
+ * console takes the value from its URL (`/<account>/`). The header names and
+ * membership authorizes: the API resolves the person's membership in the
+ * account named, answers 404 `details.account: 'unknown'` for an account the
+ * person is not in (or one that does not exist), and 400 when a session
+ * request names none. Machine credentials never send it, since a key, a
+ * deploy token or an OAuth grant already belongs to one account. One owner
+ * for the name, since the API's CORS allowlist and every browser transport
+ * spell it.
  */
 export const ACCOUNT_HEADER = 'X-Account';
 
@@ -2906,15 +2915,15 @@ export const SHIP_ENV = {
 export const SHIP_VIA_ENV = 'SHIP_VIA';
 
 /**
- * Where a human creates an API key — the console deep link quoted by every
+ * Where a human creates an API key: the console deep link quoted by every
  * surface that teaches authentication (the CLI's config wizard, the VS Code
- * and n8n listings, the n8n rate-limit hint and credential copy). Written
- * out in five files across three repos until this export.
+ * and n8n listings, the n8n rate-limit hint and credential copy). The bare
+ * form of the path, which the console opens in the reader's own account.
  *
  * Production-branded by design: published artifacts name the product, never
  * an environment (root `CLAUDE.md`, "Environment-Aware URLs").
  */
-export const MY_API_KEY_URL = 'https://my.shipstatic.com/api-key';
+export const MY_API_KEY_URL = `https://my.shipstatic.com${consolePaths().apiKey()}`;
 
 /**
  * How long an anonymous deployment lives before it expires.
@@ -3178,7 +3187,7 @@ export interface DomainResource {
  * Account resource interface - the contract all implementations must follow
  */
 export interface AccountResource {
-  get: () => Promise<AccountGetResponse>;
+  get: () => Promise<Account>;
 }
 
 /**

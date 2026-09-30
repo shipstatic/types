@@ -122,6 +122,7 @@ const domain: Domain = {
 const caps: Caps = { deployments: 2, platformDomains: 0, customDomains: 1, members: 1 };
 
 const account: Account = {
+  account: 'k3v9x2m7q1w8e5r4',
   email: 'who@example.com',
   name: 'Who',
   picture: null,
@@ -234,6 +235,11 @@ describe('every schema accepts its own shape', () => {
     // So is the access vocabulary: derived on every request, two values.
     expect(S.AccountSchema.safeParse({ ...account, access: 'suspended' }).success).toBe(false);
     expect(S.AccountSchema.safeParse({ ...account, members: 'suspended' }).success).toBe(false);
+  });
+
+  it('names the account it describes, always', () => {
+    const { account: _named, ...unnamed } = account;
+    expect(S.AccountSchema.safeParse(unnamed).success).toBe(false);
   });
 
   it('counts members like every other cap: required, and never negative', () => {

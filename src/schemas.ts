@@ -300,10 +300,7 @@ export const PlanDestinationSchema = z.object({
 });
 
 export const AccountSchema = z.object({
-  account: z
-    .string()
-    .optional()
-    .describe('The account this response describes, by id; absent on older responses.'),
+  account: z.string().describe('The account this response describes, by id.'),
   email: z.string().describe('The account email address.'),
   name: z.string().nullable().describe('Display name; null if not set.'),
   picture: z.url().nullable().describe('Profile picture URL; null if not set.'),

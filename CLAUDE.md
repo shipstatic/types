@@ -12,14 +12,16 @@ Claude Code instructions for the **Types** package.
 
 ## Architecture
 
-Two files. `src/index.ts` holds the types, organized into named sections in
+Three files. `src/index.ts` holds the types, organized into named sections in
 the order below; `src/schemas.ts` holds the wire schemas (see "Wire
 schemas") and is published as the subpath `@shipstatic/types/schemas`, so a
-consumer that never imports it carries no zod.
+consumer that never imports it carries no zod; `src/console-paths.ts` holds
+the console's path grammar (see "Console paths") and is re-exported from the
+package root.
 
 | Section | Purpose |
 |---------|---------|
-| Core Entities | Deployment (+ `DeploymentVia` — the origin vocabulary, closed here so the clients that name themselves are compiler-checked; `Deployment.via` stays `string \| null` because stored rows predate it), Domain (+ `DomainSetResult`), Token, Account (+ `AccountGetResponse` — request-scoped `authMethod` lives on the response, not the entity; `Caps` — one shape for both `usage` and `caps`, so the pair divides) — status consts, interfaces, list responses (+ `ListResponse`, `ListOptions`), request shapes (`DeploymentSetOptions`, `DomainSetOptions`, `TokenCreateOptions`), DNS/domain response shapes (`DnsRecord`, `DnsProvider`, `DnsLookup`, `DomainDnsResponse`, `DomainRecordsResponse`, `DomainShareResponse` + `SETUP_TROUBLESHOOTING_ANCHOR`, the one section of the page it opens that a link may name, `DomainValidateResponse`), the aggregate responses (`LabelsResponse`, `SetupInstructionsResponse`), and the mutation acknowledgements (`DeploymentDeleteResponse` — where the law is written — `DomainDeleteResponse`, `DomainVerifyResponse`, `TokenDeleteResponse`, `AccountDeleteResponse`, `AccountKeyResponse`) |
+| Core Entities | Deployment (+ `DeploymentVia` — the origin vocabulary, closed here so the clients that name themselves are compiler-checked; `Deployment.via` stays `string \| null` because stored rows predate it), Domain (+ `DomainSetResult`), Token, Account (+ `Caps` — one shape for both `usage` and `caps`, so the pair divides; `AccountRefusal`, the two words a refusal carries in `details.account`: `paused` and `unknown`) — status consts, interfaces, list responses (+ `ListResponse`, `ListOptions`), request shapes (`DeploymentSetOptions`, `DomainSetOptions`, `TokenCreateOptions`), DNS/domain response shapes (`DnsRecord`, `DnsProvider`, `DnsLookup`, `DomainDnsResponse`, `DomainRecordsResponse`, `DomainShareResponse` + `SETUP_TROUBLESHOOTING_ANCHOR`, the one section of the page it opens that a link may name, `DomainValidateResponse`), the aggregate responses (`LabelsResponse`, `SetupInstructionsResponse`), and the mutation acknowledgements (`DeploymentDeleteResponse` — where the law is written — `DomainDeleteResponse`, `DomainVerifyResponse`, `TokenDeleteResponse`, `AccountDeleteResponse`, `AccountKeyResponse`) |
 | Wire Surface | `API_PATHS` — every public path declared once, mounted by the API and requested by the SDK and dashboard (`/admin/*` deliberately absent; see "Admin types") — and `DEPLOY_FIELDS`, the deploy multipart body's field names, plus `DEPLOY_FILE_GRAMMAR` (+ `DeployFileSpec`, `DeployFileEncoding`), the JSON body's file grammar: the paths and the two bodies' fields are the halves of one wire surface, which is why they share a section |
 | Error System | `ErrorType` (`as const` + type), `ShipError` class, `isShipError` guard, `BuildFailureDetails` (the one named `details` shape: the evidence a human surface renders beneath a build verdict) |
 | Platform Limits | `PlatformLimits` — what the platform will refuse, from the `/limits` endpoint: the three plan-based caps (file size, count, total size) plus `blockedExtensions`, the API-owned hosting blocklist. The blocklist field is OPTIONAL and its absence means "no client-side check", never "an empty policy" — see "Validation: format vs policy" |
@@ -36,7 +38,7 @@ consumer that never imports it carries no zod.
 | Person Name | `personName`, `personShortName`: what a person is ADDRESSED by (name, else address; the first word where the room is narrow). The one rule the API's letters and pulses and the console's labels share, promoted from two identical copies on 2026-09-29. Surfaces that STATE a name as a fact do not call it |
 | Time Remaining | `formatTimeRemaining`, `formatDuration`: how long a deployment has left, in words (see "Time remaining") |
 | File Size | `formatFileSize`: a byte count as a person reads it (see "File size") |
-| Platform Constants | `DEFAULT_API`, `PUBLIC_DEPLOYMENT_TTL_SECONDS` (the anonymous-deploy lifetime — the API stamps `expires` and the claim window from it, and both MCP transports derive the duration they quote to agents; it was four restatements until 2026-08-06), `SHIP_ENV` (the Node SDK's ambient pair `SHIP_TOKEN`/`SHIP_API_URL` — the COMPLETE scrub list for embedding hosts; CLI-only vars deliberately excluded), `SHIP_VIA_ENV` (the subprocess-wrapper origin-relabel slot, read by the CLI and the stdio MCP bin; deliberately outside `SHIP_ENV` because the SDK never reads it), `MY_API_KEY_URL` (the console deep link every authentication-teaching surface quotes — five files, three repos, until 2.5.0-beta.21) |
+| Platform Constants | `DEFAULT_API`, `PUBLIC_DEPLOYMENT_TTL_SECONDS` (the anonymous-deploy lifetime — the API stamps `expires` and the claim window from it, and both MCP transports derive the duration they quote to agents; it was four restatements until 2026-08-06), `SHIP_ENV` (the Node SDK's ambient pair `SHIP_TOKEN`/`SHIP_API_URL` — the COMPLETE scrub list for embedding hosts; CLI-only vars deliberately excluded), `SHIP_VIA_ENV` (the subprocess-wrapper origin-relabel slot, read by the CLI and the stdio MCP bin; deliberately outside `SHIP_ENV` because the SDK never reads it), `MY_API_KEY_URL` (the console deep link every authentication-teaching surface quotes: the bare `consolePaths().apiKey()` on the production console) |
 | Resource Contracts | `DeployInput`, `DeploymentUploadOptions`, `*Resource` interfaces |
 | Billing Types | `BillingInterval`, `Plan`, `PlansResponse`, `CheckoutSession`, `BillingPortalSession` — the vocabulary only, spelled as Stripe spells it. No price and no cap is published: they are policy, delivered by `GET /plans` (see "Validation: format vs policy"). The platform runs on Stripe and its vocabulary says so (`StripeSession`); the plan vocabulary is fenced by `tests/billing-vocabulary.test.ts` |
 | Activity Types | `ActivityEvent`, `UserVisibleActivityEvent`, `Activity`, `ActivityMeta`, `ActivityListResponse` — wire contracts for `GET /activities`, produced by the API and consumed by `web/my`. There is deliberately **no** `ActivityResource`: the SDK does not reach that endpoint (recorded in `npm/ship/CLAUDE.md`), and a resource interface nothing implements would be dead surface. A shared type needs two consumers, not three. |
@@ -492,6 +494,43 @@ same way the deadline does: several holders, and drift between them silent
 (a table saying `180.0Kb` beside a card saying `180 KB` is not an error anything
 raises).
 
+## Console paths (`src/console-paths.ts`)
+
+**The console's path grammar has one owner, because it has two holders.** The
+console mounts these paths as routes, and the API, its letters and its
+billing returns emit them as links; a drift between the two is a link that
+404s with nothing to report it, and no fence reaches across the two repos.
+
+- **`consolePaths(account?)`** returns the builders bound to one account
+  (`/<account>/domains`), or, with no account, the bare form
+  (`/domains`). A producer whose subject is an account composes that
+  account's path; a producer whose subject is a person emits the bare form,
+  which the console opens in the account the person entered last.
+- **`SECTIONS`** is the list of an account's sections by first segment, with
+  the `owner` flag on the two that mean the reader's OWN account (`upgrade`,
+  `api-key`): a bare path into one opens the person's own account. The
+  console's route table mounts every section twice from it. Modals carry
+  their own owner rule in the console; the flag is the section's alone.
+- **`doors`** builds the pages that exist before an account is known
+  (`login`, `register`, `logout`, `invitations`, `claim`, `consent`).
+- **The matchers** (`isClaimPath`, `isInvitationPath`, `isUpgradePath`,
+  `errandOf`, `accountOfPath`) read a path in either form, the way the
+  console's router matches it: case-insensitively, ignoring a trailing
+  slash, the query and the fragment. `billingReturnOf` reads the two query
+  markers a Stripe return lands with, which the builders write
+  (`successAfterCheckout`, `settingsAfterBilling`), so neither side spells a
+  marker.
+
+**Sections, doors and the operator partition (`admin`) are disjoint sets of
+first segments**, held at compile time inside the module: a shared name
+fails the build. That is what lets the grammar read any other first segment
+as an account id without a check of its shape, since whether the account
+exists is the server's answer, never the path's.
+
+The console-only sub-paths (the `qr`, `labels` and `delete` modals,
+`settings/name` and the rest) stay in the console's `lib/routes.ts`: no
+server emits them, so they have one holder.
+
 ## Consumers
 
 | Package | Uses |
@@ -503,6 +542,7 @@ raises).
 | `web/my` | Entity types, response types |
 | `@shipstatic/ship` (the CLI), `@shipstatic/mcp`, `cloudflare/mcp`, `integrations/vscode`, `web/www`, `web/my` | `formatTimeRemaining` / `formatDuration`: the time a deployment has left (`PUBLIC_EXPIRY` spells the anonymous lifetime with `formatDuration`) |
 | `@shipstatic/ship` (re-exported; the CLI), `cloudflare/api`, `cloudflare/mcp`, `web/my` | `formatFileSize`: a deployment's size |
+| `cloudflare/api`, `cloudflare/shared` (the letters), `web/my` | `consolePaths`, `SECTIONS`, `doors` and the matchers: the console's path grammar (see "Console paths") |
 
 ## The typecheck covers `tests/` too
 
@@ -565,10 +605,11 @@ Four rules, each of which was broken once and is now structural:
   was no entity to extend, only a list's item.
 - **A response composes its entity, never restates it.**
   `DeploymentCreateResponse extends Deployment`, `TokenCreateResponse extends
-  Token`, `DomainSetResult extends Domain`, `AccountGetResponse extends
-  Account`. Request-scoped and one-time fields (`claim`, `secret`,
-  `isCreate`, `authMethod`) live on the response; the entity stays the
-  entity.
+  Token`, `DomainSetResult extends Domain`. Request-scoped and one-time
+  fields (`claim`, `secret`, `isCreate`) live on the response; the entity
+  stays the entity. `GET /account` answers the bare `Account`: it has no
+  request-scoped field, since the person facts a browser needs come from its
+  session and the credential's kind has no reader.
 - **A list response is `ListResponse` plus its plural noun.** The cursor is
   declared once, on `ListResponse`, so a fifth list cannot get the envelope
   subtly wrong — and the "no `total`" doctrine is stated in one place instead
@@ -674,6 +715,14 @@ without the field, and a required field would make every additive API change
 a lockstep SDK release. `Account.used` is the precedent. A field may become
 required at the entity's next natural break (major bump) once every
 published consumer carries it.
+
+**The pre-launch exception.** Until this package has external consumers, a
+breaking change (a field made required, a type deleted or renamed) may ride a
+MINOR, and its release notes name this exception. Every consumer today is
+first-party and moves in the convoy, so a major would buy nothing a reader
+could use. `Account.account` becoming required and `AccountGetResponse`
+leaving (3.8.0) rode it. The exception ends the day a package outside the
+estate depends on this one; from then, the law above holds without it.
 
 **New error types:** Add to `ErrorType` (its JSDoc says who produces it and what it is distinct from), a static factory on `ShipError`, and its category in `ERROR_CATEGORIES` (every 4xx-carrying type belongs in `client`; a fault or a state belongs nowhere). Name any `details` shape a human surface renders (`BuildFailureDetails` is the precedent), and add the factory, category and wire round-trip cases to `tests/errors.test.ts`.
 
