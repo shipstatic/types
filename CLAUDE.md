@@ -12,12 +12,18 @@ Claude Code instructions for the **Types** package.
 
 ## Architecture
 
-Three files. `src/index.ts` holds the types, organized into named sections in
+Two files. `src/index.ts` holds the types, organized into named sections in
 the order below; `src/schemas.ts` holds the wire schemas (see "Wire
 schemas") and is published as the subpath `@shipstatic/types/schemas`, so a
-consumer that never imports it carries no zod; `src/console-paths.ts` holds
-the console's path grammar (see "Console paths") and is re-exported from the
-package root.
+consumer that never imports it carries no zod.
+
+**The root entry is ONE declaration file, and that is a property consumers
+rely on.** `@shipstatic/ship` inlines this package's declarations into its own
+(`dts.resolve` in its `tsup.config.ts`), and the bundler inlines the entry
+alone: a sibling module re-exported from `index.ts` is left behind as a
+relative import that resolves to nothing in ship's `dist`, which `attw` then
+refuses. So a new root export is a section of `index.ts`, never a file of its
+own; only a subpath entry (`schemas`) is a separate file.
 
 | Section | Purpose |
 |---------|---------|
@@ -38,6 +44,7 @@ package root.
 | Person Name | `personName`, `personShortName`: what a person is ADDRESSED by (name, else address; the first word where the room is narrow). The one rule the API's letters and pulses and the console's labels share, promoted from two identical copies on 2026-09-29. Surfaces that STATE a name as a fact do not call it |
 | Time Remaining | `formatTimeRemaining`, `formatDuration`: how long a deployment has left, in words (see "Time remaining") |
 | File Size | `formatFileSize`: a byte count as a person reads it (see "File size") |
+| Console Paths | `consolePaths`, `SECTIONS`, `doors`, the matchers and `billingReturnOf`: the console's path grammar, owned here because the console mounts it and the API emits it (see "Console paths") |
 | Platform Constants | `DEFAULT_API`, `PUBLIC_DEPLOYMENT_TTL_SECONDS` (the anonymous-deploy lifetime — the API stamps `expires` and the claim window from it, and both MCP transports derive the duration they quote to agents; it was four restatements until 2026-08-06), `SHIP_ENV` (the Node SDK's ambient pair `SHIP_TOKEN`/`SHIP_API_URL` — the COMPLETE scrub list for embedding hosts; CLI-only vars deliberately excluded), `SHIP_VIA_ENV` (the subprocess-wrapper origin-relabel slot, read by the CLI and the stdio MCP bin; deliberately outside `SHIP_ENV` because the SDK never reads it), `MY_API_KEY_URL` (the console deep link every authentication-teaching surface quotes: the bare `consolePaths().apiKey()` on the production console) |
 | Resource Contracts | `DeployInput`, `DeploymentUploadOptions`, `*Resource` interfaces |
 | Billing Types | `BillingInterval`, `Plan`, `PlansResponse`, `CheckoutSession`, `BillingPortalSession` — the vocabulary only, spelled as Stripe spells it. No price and no cap is published: they are policy, delivered by `GET /plans` (see "Validation: format vs policy"). The platform runs on Stripe and its vocabulary says so (`StripeSession`); the plan vocabulary is fenced by `tests/billing-vocabulary.test.ts` |
@@ -494,7 +501,7 @@ same way the deadline does: several holders, and drift between them silent
 (a table saying `180.0Kb` beside a card saying `180 KB` is not an error anything
 raises).
 
-## Console paths (`src/console-paths.ts`)
+## Console paths (the "Console Paths" section)
 
 **The console's path grammar has one owner, because it has two holders.** The
 console mounts these paths as routes, and the API, its letters and its
