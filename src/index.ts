@@ -801,7 +801,7 @@ export type AccountPlanType = (typeof AccountPlan)[keyof typeof AccountPlan];
  * than the 403 uses.
  *
  * All three are counts plans SELL, and every plan publishes a number for each.
- * A platform subdomain (`my-app.shipstatic.com`) is among them: the namespace
+ * A platform domain (`my-app.shipstatic.com`) is among them: the namespace
  * is the platform's, so every plan bounds how many names one account may take
  * from it — which is not the address every deployment gets by construction
  * (`happy-cat-abc1234.shipstatic.com`), one per deployment and bounded by
@@ -3946,7 +3946,7 @@ export function isPlatformDomain(domain: string, platformDomain: string): boolea
 }
 
 /**
- * Check if a domain is a custom domain (not a platform subdomain).
+ * Check if a domain is a custom domain (not a platform domain).
  * Custom domains are billable and require DNS verification.
  *
  * @example isCustomDomain("example.com", "shipstatic.com") → true
