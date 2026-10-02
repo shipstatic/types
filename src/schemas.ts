@@ -289,11 +289,6 @@ export const ScheduledChangeSchema = z.object({
   plan: grown(AccountPlan, 'The plan the account moves to.'),
   interval: z.enum(['month', 'year']).describe('The billing interval the change applies with.'),
   at: unixSeconds('when the change applies'),
-  excess: CapsSchema.partial()
-    .optional()
-    .describe(
-      'What the account must remove before the change applies to fit the booked plan, per kind. Absent while it fits.',
-    ),
 });
 
 export const PlanDestinationSchema = z.object({
@@ -302,11 +297,6 @@ export const PlanDestinationSchema = z.object({
     .array(z.enum(['month', 'year']))
     .min(1)
     .describe('The billing intervals that move is legal with, from where the account stands.'),
-  excess: CapsSchema.partial()
-    .optional()
-    .describe(
-      'What the account holds beyond what this plan allows, per kind: how many to remove before the move is accepted. Absent when the account fits.',
-    ),
 });
 
 export const AccountSchema = z.object({
