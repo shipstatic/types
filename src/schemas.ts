@@ -289,6 +289,11 @@ export const ScheduledChangeSchema = z.object({
   plan: grown(AccountPlan, 'The plan the account moves to.'),
   interval: z.enum(['month', 'year']).describe('The billing interval the change applies with.'),
   at: unixSeconds('when the change applies'),
+  excess: CapsSchema.partial()
+    .optional()
+    .describe(
+      'What the account must remove before the change applies to fit the booked plan, per kind. Absent while it fits.',
+    ),
 });
 
 export const PlanDestinationSchema = z.object({

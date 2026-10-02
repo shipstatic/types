@@ -269,6 +269,18 @@ describe('every schema accepts its own shape', () => {
     );
   });
 
+  it('a booked change says what the account has added beyond it, in the same shape', () => {
+    const booked = { plan: 'pro', interval: 'month', at: 1_800_000_000 };
+    expect(S.ScheduledChangeSchema.safeParse(booked).success).toBe(true);
+    expect(
+      S.ScheduledChangeSchema.safeParse({ ...booked, excess: { members: 1, customDomains: 2 } })
+        .success,
+    ).toBe(true);
+    expect(S.ScheduledChangeSchema.safeParse({ ...booked, excess: { members: -1 } }).success).toBe(
+      false,
+    );
+  });
+
   it("a destination the account does not fit says what to remove, in the caps' own keys", () => {
     const cheaper = { plan: 'pro', intervals: ['month', 'year'] };
     // Only the kinds that exceed are named, so every key is optional.

@@ -1045,10 +1045,12 @@ export interface PlanDestination {
   /**
    * What the account holds beyond what this plan allows: per kind, how many
    * to remove. Present only on a cheaper tier the account does not fit, and
-   * then never empty. A move down a tier pauses nothing, so the change door
-   * refuses it until the account fits: the owner removes the excess, and the
-   * field is gone from the next read. Which kinds count is the platform's to
-   * decide; a client renders the keys it is given.
+   * then never empty. A move down a tier is booked only by an account that
+   * fits it, so the change door refuses the move until the owner has removed
+   * the excess, and the field is gone from the next read. A move already
+   * booked says the same of itself ({@link ScheduledChange.excess}). Which
+   * kinds count is the platform's to decide; a client renders the keys it is
+   * given.
    */
   readonly excess?: Partial<Caps>;
 }
@@ -3518,8 +3520,7 @@ export interface PlansResponse {
  *
  * A move down a tier is refused while the account holds more than the
  * destination allows (400, `details.excess` in {@link PlanDestination.excess}'s
- * shape): nothing is paused for a change the owner chose, so the account fits
- * first.
+ * shape): it is booked only by an account that fits it.
  */
 export interface PlanChangeRequest {
   readonly plan: AccountPlanType;
@@ -3542,6 +3543,20 @@ export interface ScheduledChange {
   readonly plan: AccountPlanType;
   readonly interval: BillingInterval;
   readonly at: number;
+  /**
+   * What the account must remove before `at` to fit the booked plan: per
+   * kind, how many, in {@link PlanDestination.excess}'s shape. A move down a
+   * tier is booked by an account that fits it, so this is absent on the day
+   * of booking and on the change door's answer. The account keeps its
+   * current plan until the change applies, though, and may add a member or
+   * a domain the booked plan has no room for; `GET /account` then counts
+   * them here, for as long as the change is booked, whatever else the
+   * account may or may not order meanwhile. It is a count to REMOVE, not of
+   * what pauses: holdings that do not fit when the change applies are
+   * paused by the platform's own rule, which for members pauses every
+   * member while the account is over. Absent while the account fits.
+   */
+  readonly excess?: Partial<Caps>;
 }
 
 /**
