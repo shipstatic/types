@@ -1541,11 +1541,12 @@ export interface ErrorResponse {
 /**
  * `details` of an `ErrorType.Build` error: the evidence behind the verdict.
  *
- * The one `details` shape this file names, because it is the one a HUMAN
- * surface renders rather than a machine reads. The sentence in `message`
- * says what went wrong; the log is how the person fixing the project sees
- * where. A surface that builds shows both, the log as a block rather than
- * as prose.
+ * Named, like {@link PlanChangeRefusalDetails}, because a surface reads it:
+ * `ErrorResponse.details` stays `unknown`, and a shape a client narrows to is
+ * owned here rather than restated at its read site. The sentence in
+ * `message` says what went wrong; the log is how the person fixing the
+ * project sees where. A surface that builds shows both, the log as a block
+ * rather than as prose.
  */
 export interface BuildFailureDetails {
   /**
@@ -2892,10 +2893,12 @@ export interface StaticFile {
  * console: under `/<account>/` and at the root.
  *
  * `owner` marks a section that means the person's OWN account: a bare path
- * into it opens the person's own account rather than the one entered last,
- * since a pricing link's `/upgrade/pro` and the published API-key link speak
- * about the reader's plan and key. Modals inside a section carry their own
- * owner rule in the console; this flag is the section's alone.
+ * into it opens the person's own account rather than the one entered last.
+ * A pricing link's `/upgrade/pro` and the published API-key link speak about
+ * the reader's plan and key, and `/success` is where a purchase lands: only
+ * an owner buys, and a person owns exactly one account. Modals inside a
+ * section carry their own owner rule in the console; this flag is the
+ * section's alone.
  */
 export const SECTIONS = {
   new: { owner: false },
@@ -2903,7 +2906,7 @@ export const SECTIONS = {
   domains: { owner: false },
   settings: { owner: false },
   upgrade: { owner: true },
-  success: { owner: false },
+  success: { owner: true },
   'api-key': { owner: true },
 } as const satisfies Readonly<Record<string, { readonly owner: boolean }>>;
 
@@ -3505,14 +3508,28 @@ export interface PlansResponse {
  * Schedule that applies the change at period end. The answer says which
  * happened ({@link PlanChangeResponse}).
  *
- * A move down a tier is booked only by an account that fits it: while the
- * account holds more members or domains than the destination allows, the
- * door refuses (400) with a sentence naming what to remove, and the same
- * counts in `details.excess`, keyed like {@link Caps}.
+ * A move down a tier is booked only by an account that fits it: until it
+ * does, the door refuses (400) with a sentence naming what to remove, and
+ * the same counts as {@link PlanChangeRefusalDetails}.
  */
 export interface PlanChangeRequest {
   readonly plan: AccountPlanType;
   readonly interval: BillingInterval;
+}
+
+/**
+ * `details` of the change door's refusal of a move down a tier the account
+ * does not fit: the account holds more members, custom domains or platform
+ * domains than the destination allows.
+ *
+ * `excess` counts what to REMOVE before asking again, per kind, keyed like
+ * {@link Caps}; only the kinds over the destination's caps appear. The
+ * door's `message` names the same counts in a sentence, and that sentence is
+ * what a surface shows; the counts are for a client that acts on the
+ * refusal.
+ */
+export interface PlanChangeRefusalDetails {
+  readonly excess: Partial<Caps>;
 }
 
 /**

@@ -65,11 +65,11 @@ describe('consolePaths', () => {
 });
 
 describe('SECTIONS', () => {
-  it('flags the two sections that mean the reader’s own account', () => {
+  it('flags the three sections that mean the reader’s own account', () => {
     const owned = Object.entries(SECTIONS)
       .filter(([, section]) => section.owner)
       .map(([name]) => name);
-    expect(owned).toEqual(['upgrade', 'api-key']);
+    expect(owned).toEqual(['upgrade', 'success', 'api-key']);
   });
 });
 
