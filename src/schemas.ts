@@ -297,6 +297,11 @@ export const PlanDestinationSchema = z.object({
     .array(z.enum(['month', 'year']))
     .min(1)
     .describe('The billing intervals that move is legal with, from where the account stands.'),
+  excess: CapsSchema.partial()
+    .optional()
+    .describe(
+      'What the account holds beyond what this plan allows, per kind: how many to remove before the move is accepted. Absent when the account fits.',
+    ),
 });
 
 export const AccountSchema = z.object({

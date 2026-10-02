@@ -811,8 +811,9 @@ export type AccountPlanType = (typeof AccountPlan)[keyof typeof AccountPlan];
  * "unlimited" — so no consumer needs an "is it bounded?" branch. A cap of `0`
  * means the plan does not have the feature at all; a cap of `N` bounds
  * creation, and what an account already holds above a cap stays until a plan
- * TRANSITION fits it (excess paused, newest first — a domain is the only kind
- * that pauses).
+ * TRANSITION fits it: excess domains are paused, newest first, and members
+ * are paused together while the account holds more than its cap. Deployments
+ * never pause; above their cap they only block creation.
  *
  * A count is an aggregate over a collection, so it lives on the summary
  * resource that owns the collection: `GET /account` for one caller, `GET
@@ -1023,10 +1024,12 @@ export interface Account {
    * from where the account stands. It excludes the plan and cadence the
    * account already holds and the one move the door refuses, a dearer tier
    * at a shorter interval (an immediate move would mint a proration credit,
-   * a deferred one would make a customer asking for more wait a year). The
-   * rule's owner is the platform's plan table; a console feeds these
-   * intervals into its own move model instead of restating it. Additive:
-   * absent on responses that predate it, and a client then derives as it did.
+   * a deferred one would make a customer asking for more wait a year). A
+   * cheaper tier the account does not yet fit is listed with what stands in
+   * the way ({@link PlanDestination.excess}). The rule's owner is the
+   * platform's plan table; a console feeds these rows into its own move
+   * model instead of restating it. Additive: absent on responses that
+   * predate it, and a client then derives as it did.
    */
   readonly destinations?: PlanDestination[];
 }
@@ -1039,6 +1042,15 @@ export interface Account {
 export interface PlanDestination {
   readonly plan: AccountPlanType;
   readonly intervals: BillingInterval[];
+  /**
+   * What the account holds beyond what this plan allows: per kind, how many
+   * to remove. Present only on a cheaper tier the account does not fit, and
+   * then never empty. A move down a tier pauses nothing, so the change door
+   * refuses it until the account fits: the owner removes the excess, and the
+   * field is gone from the next read. Which kinds count is the platform's to
+   * decide; a client renders the keys it is given.
+   */
+  readonly excess?: Partial<Caps>;
 }
 
 /**
@@ -3503,6 +3515,11 @@ export interface PlansResponse {
  * consent), and a billed account moving down gets a Stripe Subscription
  * Schedule that applies the change at period end. The answer says which
  * happened ({@link PlanChangeResponse}).
+ *
+ * A move down a tier is refused while the account holds more than the
+ * destination allows (400, `details.excess` in {@link PlanDestination.excess}'s
+ * shape): nothing is paused for a change the owner chose, so the account fits
+ * first.
  */
 export interface PlanChangeRequest {
   readonly plan: AccountPlanType;
