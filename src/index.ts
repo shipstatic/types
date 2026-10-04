@@ -1167,7 +1167,6 @@ export const API_PATHS = {
   PLANS: '/plans',
   PING: '/ping',
   SETUP: '/setup',
-  SPA_CHECK: '/spa-check',
   UPLOAD: '/upload',
 } as const;
 
@@ -1207,8 +1206,6 @@ export const DEPLOY_FIELDS = {
   BUILD: 'build',
   /** @internal Server-processing flag — first-party `/upload` only. */
   PRERENDER: 'prerender',
-  /** @internal Server-processing flag — first-party `/upload` only. */
-  SPA: 'spa',
   /**
    * @internal The build settings, first-party `/upload` only and meaningful
    * only with `BUILD`: the command to run instead of the manifest's build
@@ -2554,32 +2551,6 @@ export type OAuthScopeType = (typeof OAuthScope)[keyof typeof OAuthScope];
 
 export const DEPLOYMENT_CONFIG_FILENAME = 'ship.json';
 
-/** Default ship.json config for SPA routing. Single source of truth — used by both API and SDK. */
-export const SPA_DEFAULT_CONFIG = {
-  rewrites: [{ source: '/(.*)', destination: '/index.html' }],
-} as const;
-
-/**
- * The `/spa-check` pre-flight's client-side envelope: which file is the
- * check's subject, and how large it may be before a client skips the call.
- *
- * One fact with three holders until this export — the API's config declared
- * the cap, the SDK's `checkSPA` hardcoded `100 * 1024`, and prose restated
- * "100KB". `INDEX_FILE` is the selection rule (the file whose content rides
- * `SPACheckRequest.index`), restated by every client that builds the request.
- *
- * Neither member is a validation boundary: a client over the cap simply
- * skips the pre-flight, because the server answers an oversized index
- * `isSPA: false` anyway. A consumer that cannot import this (n8n) needs no
- * size copy at all — outcome parity is the server's, not the client's.
- */
-export const SPA_CHECK_CONSTRAINTS = {
-  /** The file whose content is the check's subject. */
-  INDEX_FILE: 'index.html',
-  /** Skip the pre-flight above this size — the server would answer false. */
-  MAX_INDEX_BYTES: 100 * 1024,
-} as const;
-
 /**
  * Assert that a ship.json file is *syntactically* loadable. Syntax only —
  * never schema.
@@ -2812,46 +2783,6 @@ export function validateTtl(value: unknown): number | undefined {
     );
   }
   return value;
-}
-
-// =============================================================================
-// SPA CHECK TYPES
-// =============================================================================
-
-/**
- * Request payload for SPA check endpoint
- */
-export interface SPACheckRequest {
-  /** Array of file paths */
-  files: string[];
-  /** HTML content of index.html file */
-  index: string;
-}
-
-/**
- * Response from SPA check endpoint
- */
-/**
- * Which of the classifier's tiers reached the verdict, and why. Named rather
- * than inline so the API's own `checkSPA` can return `SPACheckResponse`
- * instead of restating its shape.
- */
-export interface SPACheckDebug {
-  /** Which tier made the detection */
-  tier: 'exclusions' | 'inclusions' | 'scoring' | 'ai' | 'fallback';
-  /** The reason for the detection result */
-  reason: string;
-}
-
-/**
- * A report: it answers a question and carries only the answer (`CLAUDE.md`,
- * "A report answers a question").
- */
-export interface SPACheckResponse {
-  /** Whether the project is detected as a Single Page Application */
-  isSPA: boolean;
-  /** Debugging information about detection */
-  debug: SPACheckDebug;
 }
 
 // =============================================================================
@@ -3319,8 +3250,6 @@ export interface DeploymentUploadOptions {
   build?: boolean;
   /** @internal Trigger server-side prerender. Only available via /upload endpoint. */
   prerender?: boolean;
-  /** @internal Trigger server-side SPA detection. Only available via /upload endpoint. */
-  spa?: boolean;
   /**
    * @internal The command the build runs instead of the manifest's own
    * `build` script (`npm run build:site`, `hugo`, …). Only with `build`, only

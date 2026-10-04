@@ -104,7 +104,7 @@ describe('the response-shape law', () => {
       'A field that asserts the call worked restates the status code, and the ' +
         'two can then disagree. Delete it: 200 means it worked, 202 means it ' +
         'was accepted. If the field is the ANSWER to a question rather than an ' +
-        'assertion about the call (`valid`, `isSPA`, `available`), name it for ' +
+        'assertion about the call (`valid`, `available`), name it for ' +
         `the answer. Banned: ${BANNED_ALWAYS.join(', ')}.`,
     ).toEqual([]);
   });
