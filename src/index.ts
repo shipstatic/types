@@ -126,12 +126,14 @@ export interface Deployment {
   /** Whether deployment has a password set */
   readonly password: boolean;
   /**
-   * The page every missing path opens, when the deployment's rewrites end in
-   * a catch-all to one: the platform's single-page preset (a deployment whose
-   * only page is `index.html`), or a catch-all the author wrote. `null` when
-   * a missing path is a 404, which is what an application with pages beside
-   * its shell gets until its author declares the route. Absent from an API
-   * older than the field, as every new field on an existing entity is.
+   * The default page the deployment declares for a missing path: the
+   * platform's single-page preset (a deployment whose only page is
+   * `index.html`, or React Router's `__spa-fallback.html`), or the target of
+   * the author's own catch-all (`/(.*)` or `/:path*`) to one file. The
+   * author's other rules still run ahead of it. `null` when no default is
+   * declared, which is what an application with pages beside its shell gets
+   * until its author declares the route. Absent from an API older than the
+   * field, as every new field on an existing entity is.
    */
   readonly fallback?: string | null;
   /** Labels for categorization and filtering (lowercase, alphanumeric with separators). Always present, empty array when none. */
