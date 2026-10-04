@@ -81,6 +81,7 @@ export const DeploymentSchema = z.object({
   fallback: z
     .string()
     .nullable()
+    .optional()
     .describe(
       'The page every missing path opens, when the deployment ends in a catch-all rewrite to one (the single-page preset for a deployment whose only page is index.html, or a catch-all the author wrote); null when a missing path is a 404. An app with pages beside its shell reads null until its ship.json declares the route.',
     ),

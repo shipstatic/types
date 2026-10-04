@@ -130,9 +130,10 @@ export interface Deployment {
    * a catch-all to one: the platform's single-page preset (a deployment whose
    * only page is `index.html`), or a catch-all the author wrote. `null` when
    * a missing path is a 404, which is what an application with pages beside
-   * its shell gets until its author declares the route.
+   * its shell gets until its author declares the route. Absent from an API
+   * older than the field, as every new field on an existing entity is.
    */
-  readonly fallback: string | null;
+  readonly fallback?: string | null;
   /** Labels for categorization and filtering (lowercase, alphanumeric with separators). Always present, empty array when none. */
   labels: string[];
   /**
