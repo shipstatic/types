@@ -336,6 +336,26 @@ describe('Validation Constants - @shipstatic/types', () => {
       expect(config.blockedExtensions).toBeUndefined();
       expect(isBlockedExtension('virus.exe', config.blockedExtensions ?? [])).toBe(false);
     });
+
+    it('carries the way forward past each limit as the API words it, optionally', () => {
+      // One sentence per limit, in the API's words; a client appends it to its
+      // own refusal verbatim. Optional for the same reason the blocklist is:
+      // an older API sends none, and a client then appends nothing.
+      const withSuggestions: PlatformLimits = {
+        maxFileSize: 20 * 1024 * 1024,
+        maxFilesCount: 500,
+        maxTotalSize: 50 * 1024 * 1024,
+        suggestions: {
+          maxFileSize: 'Upgrade to Pro for more.',
+          maxFilesCount: 'Upgrade to Pro for more.',
+          maxTotalSize: 'Upgrade to Pro for more.',
+        },
+      };
+      const older: PlatformLimits = { maxFileSize: 1, maxFilesCount: 1, maxTotalSize: 1 };
+
+      expect(withSuggestions.suggestions?.maxFileSize).toBe('Upgrade to Pro for more.');
+      expect(older.suggestions?.maxFileSize).toBeUndefined();
+    });
   });
 
   describe('FileValidationStatus', () => {

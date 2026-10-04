@@ -1949,7 +1949,28 @@ export interface PlatformLimits {
    * retire with it (tracked in root `backlog.md`).
    */
   readonly blockedExtensions?: readonly string[];
+  /**
+   * The way forward past each limit, in the API's own words, for the account
+   * that asked: `"Upgrade to Pro for more."` where a sold plan allows more,
+   * `"Please contact support if you need more."` where none does. The API
+   * writes it with the same function its own refusals use, so a client that
+   * refuses a file before uploading it appends this sentence to its refusal
+   * verbatim and says exactly what the server would have said. Which plans
+   * exist, which are sold and what an account's grant raises are the server's
+   * to know; a client never learns a plan name from this field, only a
+   * sentence. An anonymous caller is answered the free plan's sentence, as it
+   * is the free plan's numbers.
+   *
+   * **Optional, and the absence is load-bearing**, as `blockedExtensions`
+   * above: an API deployed before this field existed sends nothing, and a
+   * client then appends nothing. It hardens to required at the entity's next
+   * natural break, with the blocklist.
+   */
+  readonly suggestions?: Readonly<Record<PlatformLimitKey, string>>;
 }
+
+/** The three request limits, named as `PlatformLimits` names them. */
+export type PlatformLimitKey = 'maxFileSize' | 'maxFilesCount' | 'maxTotalSize';
 
 // =============================================================================
 // EXTENSION MATCHING
