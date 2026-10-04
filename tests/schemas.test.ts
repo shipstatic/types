@@ -97,6 +97,7 @@ const deployment: Deployment = {
   status: 'success',
   config: false,
   password: false,
+  fallback: '/index.html',
   labels: ['production'],
   via: 'cli',
   created: 1_700_000_000,

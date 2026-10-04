@@ -78,6 +78,12 @@ export const DeploymentSchema = z.object({
   status: grown(DeploymentStatus, 'Deployment lifecycle state; "success" means the site is live.'),
   config: z.boolean().describe('True if the deployment includes a ship.json routing config.'),
   password: z.boolean().describe('True if the deployment is password-protected.'),
+  fallback: z
+    .string()
+    .nullable()
+    .describe(
+      'The page every missing path opens, when the deployment ends in a catch-all rewrite to one (the single-page preset for a deployment whose only page is index.html, or a catch-all the author wrote); null when a missing path is a 404. An app with pages beside its shell reads null until its ship.json declares the route.',
+    ),
   labels: z.array(z.string()).describe('Labels attached to the deployment; empty when none.'),
   via: z
     .string()
