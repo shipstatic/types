@@ -132,8 +132,10 @@ export interface Deployment {
    * the author's own catch-all (`/(.*)` or `/:path*`) to one file. The
    * author's other rules still run ahead of it. `null` when no default is
    * declared, which is what an application with pages beside its shell gets
-   * until its author declares the route. Absent from an API older than the
-   * field, as every new field on an existing entity is.
+   * until its author declares the route. Carried by a deployment, not by a
+   * list of deployments; omitted when the deployment's artifact cannot be
+   * read, and by an API older than the field. Absent is not `null`: `null`
+   * is a declaration of none.
    */
   readonly fallback?: string | null;
   /** Labels for categorization and filtering (lowercase, alphanumeric with separators). Always present, empty array when none. */

@@ -83,7 +83,7 @@ export const DeploymentSchema = z.object({
     .nullable()
     .optional()
     .describe(
-      "The default page the deployment declares for a missing path: the single-page preset (a deployment whose only page is index.html, or React Router's __spa-fallback.html), or the target of the author's own catch-all (/(.*) or /:path*) to one file. The author's other rules still run ahead of it. Null when no default is declared: a missing path is then a 404 unless a rule of the author's answers it. An app with pages beside its shell reads null until its ship.json declares the route.",
+      "The default page the deployment declares for a missing path: the single-page preset (a deployment whose only page is index.html, or React Router's __spa-fallback.html), or the target of the author's own catch-all (/(.*) or /:path*) to one file. The author's other rules still run ahead of it. Null when no default is declared: a missing path is then a 404 unless a rule of the author's answers it. An app with pages beside its shell reads null until its ship.json declares the route. Carried by a deployment, not by a list of deployments; omitted when the deployment's artifact cannot be read.",
     ),
   labels: z.array(z.string()).describe('Labels attached to the deployment; empty when none.'),
   via: z
