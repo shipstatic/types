@@ -39,7 +39,7 @@ own; only a subpath entry (`schemas`) is a separate file.
 | Unbuilt Project Markers | `UNBUILT_PROJECT_MARKERS`, `hasUnbuiltMarker()` |
 | Common Responses | `PingResponse` (`timestamp` in unix seconds) |
 | Credential Shapes | The one address for credential vocabulary: `AUTH_BASE_PATH` (the identity mount — API server and web auth client read the same path), `AuthMethod`, `API_KEY` / `DEPLOY_TOKEN` / `OAUTH_TOKEN` / `CALLER` (namespaced shape constants), and **both halves of the one Bearer slot** — `readBearerValue` READS it (RFC 7235 §2.1 scheme fold; absence stays the caller's own question) and `TokenKind` + `classifyToken` DISPATCH on what came out, both sides of the wire — plus `OAuthScope` |
-| Deployment Config Constants | `DEPLOYMENT_CONFIG_FILENAME`, `SPA_DEFAULT_CONFIG`, `SPA_CHECK_CONSTRAINTS` (the `/spa-check` pre-flight's envelope — the index-file selection rule + the skip cap; NOT a validation boundary, the server answers an oversized index `isSPA: false`) |
+| Deployment Config Constants | `DEPLOYMENT_CONFIG_FILENAME`, `SPA_DEFAULT_CONFIG`, `SPA_CHECK_CONSTRAINTS` (the `/spa-check` pre-flight's envelope: the index-file selection rule and the skip cap in UTF-8 bytes, held by every client, n8n's copy fenced; NOT a validation boundary, the server answers an oversized index `isSPA: false`) |
 | Validation Utilities | `validateIdempotencyKey` (+ `IDEMPOTENCY_KEY_CONSTRAINTS`, which owns the header NAME as well as the format — see `CALLER.HEADER` for the same reasoning), `normalizeVia` (moved from the API 2026-08-06: a client reaches the same verdict offline, which is this file's own test for a format rule), `readBearerValue` (the Authorization header's scheme fold — see "The credential shape law"), `validateToken` (classify, then apply the population's format rules via one shared prefixed-credential helper), `validateApiKey`, `validateDeployToken`, `validateOAuthToken`, `validateCaller`, `validateApiUrl`, `isDeployment`, `validateTtl` (+ `TTL_CONSTRAINTS` — see "One lifetime grammar") |
 | SPA Check Types | `SPACheckRequest`, `SPACheckResponse` |
 | Static File | `StaticFile` (cross-environment file representation) |
@@ -696,7 +696,7 @@ Four rules, each of which was broken once and is now structural:
   `Promise<{domain, hash}>`, so the CLI declared its own
   `DomainShareResponse` and the API typed neither), not as options
   (`DeploymentSetOptions`, `DomainSetOptions`, `TokenCreateOptions`), and not
-  nested inside a response (`DnsLookup`, `SPACheckDebug`). An inline shape
+  nested inside a response (`DnsLookup`). An inline shape
   cannot be imported, so every consumer that needs to hold one redeclares it
   — which is the drift this package exists to prevent, committed inside the
   package itself.

@@ -2568,15 +2568,17 @@ export const SPA_DEFAULT_CONFIG = {
  * "100KB". `INDEX_FILE` is the selection rule (the file whose content rides
  * `SPACheckRequest.index`), restated by every client that builds the request.
  *
- * Neither member is a validation boundary: a client over the cap simply
- * skips the pre-flight, because the server answers an oversized index
- * `isSPA: false` anyway. A consumer that cannot import this (n8n) needs no
- * size copy at all — outcome parity is the server's, not the client's.
+ * Neither member is a validation boundary: a client over the cap skips the
+ * pre-flight and answers "no" itself, which is the answer the server gives an
+ * oversized index. Every client holds the cap, in bytes: the server's own
+ * route refuses a body over the JSON intake cap, so a client that asked about
+ * any index would fail a deploy whose upload succeeds. The n8n node, which
+ * cannot import this, restates the number under its contract fence.
  */
 export const SPA_CHECK_CONSTRAINTS = {
   /** The file whose content is the check's subject. */
   INDEX_FILE: 'index.html',
-  /** Skip the pre-flight above this size — the server would answer false. */
+  /** Skip the pre-flight above this many UTF-8 bytes: the server answers no. */
   MAX_INDEX_BYTES: 100 * 1024,
 } as const;
 
@@ -2829,29 +2831,19 @@ export interface SPACheckRequest {
 }
 
 /**
- * Response from SPA check endpoint
- */
-/**
- * Which of the classifier's tiers reached the verdict, and why. Named rather
- * than inline so the API's own `checkSPA` can return `SPACheckResponse`
- * instead of restating its shape.
- */
-export interface SPACheckDebug {
-  /** Which tier made the detection */
-  tier: 'exclusions' | 'inclusions' | 'scoring' | 'ai' | 'fallback';
-  /** The reason for the detection result */
-  reason: string;
-}
-
-/**
- * A report: it answers a question and carries only the answer (`CLAUDE.md`,
- * "A report answers a question").
+ * The `/spa-check` answer: whether the upload is a single-page app, and the
+ * one sentence saying why it was or was not detected.
+ *
+ * `reason` is there so anyone can ask the open route about an upload and
+ * read the answer. It is human-readable text under the message authoring law:
+ * clients branch on `isSPA`, never on the sentence, so its wording is not a
+ * contract.
  */
 export interface SPACheckResponse {
-  /** Whether the project is detected as a Single Page Application */
+  /** Whether the upload is detected as a single-page app */
   isSPA: boolean;
-  /** Debugging information about detection */
-  debug: SPACheckDebug;
+  /** Why it was or was not detected, for a person to read */
+  reason: string;
 }
 
 // =============================================================================
