@@ -840,11 +840,61 @@ export interface Caps {
    */
   readonly customDomains: number;
   /**
-   * Members of the account, the owner included: one membership row each, so
-   * a pending invitation is not yet a member. As `usage` it is how many the
-   * account has, as `caps` how many its plan allows.
+   * Member places. As `caps` it is how many people the plan allows in the
+   * account, the owner included. As `usage` it is the members the account
+   * has: one membership row each. A pending invitation holds a place too,
+   * counted beside it as {@link AccountUsage.invitations}, so what stands
+   * against this cap is {@link placesTaken}, members and invitations
+   * together.
    */
   readonly members: number;
+}
+
+/**
+ * What the account holds: every cap's count, and the pending invitations.
+ *
+ * A member place is taken by a member or by a pending invitation, and an
+ * account never holds more of the two together than its plan's `members`
+ * cap: the invite door refuses a new invitation when the places are taken,
+ * and a move down a tier is booked only when the places fit the destination.
+ * The count has no cap of its own, which is why it is a field of the usage
+ * and not of {@link Caps}: the place it takes is a member's.
+ *
+ * Only a member pauses, though. An account over its members cap pauses every
+ * member while it does not fit; a pending invitation pauses nobody and
+ * counts toward no pause.
+ */
+export interface AccountUsage extends Caps {
+  /**
+   * Invitations still open: pending, and not yet expired. An expired one
+   * holds nothing, whether or not a sweep has removed its row.
+   */
+  readonly invitations: number;
+}
+
+/** The member places an account has taken: its members, and its pending invitations. */
+export function placesTaken(usage: Pick<AccountUsage, 'members' | 'invitations'>): number {
+  return usage.members + usage.invitations;
+}
+
+/**
+ * What stands between an account's places and a members cap: how many
+ * members to remove and how many invitations to cancel before the places
+ * fit, each `0` where nothing does.
+ *
+ * Members first, because a member over the cap has to go whatever else the
+ * account holds; invitations take whatever places the members leave, and
+ * the ones beyond those are what to cancel. So two members and one
+ * invitation against a cap of one is one member and one invitation, and
+ * five members against the same cap is four members and no invitation.
+ */
+export function placesOver(
+  usage: Pick<AccountUsage, 'members' | 'invitations'>,
+  cap: number,
+): Pick<AccountUsage, 'members' | 'invitations'> {
+  const members = Math.max(0, usage.members - cap);
+  const room = Math.max(0, cap - usage.members);
+  return { members, invitations: Math.max(0, usage.invitations - room) };
 }
 
 /**
@@ -918,13 +968,17 @@ export interface Account {
    * still work, every write is refused. The plan is unchanged underneath.
    */
   readonly suspended: boolean;
-  /** What the account currently holds — see {@link Caps}. */
-  readonly usage: Caps;
   /**
-   * What the account is allowed to hold, under the same keys as
-   * {@link usage}, so the pair divides. These are the account's EFFECTIVE
-   * caps: its plan's numbers, plus whatever the operator granted it
-   * individually.
+   * What the account currently holds: every cap's count, and the pending
+   * invitations beside them — see {@link AccountUsage}.
+   */
+  readonly usage: AccountUsage;
+  /**
+   * What the account is allowed to hold, under {@link usage}'s cap keys, so
+   * the pair divides. These are the account's EFFECTIVE caps: its plan's
+   * numbers, plus whatever the operator granted it individually. The one key
+   * of `usage` absent here is `invitations`, which has no cap of its own: a
+   * pending invitation takes a member place, so it counts against `members`.
    */
   readonly caps: Caps;
   /**
@@ -3518,17 +3572,18 @@ export interface PlanChangeRequest {
 
 /**
  * `details` of the change door's refusal of a move down a tier the account
- * does not fit: the account holds more members, custom domains or platform
- * domains than the destination allows.
+ * does not fit: the account holds more members, pending invitations, custom
+ * domains or platform domains than the destination allows.
  *
  * `excess` counts what to REMOVE before asking again, per kind, keyed like
- * {@link Caps}; only the kinds over the destination's caps appear. The
- * door's `message` names the same counts in a sentence, and that sentence is
- * what a surface shows; the counts are for a client that acts on the
- * refusal.
+ * {@link AccountUsage}; only the kinds over the destination's caps appear.
+ * Members and invitations are counted apart ({@link placesOver}), since one
+ * is removed and the other cancelled. The door's `message` names the same
+ * counts in a sentence, and that sentence is what a surface shows; the
+ * counts are for a client that acts on the refusal.
  */
 export interface PlanChangeRefusalDetails {
-  readonly excess: Partial<Caps>;
+  readonly excess: Partial<AccountUsage>;
 }
 
 /**

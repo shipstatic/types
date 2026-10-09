@@ -270,7 +270,18 @@ export const CapsSchema = z.object({
   members: z
     .int()
     .nonnegative()
-    .describe('Members of the account, the owner included; a pending invitation is not one.'),
+    .describe(
+      'Member places: as caps, how many people the plan allows, the owner included; as usage, the members the account has.',
+    ),
+});
+
+export const AccountUsageSchema = CapsSchema.extend({
+  invitations: z
+    .int()
+    .nonnegative()
+    .describe(
+      'Invitations still open: pending and not yet expired. Each takes a member place beside the members, against the members cap.',
+    ),
 });
 
 export const AccountRoleSchema = z
@@ -310,9 +321,11 @@ export const AccountSchema = z.object({
     .describe(
       'True while the operator has suspended the account: reads work, every write is refused.',
     ),
-  usage: CapsSchema.describe('What the account currently holds.'),
+  usage: AccountUsageSchema.describe(
+    'What the account currently holds: every cap, and the pending invitations beside them.',
+  ),
   caps: CapsSchema.describe(
-    'What the account is allowed to hold: the same keys as usage, so the pair divides.',
+    "What the account is allowed to hold, under usage's cap keys, so the pair divides. A pending invitation takes a member place, so it counts against members.",
   ),
   role: AccountRoleSchema.optional().describe(
     "The credential's standing in this account. Absent on older responses, which then mean owner.",

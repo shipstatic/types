@@ -20,6 +20,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type {
   Account,
+  AccountUsage,
   Caps,
   Deployment,
   DeploymentCreateResponse,
@@ -77,6 +78,7 @@ const _domainDns: Held<DomainDnsResponse, typeof S.DomainDnsResponseSchema> = tr
 const _domainShare: Held<DomainShareResponse, typeof S.DomainShareResponseSchema> = true;
 const _domainValidate: Held<DomainValidateResponse, typeof S.DomainValidateResponseSchema> = true;
 const _caps: Held<Caps, typeof S.CapsSchema> = true;
+const _usage: Held<AccountUsage, typeof S.AccountUsageSchema> = true;
 const _scheduled: Held<ScheduledChange, typeof S.ScheduledChangeSchema> = true;
 const _destination: Held<PlanDestination, typeof S.PlanDestinationSchema> = true;
 const _account: Held<Account, typeof S.AccountSchema> = true;
@@ -120,6 +122,8 @@ const domain: Domain = {
 };
 
 const caps: Caps = { deployments: 2, platformDomains: 0, customDomains: 1, members: 1 };
+/** What the account holds: the caps' counts, and the one key beside them. */
+const usage: AccountUsage = { ...caps, invitations: 0 };
 
 const account: Account = {
   account: 'k3v9x2m7q1w8e5r4',
@@ -128,7 +132,7 @@ const account: Account = {
   picture: null,
   plan: 'pro',
   suspended: false,
-  usage: caps,
+  usage,
   caps: { deployments: 100, platformDomains: 10, customDomains: 3, members: 1 },
   created: 1_700_000_000,
   activated: 1_700_000_050,
@@ -225,7 +229,7 @@ describe('every schema accepts its own shape', () => {
       role: 'member',
       access: 'paused',
       members: 'paused',
-      usage: { ...caps, members: 6 },
+      usage: { ...usage, members: 6 },
       caps: { ...account.caps, members: 5 },
     };
     expect(S.AccountSchema.safeParse(inATeam).success).toBe(true);
@@ -246,6 +250,18 @@ describe('every schema accepts its own shape', () => {
     expect(S.CapsSchema.safeParse({ ...caps, members: -1 }).success).toBe(false);
     const { members: _, ...withoutMembers } = caps;
     expect(S.CapsSchema.safeParse(withoutMembers).success).toBe(false);
+  });
+
+  it('counts pending invitations in the usage and in no cap: a place taken, never a ceiling of its own', () => {
+    expect(S.AccountUsageSchema.safeParse({ ...usage, invitations: 2 }).success).toBe(true);
+    expect(S.AccountUsageSchema.safeParse({ ...usage, invitations: -1 }).success).toBe(false);
+    const { invitations: _, ...withoutInvitations } = usage;
+    expect(S.AccountUsageSchema.safeParse(withoutInvitations).success).toBe(false);
+    expect(S.AccountSchema.safeParse({ ...account, usage: withoutInvitations }).success).toBe(
+      false,
+    );
+    // The caps side has no such key: a schema that admitted it would read as a cap.
+    expect(S.CapsSchema.strict().safeParse({ ...caps, invitations: 0 }).success).toBe(false);
   });
 
   it('destinations are additive, and a destination always names at least one interval', () => {
