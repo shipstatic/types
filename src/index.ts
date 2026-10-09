@@ -878,25 +878,87 @@ export function placesTaken(usage: Pick<AccountUsage, 'members' | 'invitations'>
 }
 
 /**
- * What stands between an account's places and a members cap: how many
- * members to remove and how many invitations to cancel before the places
- * fit, each `0` where nothing does.
- *
- * The places over the cap are counted once ({@link placesTaken} less the
- * cap), and members are named first, because a member over the cap has to
- * go whatever else the account holds; what is over after them is the
- * invitations to cancel. So two members and one invitation against a cap of
- * one is one member and one invitation, and five members against the same
- * cap is four members and no invitation.
+ * The kind each count of {@link AccountUsage} names, as a person reads it:
+ * one and many. The one vocabulary every surface that says a count uses, the
+ * api's cap refusals and the console's room notes alike, so "custom domain"
+ * is one word wherever it is met. A person reads "ShipStatic domain" where
+ * the code says platform domain; the code's word never reaches them.
  */
-export function placesOver(
-  usage: Pick<AccountUsage, 'members' | 'invitations'>,
-  cap: number,
-): Pick<AccountUsage, 'members' | 'invitations'> {
-  const over = Math.max(0, placesTaken(usage) - cap);
-  const members = Math.max(0, usage.members - cap);
-  return { members, invitations: over - members };
+export const KIND: Record<keyof AccountUsage, { readonly one: string; readonly many: string }> = {
+  deployments: { one: 'deployment', many: 'deployments' },
+  platformDomains: { one: 'ShipStatic domain', many: 'ShipStatic domains' },
+  customDomains: { one: 'custom domain', many: 'custom domains' },
+  members: { one: 'member', many: 'members' },
+  invitations: { one: 'invitation', many: 'invitations' },
+};
+
+/**
+ * What an account holds beyond a set of caps, per kind, only the kinds that
+ * are over: what a move down a tier must shed before it is booked, and what
+ * the console notes on a cheaper card.
+ *
+ * Member places are read against `caps.members`: the places over the cap are
+ * counted once ({@link placesTaken} less the cap), members are named first,
+ * because a member over the cap has to go whatever else the account holds,
+ * and what is over after them is the invitations to cancel. So two members
+ * and one invitation against a cap of one is one member and one invitation,
+ * and five members against the same cap is four members and no invitation.
+ * The two domain kinds are read against their own caps. Deployments are not
+ * read at all: nothing pauses them, and above their cap they only block
+ * creation (see {@link Caps}).
+ */
+export function excessOver(usage: AccountUsage, caps: Caps): Partial<AccountUsage> {
+  const places = Math.max(0, placesTaken(usage) - caps.members);
+  const members = Math.max(0, usage.members - caps.members);
+  const over = {
+    members,
+    invitations: places - members,
+    customDomains: usage.customDomains - caps.customDomains,
+    platformDomains: usage.platformDomains - caps.platformDomains,
+  };
+  return Object.fromEntries(Object.entries(over).filter(([, count]) => count > 0));
 }
+
+/**
+ * Counts of kinds in words, people first: "4 members and 2 custom domains",
+ * or nothing. The order is {@link KIND}'s minus the two kinds a count never
+ * names here, deployments and invitations, which have their own sentence
+ * ({@link fitPhrase}).
+ */
+export function countPhrase(excess: Partial<AccountUsage>): string {
+  return listOf(
+    (['members', 'customDomains', 'platformDomains'] as const)
+      .filter((kind) => (excess[kind] ?? 0) > 0)
+      .map((kind) => counted(kind, excess[kind] ?? 0)),
+  );
+}
+
+/**
+ * What to do before an account fits a set of caps, in words: "remove 1
+ * member and cancel 1 invitation", "remove 2 custom domains", "cancel 2
+ * invitations", or nothing when it fits. Two verbs, because a member place is
+ * freed two ways: a member is removed, a pending invitation is cancelled. The
+ * api's change door and the console's room notes say this one phrase, so a
+ * refusal and the note that preceded it cannot differ.
+ */
+export function fitPhrase(excess: Partial<AccountUsage>): string {
+  const remove = countPhrase(excess);
+  const invitations = excess.invitations ?? 0;
+  return listOf([
+    ...(remove ? [`remove ${remove}`] : []),
+    ...(invitations > 0 ? [`cancel ${counted('invitations', invitations)}`] : []),
+  ]);
+}
+
+/** "4 members", "1 custom domain". */
+const counted = (kind: keyof AccountUsage, count: number): string =>
+  `${count} ${count === 1 ? KIND[kind].one : KIND[kind].many}`;
+
+/** "a", "a and b", "a, b and c". */
+const listOf = (parts: readonly string[]): string =>
+  parts.length > 1
+    ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+    : (parts[0] ?? '');
 
 /**
  * A person's standing in an account. `owner` founded it and alone manages
@@ -3577,8 +3639,8 @@ export interface PlanChangeRequest {
  * domains or platform domains than the destination allows.
  *
  * `excess` counts what to REMOVE before asking again, per kind, keyed like
- * {@link AccountUsage}; only the kinds over the destination's caps appear.
- * Members and invitations are counted apart ({@link placesOver}), since one
+ * {@link AccountUsage}; only the kinds over the destination's caps appear
+ * ({@link excessOver}). Members and invitations are counted apart, since one
  * is removed and the other cancelled. The door's `message` names the same
  * counts in a sentence, and that sentence is what a surface shows; the
  * counts are for a client that acts on the refusal.
