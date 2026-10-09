@@ -884,7 +884,10 @@ export function placesTaken(usage: Pick<AccountUsage, 'members' | 'invitations'>
  * is one word wherever it is met. A person reads "ShipStatic domain" where
  * the code says platform domain; the code's word never reaches them.
  */
-export const KIND: Record<keyof AccountUsage, { readonly one: string; readonly many: string }> = {
+export const USAGE_KIND: Record<
+  keyof AccountUsage,
+  { readonly one: string; readonly many: string }
+> = {
   deployments: { one: 'deployment', many: 'deployments' },
   platformDomains: { one: 'ShipStatic domain', many: 'ShipStatic domains' },
   customDomains: { one: 'custom domain', many: 'custom domains' },
@@ -921,7 +924,7 @@ export function excessOver(usage: AccountUsage, caps: Caps): Partial<AccountUsag
 
 /**
  * Counts of kinds in words, people first: "4 members and 2 custom domains",
- * or nothing. The order is {@link KIND}'s minus the two kinds a count never
+ * or nothing. The order is {@link USAGE_KIND}'s minus the two kinds a count never
  * names here, deployments and invitations, which have their own sentence
  * ({@link fitPhrase}).
  */
@@ -952,7 +955,7 @@ export function fitPhrase(excess: Partial<AccountUsage>): string {
 
 /** "4 members", "1 custom domain". */
 const counted = (kind: keyof AccountUsage, count: number): string =>
-  `${count} ${count === 1 ? KIND[kind].one : KIND[kind].many}`;
+  `${count} ${count === 1 ? USAGE_KIND[kind].one : USAGE_KIND[kind].many}`;
 
 /** "a", "a and b", "a, b and c". */
 const listOf = (parts: readonly string[]): string =>
