@@ -521,13 +521,12 @@ billing returns emit them as links; a drift between the two is a link that
 - **`doors`** builds the pages that exist before an account is known
   (`login`, `register`, `logout`, `invitation`, `claim`, `consent`), one
   builder per door segment and named for it, which the compiler holds. The
-  console's route table mounts every door from its builder. A door's path
-  names a resource with a page of its own (`invitation(id)`, `claim(code)`),
-  and its query carries what the page reads once on arrival: the three
-  sign-in doors take it by name (`login({ token, next })`,
-  `register({ next })`, `logout({ next })`), `next` being the journey and
-  `token` the sign-in link's one-shot credential, which the console spends
-  the moment it lands (`/login?token=…&next=…`).
+  console's route table mounts every door from its builder. A door's object
+  rides its path and the journey rides the query: `invitation(id)` and
+  `claim(code)` take their object, and the three sign-in doors take the
+  journey by name (`login({ token, next })`, `register({ next })`,
+  `logout({ next })`), the login door's object being the sign-in link's
+  token (`/login/<token>`).
 - **The matchers** (`doorOf`, `isUpgradePath`, `errandOf`,
   `accountOfPath`) read a path in either form, the way the
   console's router matches it: case-insensitively, ignoring a trailing

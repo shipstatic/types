@@ -3062,13 +3062,9 @@ const BILLING_RETURNS = {
 type BillingReturn = keyof typeof BILLING_RETURNS;
 const marker = (kind: BillingReturn): string => BILLING_RETURNS[kind].join('=');
 
-/** A door with its query, the parameters that have a value, in the order given. */
-const withQuery = (door: string, query: Record<string, string | undefined>): string => {
-  const params = new URLSearchParams();
-  for (const [name, value] of Object.entries(query)) if (value) params.set(name, value);
-  const search = params.toString();
-  return search ? `${door}?${search}` : door;
-};
+/** A link with an optional `?next=`, the console's own return path. */
+const withNext = (door: string, next?: string): string =>
+  next ? `${door}?next=${encodeURIComponent(next)}` : door;
 
 /**
  * The paths inside one account, or, with no account, the bare form the
@@ -3116,23 +3112,21 @@ interface Journey {
 
 /**
  * The doors: the pages that exist before an account is known, one builder
- * per door segment and named for it. A door's path names a resource with a
- * page of its own (the invitation, the claim code), and its query carries
- * what the page reads once on arrival: the journey (`next`), and on the
- * login door the sign-in link's one-shot `token`, which the console spends
- * the moment it lands. The three doors a sign-in moves through take their
- * query by name.
+ * per door segment and named for it. A door's object rides its path (the
+ * sign-in link's token, the invitation, the claim code), and the journey
+ * rides the query, so the three doors a sign-in moves through take it by
+ * name.
  *
  * ```ts
  * doors.login({ token, next: '/claim/abc' })
- * // '/login?token=<token>&next=%2Fclaim%2Fabc'
+ * // '/login/<token>?next=%2Fclaim%2Fabc'
  * ```
  */
 export const doors = {
   login: ({ token, next }: Journey & { readonly token?: string } = {}): string =>
-    withQuery('/login', { token, next }),
-  register: ({ next }: Journey = {}): string => withQuery('/register', { next }),
-  logout: ({ next }: Journey = {}): string => withQuery('/logout', { next }),
+    withNext(token ? `/login/${token}` : '/login', next),
+  register: ({ next }: Journey = {}): string => withNext('/register', next),
+  logout: ({ next }: Journey = {}): string => withNext('/logout', next),
   invitation: (invitation: string): string => `/invitation/${invitation}`,
   claim: (code: string): string => `/claim/${code}`,
   consent: (): string => '/consent',
@@ -3196,9 +3190,8 @@ export function accountOfPath(path: string): string | null {
  * The door a path names, or null for an account place or the operator
  * partition. Every question about doors reads this one answer: which page is
  * an auth page, which errand a destination carries, what a vendor must not
- * see. The first segment decides and the rest is the door's own: `/claim/<code>`
- * is the claim door whatever the code, `/login?token=…` the login door
- * whatever the query.
+ * see. `/login/<token>` is the login door, as `/claim/<code>` is the claim
+ * door: a door's object is the rest of its path.
  */
 export function doorOf(path: string): DoorSegment | null {
   const place = placeOf(path);
