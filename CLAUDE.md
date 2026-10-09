@@ -521,14 +521,21 @@ billing returns emit them as links; a drift between the two is a link that
 - **`doors`** builds the pages that exist before an account is known
   (`login`, `register`, `logout`, `invitation`, `claim`, `consent`), one
   builder per door segment and named for it, which the compiler holds. The
-  console's route table mounts every door from its builder.
-- **The matchers** (`isClaimPath`, `isInvitationPath`, `isUpgradePath`,
-  `errandOf`, `accountOfPath`) read a path in either form, the way the
+  console's route table mounts every door from its builder. A door's object
+  rides its path and the journey rides the query: `invitation(id)` and
+  `claim(code)` take their object, and the three sign-in doors take the
+  journey by name (`login({ token, next })`, `register({ next })`,
+  `logout({ next })`), the login door's object being the sign-in link's
+  token (`/login/<token>`).
+- **The matchers** (`doorOf`, `isUpgradePath`, `errandOf`,
+  `accountOfPath`) read a path in either form, the way the
   console's router matches it: case-insensitively, ignoring a trailing
   slash, the query and the fragment. `billingReturnOf` reads the two query
   markers a Stripe return lands with, which the builders write
   (`successAfterCheckout`, `settingsAfterBilling`), so neither side spells a
-  marker.
+  marker. `doorOf` is the one reader of the doors: an auth page, an errand
+  and what a vendor must not see are each a question about which door a
+  path names, so no per-door predicate exists.
 
 **Sections, doors and the operator partition (`admin`) are disjoint sets of
 first segments**, held at compile time inside the module: a shared name

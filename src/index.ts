@@ -545,8 +545,7 @@ export interface DomainShareResponse {
  * the console sends a stuck reader to it rather than to the general docs. If
  * the spellings ever diverged, nothing would fail: the link would open the page
  * at its top and nobody would be told, the silent-drift class this
- * constitution exists to delete ({@link SIGN_IN_RETURN_PARAM} is the same shape
- * one domain over).
+ * constitution exists to delete.
  */
 export const SETUP_TROUBLESHOOTING_ANCHOR = 'troubleshooting';
 
@@ -2429,21 +2428,6 @@ export interface PingResponse {
 export const AUTH_BASE_PATH = '/auth';
 
 /**
- * The query marker a completed sign-in LANDS with.
- *
- * The API's magic-link verify leg stamps `?signing-in=1` onto its success
- * redirect, and the console boots into its wait screen on seeing it — two
- * repos, one spelling, which is why it lives here. Success is marked and the
- * error leg deliberately is NOT: the console gives the marker precedence, so
- * a marked error would render a wait that resolves to bare doors with the
- * error's sentence lost. If the spellings ever diverged the failure would be
- * invisible to every suite — email landings would flash the doors for one
- * round trip instead of waiting — which is exactly the silent-drift class
- * this constitution exists to delete.
- */
-export const SIGN_IN_RETURN_PARAM = 'signing-in';
-
-/**
  * How a request (or recorded activity) was authorized.
  *
  * Client populations: `SESSION` (first-party cookie), `API_KEY` (`ship-`
@@ -3049,7 +3033,8 @@ export type ConsoleSection = keyof typeof SECTIONS;
 
 /** The pages that exist before an account is known, by first segment. */
 const DOOR_SEGMENTS = ['login', 'register', 'logout', 'invitation', 'claim', 'consent'] as const;
-type DoorSegment = (typeof DOOR_SEGMENTS)[number];
+/** A door's first segment. */
+export type DoorSegment = (typeof DOOR_SEGMENTS)[number];
 
 /** The operator partition's first segment. */
 const ADMIN_SEGMENT = 'admin';
@@ -3120,18 +3105,32 @@ export function consolePaths(account?: string) {
 /** The builders `consolePaths` returns. */
 export type ConsolePaths = ReturnType<typeof consolePaths>;
 
+/** Where a sign-in door's journey goes on: the console path a `?next` carries. */
+interface Journey {
+  readonly next?: string;
+}
+
 /**
  * The doors: the pages that exist before an account is known, one builder
- * per door segment and named for it.
+ * per door segment and named for it. A door's object rides its path (the
+ * sign-in link's token, the invitation, the claim code), and the journey
+ * rides the query, so the three doors a sign-in moves through take it by
+ * name.
+ *
+ * ```ts
+ * doors.login({ token, next: '/claim/abc' })
+ * // '/login/<token>?next=%2Fclaim%2Fabc'
+ * ```
  */
 export const doors = {
-  login: (next?: string): string => withNext('/login', next),
-  register: (next?: string): string => withNext('/register', next),
-  logout: (): string => '/logout',
+  login: ({ token, next }: Journey & { readonly token?: string } = {}): string =>
+    withNext(token ? `/login/${token}` : '/login', next),
+  register: ({ next }: Journey = {}): string => withNext('/register', next),
+  logout: ({ next }: Journey = {}): string => withNext('/logout', next),
   invitation: (invitation: string): string => `/invitation/${invitation}`,
   claim: (code: string): string => `/claim/${code}`,
   consent: (): string => '/consent',
-} as const satisfies Record<DoorSegment, (value: string) => string>;
+} as const satisfies Record<DoorSegment, (...args: never[]) => string>;
 
 /**
  * Which Stripe return a query string marks: `checkout` for the success page
@@ -3187,17 +3186,17 @@ export function accountOfPath(path: string): string | null {
   return place.kind === 'account' ? place.account : null;
 }
 
-/** Whether a path names a claim link (`/claim/:code`, a bearer credential). */
-export const isClaimPath = (path: string): boolean => {
+/**
+ * The door a path names, or null for an account place or the operator
+ * partition. Every question about doors reads this one answer: which page is
+ * an auth page, which errand a destination carries, what a vendor must not
+ * see. `/login/<token>` is the login door, as `/claim/<code>` is the claim
+ * door: a door's object is the rest of its path.
+ */
+export function doorOf(path: string): DoorSegment | null {
   const place = placeOf(path);
-  return place.kind === 'door' && place.door === 'claim';
-};
-
-/** Whether a path names an invitation (`/invitation/:invitation`). */
-export const isInvitationPath = (path: string): boolean => {
-  const place = placeOf(path);
-  return place.kind === 'door' && place.door === 'invitation';
-};
+  return place.kind === 'door' ? place.door : null;
+}
 
 /**
  * Whether a path names the upgrade section, in either form: `/upgrade`,
@@ -3217,8 +3216,9 @@ export type ConsoleErrand = 'claim' | 'invite' | 'upgrade';
  * it.
  */
 export function errandOf(path: string): ConsoleErrand | null {
-  if (isClaimPath(path)) return 'claim';
-  if (isInvitationPath(path)) return 'invite';
+  const door = doorOf(path);
+  if (door === 'claim') return 'claim';
+  if (door === 'invitation') return 'invite';
   if (isUpgradePath(path)) return 'upgrade';
   return null;
 }

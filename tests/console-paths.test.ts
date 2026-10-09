@@ -3,10 +3,9 @@ import {
   accountOfPath,
   billingReturnOf,
   consolePaths,
+  doorOf,
   doors,
   errandOf,
-  isClaimPath,
-  isInvitationPath,
   isUpgradePath,
   MY_API_KEY_URL,
   SECTIONS,
@@ -76,14 +75,25 @@ describe('SECTIONS', () => {
 describe('doors', () => {
   it('composes each door', () => {
     expect(doors.login()).toBe('/login');
-    expect(doors.login('/k3v9x2m7q1w8e5r4/upgrade/pro')).toBe(
+    expect(doors.login({ next: '/k3v9x2m7q1w8e5r4/upgrade/pro' })).toBe(
       '/login?next=%2Fk3v9x2m7q1w8e5r4%2Fupgrade%2Fpro',
     );
-    expect(doors.register('/claim/abc')).toBe('/register?next=%2Fclaim%2Fabc');
+    expect(doors.register()).toBe('/register');
+    expect(doors.register({ next: '/claim/abc' })).toBe('/register?next=%2Fclaim%2Fabc');
     expect(doors.logout()).toBe('/logout');
+    expect(doors.logout({ next: '/settings' })).toBe('/logout?next=%2Fsettings');
     expect(doors.invitation('inv123')).toBe('/invitation/inv123');
     expect(doors.claim('abc123')).toBe('/claim/abc123');
     expect(doors.consent()).toBe('/consent');
+  });
+
+  it("carries the sign-in link token as the login door's object, and the journey as its query", () => {
+    expect(doors.login({ token: 'tok' })).toBe('/login/tok');
+    expect(doors.login({ token: 'tok', next: '/invitation/inv1' })).toBe(
+      '/login/tok?next=%2Finvitation%2Finv1',
+    );
+    // The console mounts its route with the builder's own spelling.
+    expect(doors.login({ token: ':token' })).toBe('/login/:token');
   });
 });
 
@@ -104,14 +114,32 @@ describe('the matchers', () => {
     }
   });
 
-  it('read the claim and invitation doors', () => {
-    expect(isClaimPath('/claim/abc123')).toBe(true);
-    expect(isClaimPath('/Claim/abc123/')).toBe(true);
-    expect(isClaimPath('/k3v9x2m7q1w8e5r4/claim/abc123')).toBe(false);
-    expect(isInvitationPath('/invitation/inv123')).toBe(true);
-    expect(isInvitationPath('/Invitation/inv123/')).toBe(true);
-    expect(isInvitationPath('/invitations/inv123')).toBe(false);
-    expect(isInvitationPath('/k3v9x2m7q1w8e5r4/invitation/inv123')).toBe(false);
+  it('read the door a path names, as the router matches it', () => {
+    expect(doorOf('/login')).toBe('login');
+    expect(doorOf('/login?next=%2Fclaim%2Fabc')).toBe('login');
+    expect(doorOf('/login/tok')).toBe('login');
+    expect(doorOf('/Login/tok/')).toBe('login');
+    expect(doorOf('/register')).toBe('register');
+    expect(doorOf('/logout')).toBe('logout');
+    expect(doorOf('/invitation/inv123')).toBe('invitation');
+    expect(doorOf('/Invitation/inv123/')).toBe('invitation');
+    expect(doorOf('/claim/abc123')).toBe('claim');
+    expect(doorOf('/Claim/abc123/')).toBe('claim');
+    expect(doorOf('/consent')).toBe('consent');
+  });
+
+  it('read no door from anything that merely resembles one', () => {
+    for (const path of [
+      '/invitations/inv123',
+      '/claims/abc',
+      '/k3v9x2m7q1w8e5r4/claim/abc123',
+      '/k3v9x2m7q1w8e5r4/invitation/inv123',
+      '/',
+      '/upgrade',
+      '/admin',
+    ]) {
+      expect(doorOf(path), path).toBeNull();
+    }
   });
 
   it('name the errand a destination carries', () => {
@@ -120,6 +148,7 @@ describe('the matchers', () => {
     expect(errandOf('/upgrade/pro')).toBe('upgrade');
     expect(errandOf('/k3v9x2m7q1w8e5r4/upgrade/pro')).toBe('upgrade');
     expect(errandOf('/k3v9x2m7q1w8e5r4/settings')).toBeNull();
+    expect(errandOf('/login/tok?next=%2Fclaim%2Fabc')).toBeNull();
     expect(errandOf('/')).toBeNull();
   });
 
