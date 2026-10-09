@@ -3048,7 +3048,7 @@ export const SECTIONS = {
 export type ConsoleSection = keyof typeof SECTIONS;
 
 /** The pages that exist before an account is known, by first segment. */
-const DOOR_SEGMENTS = ['login', 'register', 'logout', 'invitations', 'claim', 'consent'] as const;
+const DOOR_SEGMENTS = ['login', 'register', 'logout', 'invitation', 'claim', 'consent'] as const;
 type DoorSegment = (typeof DOOR_SEGMENTS)[number];
 
 /** The operator partition's first segment. */
@@ -3120,15 +3120,18 @@ export function consolePaths(account?: string) {
 /** The builders `consolePaths` returns. */
 export type ConsolePaths = ReturnType<typeof consolePaths>;
 
-/** The doors: the pages that exist before an account is known. */
+/**
+ * The doors: the pages that exist before an account is known, one builder
+ * per door segment and named for it.
+ */
 export const doors = {
   login: (next?: string): string => withNext('/login', next),
   register: (next?: string): string => withNext('/register', next),
   logout: (): string => '/logout',
-  invitation: (invitation: string): string => `/invitations/${invitation}`,
+  invitation: (invitation: string): string => `/invitation/${invitation}`,
   claim: (code: string): string => `/claim/${code}`,
   consent: (): string => '/consent',
-} as const;
+} as const satisfies Record<DoorSegment, (value: string) => string>;
 
 /**
  * Which Stripe return a query string marks: `checkout` for the success page
@@ -3190,10 +3193,10 @@ export const isClaimPath = (path: string): boolean => {
   return place.kind === 'door' && place.door === 'claim';
 };
 
-/** Whether a path names an invitation (`/invitations/:invitation`). */
+/** Whether a path names an invitation (`/invitation/:invitation`). */
 export const isInvitationPath = (path: string): boolean => {
   const place = placeOf(path);
-  return place.kind === 'door' && place.door === 'invitations';
+  return place.kind === 'door' && place.door === 'invitation';
 };
 
 /**

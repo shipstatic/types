@@ -81,7 +81,7 @@ describe('doors', () => {
     );
     expect(doors.register('/claim/abc')).toBe('/register?next=%2Fclaim%2Fabc');
     expect(doors.logout()).toBe('/logout');
-    expect(doors.invitation('inv123')).toBe('/invitations/inv123');
+    expect(doors.invitation('inv123')).toBe('/invitation/inv123');
     expect(doors.claim('abc123')).toBe('/claim/abc123');
     expect(doors.consent()).toBe('/consent');
   });
@@ -108,13 +108,15 @@ describe('the matchers', () => {
     expect(isClaimPath('/claim/abc123')).toBe(true);
     expect(isClaimPath('/Claim/abc123/')).toBe(true);
     expect(isClaimPath('/k3v9x2m7q1w8e5r4/claim/abc123')).toBe(false);
-    expect(isInvitationPath('/invitations/inv123')).toBe(true);
-    expect(isInvitationPath('/k3v9x2m7q1w8e5r4/invitations/inv123')).toBe(false);
+    expect(isInvitationPath('/invitation/inv123')).toBe(true);
+    expect(isInvitationPath('/Invitation/inv123/')).toBe(true);
+    expect(isInvitationPath('/invitations/inv123')).toBe(false);
+    expect(isInvitationPath('/k3v9x2m7q1w8e5r4/invitation/inv123')).toBe(false);
   });
 
   it('name the errand a destination carries', () => {
     expect(errandOf('/claim/abc123')).toBe('claim');
-    expect(errandOf('/invitations/inv123')).toBe('invite');
+    expect(errandOf('/invitation/inv123')).toBe('invite');
     expect(errandOf('/upgrade/pro')).toBe('upgrade');
     expect(errandOf('/k3v9x2m7q1w8e5r4/upgrade/pro')).toBe('upgrade');
     expect(errandOf('/k3v9x2m7q1w8e5r4/settings')).toBeNull();

@@ -519,7 +519,9 @@ billing returns emit them as links; a drift between the two is a link that
   console's route table mounts every section twice from it. Modals carry
   their own owner rule in the console; the flag is the section's alone.
 - **`doors`** builds the pages that exist before an account is known
-  (`login`, `register`, `logout`, `invitations`, `claim`, `consent`).
+  (`login`, `register`, `logout`, `invitation`, `claim`, `consent`), one
+  builder per door segment and named for it, which the compiler holds. The
+  console's route table mounts every door from its builder.
 - **The matchers** (`isClaimPath`, `isInvitationPath`, `isUpgradePath`,
   `errandOf`, `accountOfPath`) read a path in either form, the way the
   console's router matches it: case-insensitively, ignoring a trailing
