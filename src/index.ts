@@ -882,19 +882,20 @@ export function placesTaken(usage: Pick<AccountUsage, 'members' | 'invitations'>
  * members to remove and how many invitations to cancel before the places
  * fit, each `0` where nothing does.
  *
- * Members first, because a member over the cap has to go whatever else the
- * account holds; invitations take whatever places the members leave, and
- * the ones beyond those are what to cancel. So two members and one
- * invitation against a cap of one is one member and one invitation, and
- * five members against the same cap is four members and no invitation.
+ * The places over the cap are counted once ({@link placesTaken} less the
+ * cap), and members are named first, because a member over the cap has to
+ * go whatever else the account holds; what is over after them is the
+ * invitations to cancel. So two members and one invitation against a cap of
+ * one is one member and one invitation, and five members against the same
+ * cap is four members and no invitation.
  */
 export function placesOver(
   usage: Pick<AccountUsage, 'members' | 'invitations'>,
   cap: number,
 ): Pick<AccountUsage, 'members' | 'invitations'> {
+  const over = Math.max(0, placesTaken(usage) - cap);
   const members = Math.max(0, usage.members - cap);
-  const room = Math.max(0, cap - usage.members);
-  return { members, invitations: Math.max(0, usage.invitations - room) };
+  return { members, invitations: over - members };
 }
 
 /**
