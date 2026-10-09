@@ -228,7 +228,7 @@ describe('every schema accepts its own shape', () => {
       account: 'org0000000000001',
       role: 'member',
       access: 'paused',
-      members: 'paused',
+      membership: 'paused',
       usage: { ...usage, members: 6 },
       caps: { ...account.caps, members: 5 },
     };
@@ -238,7 +238,7 @@ describe('every schema accepts its own shape', () => {
     expect(S.AccountSchema.safeParse({ ...account, role: 'admin' }).success).toBe(false);
     // So is the access vocabulary: derived on every request, two values.
     expect(S.AccountSchema.safeParse({ ...account, access: 'suspended' }).success).toBe(false);
-    expect(S.AccountSchema.safeParse({ ...account, members: 'suspended' }).success).toBe(false);
+    expect(S.AccountSchema.safeParse({ ...account, membership: 'suspended' }).success).toBe(false);
   });
 
   it('names the account it describes, always', () => {

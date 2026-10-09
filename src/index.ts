@@ -794,13 +794,13 @@ export const AccountPlan = {
 export type AccountPlanType = (typeof AccountPlan)[keyof typeof AccountPlan];
 
 /**
- * The three things an account ACCUMULATES, and therefore the three things a
+ * The four things an account ACCUMULATES, and therefore the four things a
  * plan caps. One word for the count and for the ceiling: `Account.usage` and
  * `Account.caps` are the same shape, so a surface renders "2 of 3" by
  * dividing one by the other and can never divide by a different denominator
  * than the 403 uses.
  *
- * All three are counts plans SELL, and every plan publishes a number for each.
+ * All four are counts plans SELL, and every plan publishes a number for each.
  * A platform domain (`my-app.shipstatic.com`) is among them: the namespace
  * is the platform's, so every plan bounds how many names one account may take
  * from it — which is not the address every deployment gets by construction
@@ -1061,15 +1061,16 @@ export interface Account {
    */
   readonly access?: AccountAccess;
   /**
-   * Whether the account's MEMBERS are admitted today: `paused` while it holds
-   * more members than its plan allows, until the owner upgrades or removes
-   * members. It is {@link access} for everyone who is not the owner, published
-   * for the account so the one person it never pauses can be told; the API
-   * derives both from one rule, so a console reads the pause here rather than
-   * re-deriving it from the member counts. Optional by the additive-evolution
-   * law: a response that predates it is `active`.
+   * The account's own standing, beside the credential's ({@link access}):
+   * whether its MEMBERS are admitted today, `paused` while it holds more
+   * members than its plan allows, until the owner upgrades or removes
+   * members. It is {@link access} for everyone who is not the owner,
+   * published for the account so the one person it never pauses can be told;
+   * the API derives both from one rule, so a console reads the pause here
+   * rather than re-deriving it from the member counts. Optional by the
+   * additive-evolution law: a response that predates it is `active`.
    */
-  readonly members?: AccountAccess;
+  readonly membership?: AccountAccess;
   /** Unix timestamp (seconds) when account was created */
   readonly created: number;
   /** Unix timestamp (seconds) when account was activated (first deployment), null if not yet activated */
