@@ -6,6 +6,7 @@ import {
   doorOf,
   doors,
   errandOf,
+  isClaimPath,
   isUpgradePath,
   MY_API_KEY_URL,
   SECTIONS,
@@ -38,6 +39,7 @@ describe('consolePaths', () => {
     expect(scoped.success()).toBe('/k3v9x2m7q1w8e5r4/success');
     expect(scoped.successAfterCheckout()).toBe('/k3v9x2m7q1w8e5r4/success?upgrading=true');
     expect(scoped.apiKey()).toBe('/k3v9x2m7q1w8e5r4/api-key');
+    expect(scoped.claim('abc123')).toBe('/k3v9x2m7q1w8e5r4/claim/abc123');
   });
 
   it('composes the bare form without an account', () => {
@@ -56,6 +58,7 @@ describe('consolePaths', () => {
     expect(bare.success()).toBe('/success');
     expect(bare.successAfterCheckout()).toBe('/success?upgrading=true');
     expect(bare.apiKey()).toBe('/api-key');
+    expect(bare.claim('abc123')).toBe('/claim/abc123');
   });
 
   it('publishes the API-key link as the bare form on the production console', () => {
@@ -83,7 +86,6 @@ describe('doors', () => {
     expect(doors.logout()).toBe('/logout');
     expect(doors.logout({ next: '/settings' })).toBe('/logout?next=%2Fsettings');
     expect(doors.invitation('inv123')).toBe('/invitation/inv123');
-    expect(doors.claim('abc123')).toBe('/claim/abc123');
     expect(doors.consent()).toBe('/consent');
   });
 
@@ -114,6 +116,15 @@ describe('the matchers', () => {
     }
   });
 
+  it('read a claim in both forms, and nothing that merely starts like it', () => {
+    for (const path of ['/claim/abc123', '/Claim/abc123/', '/k3v9x2m7q1w8e5r4/claim/abc123']) {
+      expect(isClaimPath(path), path).toBe(true);
+    }
+    for (const path of ['/claims/abc', '/k3v9x2m7q1w8e5r4/claims/abc', '/', '/login', '/admin']) {
+      expect(isClaimPath(path), path).toBe(false);
+    }
+  });
+
   it('read the door a path names, as the router matches it', () => {
     expect(doorOf('/login')).toBe('login');
     expect(doorOf('/login?next=%2Fclaim%2Fabc')).toBe('login');
@@ -123,15 +134,13 @@ describe('the matchers', () => {
     expect(doorOf('/logout')).toBe('logout');
     expect(doorOf('/invitation/inv123')).toBe('invitation');
     expect(doorOf('/Invitation/inv123/')).toBe('invitation');
-    expect(doorOf('/claim/abc123')).toBe('claim');
-    expect(doorOf('/Claim/abc123/')).toBe('claim');
     expect(doorOf('/consent')).toBe('consent');
   });
 
   it('read no door from anything that merely resembles one', () => {
     for (const path of [
       '/invitations/inv123',
-      '/claims/abc',
+      '/claim/abc123',
       '/k3v9x2m7q1w8e5r4/claim/abc123',
       '/k3v9x2m7q1w8e5r4/invitation/inv123',
       '/',
@@ -144,6 +153,7 @@ describe('the matchers', () => {
 
   it('name the errand a destination carries', () => {
     expect(errandOf('/claim/abc123')).toBe('claim');
+    expect(errandOf('/k3v9x2m7q1w8e5r4/claim/abc123')).toBe('claim');
     expect(errandOf('/invitation/inv123')).toBe('invite');
     expect(errandOf('/upgrade/pro')).toBe('upgrade');
     expect(errandOf('/k3v9x2m7q1w8e5r4/upgrade/pro')).toBe('upgrade');

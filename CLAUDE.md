@@ -514,20 +514,24 @@ billing returns emit them as links; a drift between the two is a link that
   account's path; a producer whose subject is a person emits the bare form,
   which the console opens in the account the person entered last.
 - **`SECTIONS`** is the list of an account's sections by first segment, with
-  the `owner` flag on the two that mean the reader's OWN account (`upgrade`,
-  `api-key`): a bare path into one opens the person's own account. The
-  console's route table mounts every section twice from it. Modals carry
-  their own owner rule in the console; the flag is the section's alone.
-- **`doors`** builds the pages that exist before an account is known
-  (`login`, `register`, `logout`, `invitation`, `claim`, `consent`), one
-  builder per door segment and named for it, which the compiler holds. The
-  console's route table mounts every door from its builder. A door's object
-  rides its path and the journey rides the query: `invitation(id)` and
-  `claim(code)` take their object, and the three sign-in doors take the
-  journey by name (`login({ token, next })`, `register({ next })`,
-  `logout({ next })`), the login door's object being the sign-in link's
-  token (`/login/<token>`).
-- **The matchers** (`doorOf`, `isUpgradePath`, `errandOf`,
+  the `owner` flag on the three that mean the reader's OWN account
+  (`upgrade`, `success`, `api-key`): a bare path into one opens the person's
+  own account. The console's route table mounts every section twice from it.
+  Modals carry their own owner rule in the console; the flag is the
+  section's alone. **The claim is a section**, not a door: a claim link
+  (`consolePaths().claim(code)`, `/claim/<code>`) is the bare form the API
+  mails, and the console opens it where it opens `/`, in the account the
+  person is standing in, where the page keeps the site. What a person does
+  IN an account is a section, whoever composed the link.
+- **`doors`** builds the pages a PERSON stands on before an account is known
+  (`login`, `register`, `logout`, `invitation`, `consent`), one builder per
+  door segment and named for it, which the compiler holds. The console's
+  route table mounts every door from its builder. A door's object rides its
+  path and the journey rides the query: `invitation(id)` takes its object,
+  and the three sign-in doors take the journey by name
+  (`login({ token, next })`, `register({ next })`, `logout({ next })`), the
+  login door's object being the sign-in link's token (`/login/<token>`).
+- **The matchers** (`doorOf`, `isClaimPath`, `isUpgradePath`, `errandOf`,
   `accountOfPath`) read a path in either form, the way the
   console's router matches it: case-insensitively, ignoring a trailing
   slash, the query and the fragment. `billingReturnOf` reads the two query

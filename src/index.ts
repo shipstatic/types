@@ -3023,6 +3023,11 @@ export const SECTIONS = {
   deployments: { owner: false },
   domains: { owner: false },
   settings: { owner: false },
+  // A claim link (`/claim/<code>`) is mailed and answered without an account,
+  // so it opens where `/` opens: the account the person is standing in. The
+  // site is kept there. Not an owner section, since a member may keep a
+  // site in a team.
+  claim: { owner: false },
   upgrade: { owner: true },
   success: { owner: true },
   'api-key': { owner: true },
@@ -3032,7 +3037,7 @@ export const SECTIONS = {
 export type ConsoleSection = keyof typeof SECTIONS;
 
 /** The pages that exist before an account is known, by first segment. */
-const DOOR_SEGMENTS = ['login', 'register', 'logout', 'invitation', 'claim', 'consent'] as const;
+const DOOR_SEGMENTS = ['login', 'register', 'logout', 'invitation', 'consent'] as const;
 /** A door's first segment. */
 export type DoorSegment = (typeof DOOR_SEGMENTS)[number];
 
@@ -3092,6 +3097,8 @@ export function consolePaths(account?: string) {
     }),
     settings: (fragment?: SettingsFragment): string =>
       at(fragment ? `/settings#${fragment}` : '/settings'),
+    /** The claim of an anonymous deployment into this account; the API mails the bare form. */
+    claim: (code: string): string => at(`/claim/${code}`),
     /** Settings, marked as the landing of a Stripe Customer Portal return. */
     settingsAfterBilling: (): string => at(`/settings?${marker('portal')}`),
     upgrade: (plan?: AccountPlanType): string => at(plan ? `/upgrade/${plan}` : '/upgrade'),
@@ -3111,11 +3118,13 @@ interface Journey {
 }
 
 /**
- * The doors: the pages that exist before an account is known, one builder
- * per door segment and named for it. A door's object rides its path (the
- * sign-in link's token, the invitation, the claim code), and the journey
- * rides the query, so the three doors a sign-in moves through take it by
- * name.
+ * The doors: the pages a PERSON stands on before an account is known, one
+ * builder per door segment and named for it: signing in and out, joining an
+ * account, granting an app access. A door's object rides its path (the
+ * sign-in link's token, the invitation's id), and the journey rides the
+ * query, so the three doors a sign-in moves through take it by name. What a
+ * person does IN an account is a section (`consolePaths`), the claim among
+ * them.
  *
  * ```ts
  * doors.login({ token, next: '/claim/abc' })
@@ -3128,7 +3137,6 @@ export const doors = {
   register: ({ next }: Journey = {}): string => withNext('/register', next),
   logout: ({ next }: Journey = {}): string => withNext('/logout', next),
   invitation: (invitation: string): string => `/invitation/${invitation}`,
-  claim: (code: string): string => `/claim/${code}`,
   consent: (): string => '/consent',
 } as const satisfies Record<DoorSegment, (...args: never[]) => string>;
 
@@ -3190,13 +3198,24 @@ export function accountOfPath(path: string): string | null {
  * The door a path names, or null for an account place or the operator
  * partition. Every question about doors reads this one answer: which page is
  * an auth page, which errand a destination carries, what a vendor must not
- * see. `/login/<token>` is the login door, as `/claim/<code>` is the claim
- * door: a door's object is the rest of its path.
+ * see. `/login/<token>` is the login door, as `/invitation/<id>` is the
+ * invitation door: a door's object is the rest of its path.
  */
 export function doorOf(path: string): DoorSegment | null {
   const place = placeOf(path);
   return place.kind === 'door' ? place.door : null;
 }
+
+/**
+ * Whether a path names the claim section, in either form: `/claim/:code`, and
+ * the same under `/<account>/`. The code is a bearer credential, which is why
+ * a reader asks about this section by name: the doors title their visitor by
+ * it, and analytics elides it.
+ */
+export const isClaimPath = (path: string): boolean => {
+  const place = placeOf(path);
+  return place.kind === 'account' && place.section === 'claim';
+};
 
 /**
  * Whether a path names the upgrade section, in either form: `/upgrade`,
@@ -3216,9 +3235,8 @@ export type ConsoleErrand = 'claim' | 'invite' | 'upgrade';
  * it.
  */
 export function errandOf(path: string): ConsoleErrand | null {
-  const door = doorOf(path);
-  if (door === 'claim') return 'claim';
-  if (door === 'invitation') return 'invite';
+  if (isClaimPath(path)) return 'claim';
+  if (doorOf(path) === 'invitation') return 'invite';
   if (isUpgradePath(path)) return 'upgrade';
   return null;
 }
