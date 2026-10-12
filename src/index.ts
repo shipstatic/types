@@ -79,7 +79,7 @@ export const DeploymentVia = {
   GIT: 'git',
   /** The n8n community node. */
   N8N: 'n8n',
-  /** Channel: the ChatGPT App listing → `mcp.<domain>/gpt`. */
+  /** Channel: the ChatGPT plugin → `mcp.<domain>/gpt`. */
   GPT: 'gpt',
   /** The VS Code extension. */
   VSC: 'vsc',
