@@ -1292,9 +1292,9 @@ export const API_PATHS = {
 } as const;
 
 /**
- * The deploy request's multipart field names — the other half of the wire
- * surface beside {@link API_PATHS}. `POST /deployments` (and the first-party
- * `/upload`) is multipart/form-data, and these are the names the API reads.
+ * The deploy request's multipart field names: the other half of the wire
+ * surface beside {@link API_PATHS}. These are the names the API reads from a
+ * multipart body on `POST /deployments` and the first-party `/upload`.
  *
  * Declared once because the body has three independent WRITERS — the SDK's
  * Node and browser body builders, and the n8n community node's hand-rolled
@@ -1342,10 +1342,10 @@ export const DEPLOY_FIELDS = {
 } as const;
 
 /**
- * The JSON deploy body's file grammar: the OTHER body `POST /upload` accepts,
- * beside the multipart one {@link DEPLOY_FIELDS} names. A JSON caller sends
- * `{ files: [{ path, content, encoding? }] }`, and this is the whole of what
- * one entry may say: three field names, two encodings, one default.
+ * The JSON deploy body's file grammar: the OTHER body both deploy doors
+ * accept, beside the multipart one {@link DEPLOY_FIELDS} names. A JSON caller
+ * sends `{ files: [{ path, content, encoding? }] }`, and this is the whole
+ * of what one entry may say: three field names, two encodings, one default.
  *
  * Declared once because the grammar has three independent holders that the
  * wire forces to restate it: the API's zod schema (the original), the hosted
