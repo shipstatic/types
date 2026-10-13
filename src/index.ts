@@ -4141,9 +4141,9 @@ export function generateDomainUrl(domain: string): string {
  * between them. The whole label, the key and the `:` and the value together,
  * counts toward {@link LABEL_CONSTRAINTS.MAX_LENGTH}.
  *
- * The platform stores a label and shows it as written. It reads nothing from
- * a key or a value and changes no behaviour because of one: a label describes
- * a resource and lets its owner find it. So a resource may carry several
+ * The platform stores a label in lowercase and shows it as stored. It reads
+ * nothing from a key or a value and changes no behaviour because of one: a
+ * label describes a resource and lets its owner find it. So a resource may carry several
  * values for one key (`team:web` and `team:api`), and only the same label
  * twice is refused.
  *
@@ -4153,23 +4153,25 @@ export function generateDomainUrl(domain: string): string {
 export const LABEL_CONSTRAINTS = {
   /** Minimum label length in characters. */
   MIN_LENGTH: 3,
-  /** Maximum label length in characters. A key, its `:` and its value share it. */
+  /**
+   * Maximum label length in characters. A key, its `:` and its value share it,
+   * and it fits a key with a UUID (36 characters) or a full git SHA (40).
+   */
   MAX_LENGTH: 63,
   /** Maximum number of labels on one resource. */
   MAX_COUNT: 10,
 } as const;
 
-/** One side of a label: lowercase letters and digits, single `.`, `_` or `-` between them. */
-const LABEL_SEGMENT = '[a-z0-9]+(?:[._-][a-z0-9]+)*';
-
 /**
- * The shape of a label: one segment, or two with a `:` between them. Length
- * is {@link LABEL_CONSTRAINTS}' rule, and {@link validateLabel} applies both.
+ * The shape of a label: one side, or two with a `:` between them. A side is
+ * lowercase letters and digits with single `.`, `_` or `-` between them, and
+ * the pattern spells it twice. Length is {@link LABEL_CONSTRAINTS}' rule, and
+ * {@link validateLabel} applies both.
  *
  * Matches: `production`, `v1.2.3`, `env:production`, `commit:3f9c2ab`
  * Refuses: `-prod`, `foo--bar`, `:production`, `env:`, `a:b:c`, `Env:Prod`
  */
-export const LABEL_PATTERN = new RegExp(`^${LABEL_SEGMENT}(?::${LABEL_SEGMENT})?$`);
+export const LABEL_PATTERN = /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[a-z0-9]+(?:[._-][a-z0-9]+)*)?$/;
 
 /**
  * Validate one label and return it normalized: trimmed and lowercased, then
@@ -4213,10 +4215,14 @@ export function validateLabel(value: unknown): string {
  * an empty array returns as is, which is how an update clears every label.
  * At most {@link LABEL_CONSTRAINTS.MAX_COUNT}, and no label twice after
  * normalization.
+ *
+ * It takes any value, like the other checks here, because two callers hand it
+ * one the compiler has not seen: the API's multipart door (a parsed JSON
+ * field) and an SDK caller without TypeScript.
  */
 export function validateLabels(labels: string[]): string[];
-export function validateLabels(labels: string[] | undefined | null): string[] | undefined;
-export function validateLabels(labels: string[] | undefined | null): string[] | undefined {
+export function validateLabels(labels: unknown): string[] | undefined;
+export function validateLabels(labels: unknown): string[] | undefined {
   if (labels === undefined || labels === null) return undefined;
   if (!Array.isArray(labels)) {
     throw ShipError.validation('Labels must be an array');

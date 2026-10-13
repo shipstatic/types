@@ -765,10 +765,11 @@ describe('Validation Constants - @shipstatic/types', () => {
       expect(() => validateLabels([...ten, 'label-10'])).toThrow('Maximum 10 labels allowed');
     });
 
-    it('refuses a value that is not an array', () => {
-      expect(() => validateLabels('production' as unknown as string[])).toThrow(
-        'Labels must be an array',
-      );
+    it('refuses a value that is not an array, and an entry that is not a string', () => {
+      expect(() => validateLabels('production')).toThrow('Labels must be an array');
+      expect(() => validateLabels({ env: 'production' })).toThrow('Labels must be an array');
+      expect(() => validateLabels(['production', 123])).toThrow('Labels must be strings');
+      expect(() => validateLabels([''])).toThrow('Labels must be at least 3 characters long');
     });
   });
 
