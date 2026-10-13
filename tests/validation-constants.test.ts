@@ -17,12 +17,14 @@ import {
   type DeploymentViaType,
   type DomainListResponse,
   type DomainResource,
+  ErrorType,
   FileValidationStatus,
   type FileValidationStatusType,
   hasUnbuiltMarker,
   hasUnsafeChars,
   IDEMPOTENCY_KEY_CONSTRAINTS,
   isBlockedExtension,
+  isShipError,
   LABEL_CONSTRAINTS,
   LABEL_PATTERN,
   normalizeVia,
@@ -42,6 +44,8 @@ import {
   UNSAFE_FILENAME_CHARS,
   validateBuildCommand,
   validateCaller,
+  validateLabel,
+  validateLabels,
   validateOutputDir,
   validatePassword,
   validateToken,
@@ -632,74 +636,139 @@ describe('Validation Constants - @shipstatic/types', () => {
   });
 
   describe('LABEL_PATTERN', () => {
-    it('should match valid labels', () => {
-      const valid = [
-        'prod',
-        'staging',
-        'dev',
-        'v1.0.0',
-        'feature-x',
-        'test_env',
-        'release.candidate',
-      ];
-
-      valid.forEach((label) => {
+    it('matches a word', () => {
+      for (const label of ['prod', 'v1.0.0', 'feature-x', 'test_env', '3f9c2ab']) {
         expect(LABEL_PATTERN.test(label)).toBe(true);
-      });
+      }
     });
 
-    it('should reject invalid label formats', () => {
-      const invalidFormat = ['-prod', 'prod-', 'pr od', 'PROD'];
+    it('matches a key and a value split by one colon', () => {
+      for (const label of [
+        'env:production',
+        'team:web',
+        'a:b',
+        'commit:3f9c2ab',
+        'app.v2:us-east-1',
+      ]) {
+        expect(LABEL_PATTERN.test(label)).toBe(true);
+      }
+    });
 
-      invalidFormat.forEach((label) => {
+    it('refuses a second colon, an empty key and an empty value', () => {
+      for (const label of ['a:b:c', ':production', 'env:', ':', 'env::production']) {
         expect(LABEL_PATTERN.test(label)).toBe(false);
-      });
+      }
     });
 
-    it('should not enforce length constraints in pattern', () => {
+    it('holds each side of the colon to the shape of a word', () => {
+      for (const label of ['-env:prod', 'env-:prod', 'env:-prod', 'env:prod-', 'env:pr--od']) {
+        expect(LABEL_PATTERN.test(label)).toBe(false);
+      }
+    });
+
+    it('refuses a separator at either end, spaces and uppercase', () => {
+      for (const label of ['-prod', 'prod-', 'pr od', 'PROD', 'env: prod', 'Env:prod']) {
+        expect(LABEL_PATTERN.test(label)).toBe(false);
+      }
+    });
+
+    it('carries no length rule of its own', () => {
       expect(LABEL_PATTERN.test('a')).toBe(true);
-      expect(LABEL_PATTERN.test('ab')).toBe(true);
-      expect(LABEL_PATTERN.test('abc')).toBe(true);
       expect(LABEL_PATTERN.test('a'.repeat(100))).toBe(true);
-    });
-
-    it('should handle separator variations', () => {
-      expect(LABEL_PATTERN.test('my-label')).toBe(true);
-      expect(LABEL_PATTERN.test('my_label')).toBe(true);
-      expect(LABEL_PATTERN.test('my.label')).toBe(true);
     });
   });
 
   describe('LABEL_CONSTRAINTS', () => {
-    it('should define min length', () => {
-      expect(LABEL_CONSTRAINTS.MIN_LENGTH).toBeGreaterThan(0);
-      expect(typeof LABEL_CONSTRAINTS.MIN_LENGTH).toBe('number');
+    it('states the three numbers', () => {
+      expect(LABEL_CONSTRAINTS).toEqual({ MIN_LENGTH: 3, MAX_LENGTH: 63, MAX_COUNT: 10 });
+    });
+  });
+
+  describe('validateLabel()', () => {
+    it('returns a word and a keyed label as written', () => {
+      expect(validateLabel('production')).toBe('production');
+      expect(validateLabel('env:production')).toBe('env:production');
     });
 
-    it('should define max length', () => {
-      expect(LABEL_CONSTRAINTS.MAX_LENGTH).toBeGreaterThan(LABEL_CONSTRAINTS.MIN_LENGTH);
-      expect(typeof LABEL_CONSTRAINTS.MAX_LENGTH).toBe('number');
+    it('trims and lowercases both sides of the colon', () => {
+      expect(validateLabel('  Production  ')).toBe('production');
+      expect(validateLabel('Env:Prod')).toBe('env:prod');
     });
 
-    it('should define max count', () => {
-      expect(LABEL_CONSTRAINTS.MAX_COUNT).toBeGreaterThan(0);
-      expect(typeof LABEL_CONSTRAINTS.MAX_COUNT).toBe('number');
+    it('counts the key, the colon and the value toward one length', () => {
+      const at = `env:${'a'.repeat(59)}`;
+      const over = `env:${'a'.repeat(60)}`;
+      expect(at).toHaveLength(63);
+      expect(validateLabel(at)).toBe(at);
+      expect(() => validateLabel(over)).toThrow('Labels must be no more than 63 characters long');
+      expect(validateLabel('a'.repeat(63))).toBe('a'.repeat(63));
+      expect(() => validateLabel('a'.repeat(64))).toThrow('no more than 63');
     });
 
-    it('should define allowed separators', () => {
-      expect(LABEL_CONSTRAINTS.SEPARATORS).toBeDefined();
-      expect(LABEL_CONSTRAINTS.SEPARATORS.length).toBeGreaterThan(0);
+    it('holds the minimum on the whole label', () => {
+      expect(validateLabel('a:b')).toBe('a:b');
+      expect(() => validateLabel('ab')).toThrow('Labels must be at least 3 characters long');
+      expect(() => validateLabel('   ')).toThrow('at least 3');
     });
 
-    it('should have reasonable limits', () => {
-      expect(LABEL_CONSTRAINTS.MIN_LENGTH).toBeGreaterThanOrEqual(1);
-      expect(LABEL_CONSTRAINTS.MIN_LENGTH).toBeLessThanOrEqual(10);
+    it('refuses a shape it does not know, in one sentence that names the colon', () => {
+      for (const label of ['a:b:c', ':production', 'env:', '-prod', 'has spaces', 'env=prod']) {
+        expect(() => validateLabel(label)).toThrow(
+          'Labels use letters and numbers, with . _ or - between them, and can have one : between a key and a value, like env:production',
+        );
+      }
+    });
 
-      expect(LABEL_CONSTRAINTS.MAX_LENGTH).toBeGreaterThanOrEqual(10);
-      expect(LABEL_CONSTRAINTS.MAX_LENGTH).toBeLessThanOrEqual(100);
+    it('refuses a value that is not a string', () => {
+      expect(() => validateLabel(123)).toThrow('Labels must be strings');
+      expect(() => validateLabel(null)).toThrow('Labels must be strings');
+    });
 
-      expect(LABEL_CONSTRAINTS.MAX_COUNT).toBeGreaterThanOrEqual(1);
-      expect(LABEL_CONSTRAINTS.MAX_COUNT).toBeLessThanOrEqual(100);
+    it('throws a validation ShipError', () => {
+      try {
+        validateLabel('x');
+        expect.unreachable();
+      } catch (error) {
+        expect(isShipError(error) && error.type).toBe(ErrorType.Validation);
+      }
+    });
+  });
+
+  describe('validateLabels()', () => {
+    it('passes absence through and keeps an empty list', () => {
+      expect(validateLabels(undefined)).toBeUndefined();
+      expect(validateLabels(null)).toBeUndefined();
+      expect(validateLabels([])).toEqual([]);
+    });
+
+    it('normalizes each label and keeps their order', () => {
+      expect(validateLabels(['Prod', 'Env:Preview', 'api.v2'])).toEqual([
+        'prod',
+        'env:preview',
+        'api.v2',
+      ]);
+    });
+
+    it('allows several values for one key', () => {
+      expect(validateLabels(['team:web', 'team:api'])).toEqual(['team:web', 'team:api']);
+    });
+
+    it('refuses the same label twice after normalization', () => {
+      expect(() => validateLabels(['env:prod', 'Env:Prod'])).toThrow(
+        'Duplicate labels are not allowed',
+      );
+    });
+
+    it('allows ten labels and refuses eleven', () => {
+      const ten = Array.from({ length: 10 }, (_, i) => `label-${i}`);
+      expect(validateLabels(ten)).toEqual(ten);
+      expect(() => validateLabels([...ten, 'label-10'])).toThrow('Maximum 10 labels allowed');
+    });
+
+    it('refuses a value that is not an array', () => {
+      expect(() => validateLabels('production' as unknown as string[])).toThrow(
+        'Labels must be an array',
+      );
     });
   });
 

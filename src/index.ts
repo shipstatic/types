@@ -125,7 +125,7 @@ export interface Deployment {
   readonly config: boolean;
   /** Whether deployment has a password set */
   readonly password: boolean;
-  /** Labels for categorization and filtering (lowercase, alphanumeric with separators). Always present, empty array when none. */
+  /** Labels for categorization and filtering (a word like `production`, or a key and a value like `env:production`). Always present, empty array when none. */
   labels: string[];
   /**
    * The client/tool that created this deployment. Every deployment created
@@ -403,7 +403,7 @@ export interface Domain {
   verifications: number;
   /** Unix timestamp (seconds) when plan enforcement paused serving, null while the plan has room for it */
   paused: number | null;
-  /** Labels for categorization and filtering (lowercase, alphanumeric with separators). Always present, empty array when none. */
+  /** Labels for categorization and filtering (a word like `production`, or a key and a value like `env:production`). Always present, empty array when none. */
   labels: string[];
   /** Unix timestamp (seconds) when domain was created */
   readonly created: number;
@@ -4131,29 +4131,105 @@ export function generateDomainUrl(domain: string): string {
 // =============================================================================
 
 /**
- * Label validation constraints shared across UI and API.
- * These rules define the single source of truth for label validation.
+ * A label is a short identifier attached to a deployment, a domain or a token.
+ * It has one of two forms:
+ *
+ * - a word: `production`, `v1.2.3`, `us-east-1`
+ * - a key and a value, split by one `:`: `env:production`, `team:web`
+ *
+ * Each side is lowercase letters and digits, with single `.`, `_` or `-`
+ * between them. The whole label, the key and the `:` and the value together,
+ * counts toward {@link LABEL_CONSTRAINTS.MAX_LENGTH}.
+ *
+ * The platform stores a label and shows it as written. It reads nothing from
+ * a key or a value and changes no behaviour because of one: a label describes
+ * a resource and lets its owner find it. So a resource may carry several
+ * values for one key (`team:web` and `team:api`), and only the same label
+ * twice is refused.
+ *
+ * Labels stay a list of strings on the wire and in storage. A caller that
+ * wants a key's value splits on the `:` itself.
  */
 export const LABEL_CONSTRAINTS = {
-  /** Minimum label length in characters */
+  /** Minimum label length in characters. */
   MIN_LENGTH: 3,
-  /** Maximum label length in characters (concise labels, matches Stack Overflow's original limit) */
-  MAX_LENGTH: 25,
-  /** Maximum number of labels allowed per resource */
+  /** Maximum label length in characters. A key, its `:` and its value share it. */
+  MAX_LENGTH: 63,
+  /** Maximum number of labels on one resource. */
   MAX_COUNT: 10,
-  /** Allowed separator characters between label segments */
-  SEPARATORS: '._-',
 } as const;
 
+/** One side of a label: lowercase letters and digits, single `.`, `_` or `-` between them. */
+const LABEL_SEGMENT = '[a-z0-9]+(?:[._-][a-z0-9]+)*';
+
 /**
- * Label validation pattern.
- * Must start and end with alphanumeric (a-z, 0-9).
- * Can contain separators (. _ -) between segments, but not consecutive.
+ * The shape of a label: one segment, or two with a `:` between them. Length
+ * is {@link LABEL_CONSTRAINTS}' rule, and {@link validateLabel} applies both.
  *
- * Valid examples: 'production', 'v1.2.3', 'api_v2', 'us-east-1'
- * Invalid examples: 'ab' (too short), '-prod' (starts with separator), 'foo--bar' (consecutive separators)
+ * Matches: `production`, `v1.2.3`, `env:production`, `commit:3f9c2ab`
+ * Refuses: `-prod`, `foo--bar`, `:production`, `env:`, `a:b:c`, `Env:Prod`
  */
-export const LABEL_PATTERN = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
+export const LABEL_PATTERN = new RegExp(`^${LABEL_SEGMENT}(?::${LABEL_SEGMENT})?$`);
+
+/**
+ * Validate one label and return it normalized: trimmed and lowercased, then
+ * held to {@link LABEL_CONSTRAINTS}' length and to {@link LABEL_PATTERN}.
+ * Throws `ShipError.validation` when it does not fit.
+ *
+ * Lowercasing is the one normalization and it applies to both sides of a
+ * `:`, so `Env:Prod` is stored as `env:prod`. A value that must keep its
+ * case does not belong in a label.
+ *
+ * The one label check on the platform: the SDK and the console call it for
+ * fast feedback and the API calls it as the boundary, so all three refuse
+ * the same strings in the same words.
+ */
+export function validateLabel(value: unknown): string {
+  if (typeof value !== 'string') {
+    throw ShipError.validation('Labels must be strings');
+  }
+  const label = value.trim().toLowerCase();
+  if (label.length < LABEL_CONSTRAINTS.MIN_LENGTH) {
+    throw ShipError.validation(
+      `Labels must be at least ${LABEL_CONSTRAINTS.MIN_LENGTH} characters long`,
+    );
+  }
+  if (label.length > LABEL_CONSTRAINTS.MAX_LENGTH) {
+    throw ShipError.validation(
+      `Labels must be no more than ${LABEL_CONSTRAINTS.MAX_LENGTH} characters long`,
+    );
+  }
+  if (!LABEL_PATTERN.test(label)) {
+    throw ShipError.validation(
+      'Labels use letters and numbers, with . _ or - between them, and can have one : between a key and a value, like env:production',
+    );
+  }
+  return label;
+}
+
+/**
+ * Validate a resource's labels and return them normalized, each through
+ * {@link validateLabel}. Absent (`undefined` / `null`) returns `undefined`;
+ * an empty array returns as is, which is how an update clears every label.
+ * At most {@link LABEL_CONSTRAINTS.MAX_COUNT}, and no label twice after
+ * normalization.
+ */
+export function validateLabels(labels: string[]): string[];
+export function validateLabels(labels: string[] | undefined | null): string[] | undefined;
+export function validateLabels(labels: string[] | undefined | null): string[] | undefined {
+  if (labels === undefined || labels === null) return undefined;
+  if (!Array.isArray(labels)) {
+    throw ShipError.validation('Labels must be an array');
+  }
+  if (labels.length > LABEL_CONSTRAINTS.MAX_COUNT) {
+    throw ShipError.validation(`Maximum ${LABEL_CONSTRAINTS.MAX_COUNT} labels allowed`);
+  }
+  const normalized = labels.map(validateLabel);
+  if (new Set(normalized).size !== normalized.length) {
+    throw ShipError.validation('Duplicate labels are not allowed');
+  }
+  return normalized;
+}
 
 /**
  * Serialize labels array to JSON string for database storage.

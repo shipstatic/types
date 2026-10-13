@@ -51,7 +51,7 @@ own; only a subpath entry (`schemas`) is a separate file.
 | Activity Types | `ActivityEvent`, `UserVisibleActivityEvent`, `Activity`, `ActivityMeta`, `ActivityListResponse` — wire contracts for `GET /activities`, produced by the API and consumed by `web/my`. There is deliberately **no** `ActivityResource`: the SDK does not reach that endpoint (recorded in `npm/ship/CLAUDE.md`), and a resource interface nothing implements would be dead surface. A shared type needs two consumers, not three. |
 | File Upload Types | `FileValidationStatus`, `ValidationIssue`, `ValidatableFile`, `FileValidationResult`, `UploadedFile` |
 | Domain Utilities | `isPlatformDomain`, `isCustomDomain`, `extractSubdomain`, `generate*Url` |
-| Label Utilities | `LABEL_CONSTRAINTS`, `LABEL_PATTERN`, `serializeLabels`, `deserializeLabels` |
+| Label Utilities | `LABEL_CONSTRAINTS`, `LABEL_PATTERN`, `validateLabel`, `validateLabels` (the one label check: the SDK, the console and the API all call it, so a label is refused in the same words everywhere), `serializeLabels`, `deserializeLabels`. A label is a word (`production`) or a key and a value split by one `:` (`env:production`). The platform stores and shows it as written and reads nothing from a key or a value, so several values for one key are allowed |
 | Password Utilities | `PASSWORD_CONSTRAINTS`, `validatePassword` |
 
 ## Wire schemas (`src/schemas.ts`, `@shipstatic/types/schemas`)
@@ -895,6 +895,7 @@ Examples that belong here:
 - `validateApiKey` — `ship-` prefix + `API_KEY.HEX_LENGTH` hex chars; the format defines the type. The width lives in the shape constant, never in prose or a test literal — a hand-written number here is a second owner for it.
 - `validateDeployToken`, `validateOAuthToken` — same shape, different prefix.
 - `validatePassword` — length 6–128 is the wire-format envelope an API endpoint accepts.
+- `validateLabels`: a label's length and shape, the count on one resource, and no label twice.
 
 Examples that do **not** belong here (keep in the API):
 

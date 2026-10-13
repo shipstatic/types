@@ -174,12 +174,16 @@ import {
 
 ```typescript
 import {
-  LABEL_CONSTRAINTS,
-  LABEL_PATTERN,
+  LABEL_CONSTRAINTS,        // { MIN_LENGTH: 3, MAX_LENGTH: 63, MAX_COUNT: 10 }
+  LABEL_PATTERN,            // a word, or a key and a value split by one ":"
+  validateLabel,            // (value: unknown) => string
+  validateLabels,           // (labels: string[] | undefined | null) => string[] | undefined
   serializeLabels,
   deserializeLabels,
 } from '@shipstatic/types';
 ```
+
+A label is a word like `production`, or a key and a value like `env:production`. `validateLabels` is the check the SDK, the console and the API all run.
 
 ### Password utilities
 
