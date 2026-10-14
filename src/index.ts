@@ -715,7 +715,10 @@ export interface DomainValidateResponse {
 export interface Token {
   /** 7-char management identifier (e.g., "a1b2c3d") */
   readonly token: string;
-  /** Labels for categorization and filtering. Always present, empty array when none. */
+  /**
+   * The token's labels, which every deployment it uploads is also born with,
+   * ahead of the upload's own. Always present, empty array when none.
+   */
   labels: string[];
   /** Unix timestamp (seconds) when token was created */
   readonly created: number;
