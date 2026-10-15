@@ -236,6 +236,9 @@ export interface DeploymentListResponse extends ListResponse {
  *
  * No prose either (`message`): an acknowledgement is data, and each surface
  * composes its own copy.
+ *
+ * It states where the deployment IS, not what the call did: a repeat finds
+ * the row already `deleting` and answers this same object again, at 202.
  */
 export interface DeploymentDeleteResponse {
   /** The deployment hostname that was marked for removal */
