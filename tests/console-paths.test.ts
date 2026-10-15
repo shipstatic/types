@@ -10,7 +10,6 @@ import {
   isUpgradePath,
   MY_API_KEY_URL,
   SECTIONS,
-  SIGN_IN_PROVIDERS,
 } from '../src/index';
 
 const ACCOUNT = 'k3v9x2m7q1w8e5r4';
@@ -91,18 +90,12 @@ describe('doors', () => {
   });
 
   it("carries the sign-in link token as the login door's object, and the journey as its query", () => {
-    expect(doors.login.link({ token: 'tok' })).toBe('/login/link/tok');
-    expect(doors.login.link({ token: 'tok', next: '/invitation/inv1' })).toBe(
-      '/login/link/tok?next=%2Finvitation%2Finv1',
+    expect(doors.login({ token: 'tok' })).toBe('/login/tok');
+    expect(doors.login({ token: 'tok', next: '/invitation/inv1' })).toBe(
+      '/login/tok?next=%2Finvitation%2Finv1',
     );
     // The console mounts its route with the builder's own spelling.
-    expect(doors.login.link({ token: ':token' })).toBe('/login/link/:token');
-  });
-
-  it("names each provider's return page on the login door, with no query of its own", () => {
-    expect(doors.login.provider('google')).toBe('/login/google');
-    expect(doors.login.provider('github')).toBe('/login/github');
-    expect(SIGN_IN_PROVIDERS).toEqual(['google', 'github']);
+    expect(doors.login({ token: ':token' })).toBe('/login/:token');
   });
 });
 
@@ -135,10 +128,8 @@ describe('the matchers', () => {
   it('read the door a path names, as the router matches it', () => {
     expect(doorOf('/login')).toBe('login');
     expect(doorOf('/login?next=%2Fclaim%2Fabc')).toBe('login');
-    expect(doorOf('/login/link/tok')).toBe('login');
-    expect(doorOf('/Login/Link/tok/')).toBe('login');
-    expect(doorOf('/login/google?code=c&state=s')).toBe('login');
-    expect(doorOf('/login/github')).toBe('login');
+    expect(doorOf('/login/tok')).toBe('login');
+    expect(doorOf('/Login/tok/')).toBe('login');
     expect(doorOf('/register')).toBe('register');
     expect(doorOf('/logout')).toBe('logout');
     expect(doorOf('/invitation/inv123')).toBe('invitation');
@@ -167,7 +158,7 @@ describe('the matchers', () => {
     expect(errandOf('/upgrade/pro')).toBe('upgrade');
     expect(errandOf('/k3v9x2m7q1w8e5r4/upgrade/pro')).toBe('upgrade');
     expect(errandOf('/k3v9x2m7q1w8e5r4/settings')).toBeNull();
-    expect(errandOf('/login/link/tok?next=%2Fclaim%2Fabc')).toBeNull();
+    expect(errandOf('/login/tok?next=%2Fclaim%2Fabc')).toBeNull();
     expect(errandOf('/')).toBeNull();
   });
 
