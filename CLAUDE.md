@@ -529,8 +529,10 @@ billing returns emit them as links; a drift between the two is a link that
   route table mounts every door from its builder. A door's object rides its
   path and the journey rides the query: `invitation(id)` takes its object,
   and the three sign-in doors take the journey by name
-  (`login({ token, next })`, `register({ next })`, `logout({ next })`), the
-  login door's object being the sign-in link's token (`/login/<token>`).
+  (`login({ next })`, `register({ next })`, `logout({ next })`). The login
+  door's object is the sign-in link's token, on its own page:
+  `login.link({ token, next })` is `/login/link/<token>`, which the API writes
+  into the sign-in email and the console mounts.
 - **The matchers** (`doorOf`, `isClaimPath`, `isUpgradePath`, `errandOf`,
   `accountOfPath`) read a path in either form, the way the
   console's router matches it: case-insensitively, ignoring a trailing

@@ -3121,6 +3121,16 @@ interface Journey {
 }
 
 /**
+ * The login door: `/login`, the journey on its query. `login.link` is the page
+ * a sign-in email's link opens, `/login/link/<token>`: the door's object, the
+ * link's token, rides the path, and the journey still rides the query.
+ */
+const login = Object.assign(({ next }: Journey = {}): string => withNext('/login', next), {
+  link: ({ token, next }: Journey & { readonly token: string }): string =>
+    withNext(`/login/link/${token}`, next),
+});
+
+/**
  * The doors: the pages a PERSON stands on before an account is known, one
  * builder per door segment and named for it: signing in and out, joining an
  * account, granting an app access. A door's object rides its path (the
@@ -3130,13 +3140,12 @@ interface Journey {
  * them.
  *
  * ```ts
- * doors.login({ token, next: '/claim/abc' })
- * // '/login/<token>?next=%2Fclaim%2Fabc'
+ * doors.login.link({ token, next: '/claim/abc' })
+ * // '/login/link/<token>?next=%2Fclaim%2Fabc'
  * ```
  */
 export const doors = {
-  login: ({ token, next }: Journey & { readonly token?: string } = {}): string =>
-    withNext(token ? `/login/${token}` : '/login', next),
+  login,
   register: ({ next }: Journey = {}): string => withNext('/register', next),
   logout: ({ next }: Journey = {}): string => withNext('/logout', next),
   invitation: (invitation: string): string => `/invitation/${invitation}`,
@@ -3201,7 +3210,7 @@ export function accountOfPath(path: string): string | null {
  * The door a path names, or null for an account place or the operator
  * partition. Every question about doors reads this one answer: which page is
  * an auth page, which errand a destination carries, what a vendor must not
- * see. `/login/<token>` is the login door, as `/invitation/<id>` is the
+ * see. `/login/link/<token>` is the login door, as `/invitation/<id>` is the
  * invitation door: a door's object is the rest of its path.
  */
 export function doorOf(path: string): DoorSegment | null {
