@@ -3121,6 +3121,40 @@ interface Journey {
 }
 
 /**
+ * The sign-in providers, by the name each one's return page carries:
+ * `/login/<provider>` is where the provider sends the person back, and the
+ * console spends the code it brings with one call to the API.
+ */
+export const SIGN_IN_PROVIDERS = ['google', 'github'] as const;
+/** A sign-in provider's name. */
+export type SignInProvider = (typeof SIGN_IN_PROVIDERS)[number];
+
+/** The login door's sign-in link page, `/login/link/<token>`. */
+const LINK_SEGMENT = 'link';
+
+// A provider's return page and the sign-in link page share the login door's
+// second segment, so no provider may be named `link`. A shared name fails the
+// build here.
+const linkIsNoProvider: [Extract<SignInProvider, typeof LINK_SEGMENT>] extends [never]
+  ? true
+  : never = true;
+void linkIsNoProvider;
+
+/**
+ * The login door: `/login`, with the journey on its query. Its pages below
+ * are the two ways a sign-in comes back to it: the link a sign-in email
+ * carries, its token in the path, and the page a provider returns to, which
+ * the provider writes its `code` and `state` onto as a query. That query is
+ * the provider's to write, so the provider's page takes no journey: Better
+ * Auth carries it inside the state.
+ */
+const login = Object.assign(({ next }: Journey = {}): string => withNext('/login', next), {
+  link: ({ token, next }: Journey & { readonly token: string }): string =>
+    withNext(`/login/${LINK_SEGMENT}/${token}`, next),
+  provider: (provider: SignInProvider): string => `/login/${provider}`,
+});
+
+/**
  * The doors: the pages a PERSON stands on before an account is known, one
  * builder per door segment and named for it: signing in and out, joining an
  * account, granting an app access. A door's object rides its path (the
@@ -3130,13 +3164,14 @@ interface Journey {
  * them.
  *
  * ```ts
- * doors.login({ token, next: '/claim/abc' })
- * // '/login/<token>?next=%2Fclaim%2Fabc'
+ * doors.login.link({ token, next: '/claim/abc' })
+ * // '/login/link/<token>?next=%2Fclaim%2Fabc'
+ * doors.login.provider('google')
+ * // '/login/google'
  * ```
  */
 export const doors = {
-  login: ({ token, next }: Journey & { readonly token?: string } = {}): string =>
-    withNext(token ? `/login/${token}` : '/login', next),
+  login,
   register: ({ next }: Journey = {}): string => withNext('/register', next),
   logout: ({ next }: Journey = {}): string => withNext('/logout', next),
   invitation: (invitation: string): string => `/invitation/${invitation}`,
@@ -3201,8 +3236,9 @@ export function accountOfPath(path: string): string | null {
  * The door a path names, or null for an account place or the operator
  * partition. Every question about doors reads this one answer: which page is
  * an auth page, which errand a destination carries, what a vendor must not
- * see. `/login/<token>` is the login door, as `/invitation/<id>` is the
- * invitation door: a door's object is the rest of its path.
+ * see. `/login/link/<token>` and `/login/google` are the login door, as
+ * `/invitation/<id>` is the invitation door: a door's object is the rest of
+ * its path.
  */
 export function doorOf(path: string): DoorSegment | null {
   const place = placeOf(path);

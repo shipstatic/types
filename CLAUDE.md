@@ -529,8 +529,17 @@ billing returns emit them as links; a drift between the two is a link that
   route table mounts every door from its builder. A door's object rides its
   path and the journey rides the query: `invitation(id)` takes its object,
   and the three sign-in doors take the journey by name
-  (`login({ token, next })`, `register({ next })`, `logout({ next })`), the
-  login door's object being the sign-in link's token (`/login/<token>`).
+  (`login({ next })`, `register({ next })`, `logout({ next })`). The login
+  door has two pages for a sign-in coming back to it, one per kind of
+  return: `login.link({ token, next })` is `/login/link/<token>`, the link a
+  sign-in email carries, and `login.provider(provider)` is
+  `/login/<provider>`, the page a provider (`SIGN_IN_PROVIDERS`: `google`,
+  `github`) sends the person back to. The API writes that page's address as
+  the provider's redirect URI and the console mounts it, which is why types
+  owns the list. The provider writes `code` and `state` onto it as a query,
+  so it takes no journey: Better Auth carries `next` inside the state. A
+  provider named `link` fails the build, since both pages share the second
+  segment.
 - **The matchers** (`doorOf`, `isClaimPath`, `isUpgradePath`, `errandOf`,
   `accountOfPath`) read a path in either form, the way the
   console's router matches it: case-insensitively, ignoring a trailing
