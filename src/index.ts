@@ -587,6 +587,41 @@ export const IDEMPOTENCY_KEY_CONSTRAINTS = {
 } as const;
 
 /**
+ * The most one deploy request may carry, and the framing a client counts
+ * toward it. A deployment larger than one request arrives in several: a
+ * declaration with its {@link DEPLOY_FIELDS.MANIFEST}, then
+ * {@link API_PATHS.DEPLOYMENT_FILES} for the rest.
+ *
+ * Framing, not plan policy, which is why it is static rather than delivered
+ * by `/limits`: a client splitting at a smaller number is always correct.
+ *
+ * **`MAX_BYTES` is a one-way door.** This package is bundled into every
+ * published client, so an installed client keeps its cap forever. Raising it
+ * is free (an older client splits smaller, which is always valid); lowering
+ * it turns every installed client's largest request into a refusal.
+ *
+ * 64 MiB because it holds the largest file any plan allows (50 MiB) with its
+ * framing, keeps a request inside the API's memory, finishes within the
+ * SDK's request timeout at 2.5 Mbit/s, and sits under the edge's 100 MiB
+ * request limit. Measured on the development environment at the boundary
+ * (2026-10-18), a request of exactly 64 MiB, one 50 MiB file and 14 MiB of
+ * others, stored in under half a second of CPU, sent with or without a
+ * `Content-Length`, alone or two at once. What a request costs when its
+ * files are rewritten is the API's to bound, and it does so per file.
+ */
+export const DEPLOY_REQUEST_CONSTRAINTS = {
+  /** The most one deploy request may carry, as `Content-Length` counts it. */
+  MAX_BYTES: 64 * 1024 * 1024,
+  /**
+   * The most multipart framing one part adds beyond its bytes and its name,
+   * and the body's closing delimiter at most the same. A ceiling by the
+   * multipart standard (a boundary is at most 70 characters), not a
+   * measurement.
+   */
+  PART_OVERHEAD: 256,
+} as const;
+
+/**
  * Normalize a `via` value from any transport — trimmed, lowercased, and a
  * member of {@link DeploymentVia}, or `undefined`.
  *
@@ -1274,6 +1309,8 @@ export const API_PATHS = {
   DEPLOYMENTS: '/deployments',
   DEPLOYMENT: (deployment: string) => `/deployments/${deployment}`,
   DEPLOYMENT_CONFIG: (deployment: string) => `/deployments/${deployment}/config`,
+  /** Fills a declared deployment with more of its files. */
+  DEPLOYMENT_FILES: (deployment: string) => `/deployments/${deployment}/files`,
   DOMAINS: '/domains',
   DOMAIN: (domain: string) => `/domains/${domain}`,
   DOMAIN_VERIFY: (domain: string) => `/domains/${domain}/verify`,
@@ -1315,8 +1352,11 @@ export const API_PATHS = {
 export const DEPLOY_FIELDS = {
   /** One entry per file — read with `getAll`. */
   FILES: 'files[]',
-  /** JSON array of MD5 hex digests, index-aligned with `FILES`. */
-  CHECKSUMS: 'checksums',
+  /**
+   * JSON array of {@link ManifestEntry}, one per file of the deployment: its
+   * declaration. Optional; a request without one is the whole deployment.
+   */
+  MANIFEST: 'manifest',
   /** JSON array of label strings. */
   LABELS: 'labels',
   /** The deploying surface's {@link DeploymentVia} member. */
@@ -1346,6 +1386,20 @@ export const DEPLOY_FIELDS = {
   /** @internal reCAPTCHA proof — `web/www`'s public uploader only. */
   CAPTCHA: 'captcha',
 } as const;
+
+/**
+ * One file of a deployment's declaration ({@link DEPLOY_FIELDS.MANIFEST}).
+ * The wire shape both ends share and nothing more: the API owns what makes a
+ * manifest valid, and a client builds one from files it has already checked.
+ */
+export interface ManifestEntry {
+  /** The deploy path, relative to the deployment root, no leading slash. */
+  path: string;
+  /** The file's size in bytes. */
+  size: number;
+  /** The MD5 of the file's bytes, 32 lowercase hex characters. */
+  md5: string;
+}
 
 /**
  * The JSON deploy body's file grammar: the OTHER body both deploy doors
@@ -3501,8 +3555,9 @@ export interface DeploymentUploadOptions {
    * commit sha, a uuid minted before the first try — never one minted fresh
    * on each retry, which would defeat the point.
    *
-   * The replay is per-caller, and it stores successes only: a failed deploy
-   * retries fresh under the same key.
+   * A key replays within the account that sent it; an anonymous key is
+   * ignored, and each anonymous deploy is a new deployment. Only successes
+   * replay: a failed deploy retries fresh under the same key.
    */
   idempotencyKey?: string;
 }

@@ -3,6 +3,7 @@ import {
   ACCOUNT_HEADER,
   type ActivityListResponse,
   API_KEY,
+  API_PATHS,
   AUTH_BASE_PATH,
   AuthMethod,
   BUILD_SETTINGS,
@@ -10,6 +11,7 @@ import {
   classifyToken,
   DEPLOY_FIELDS,
   DEPLOY_FILE_GRAMMAR,
+  DEPLOY_REQUEST_CONSTRAINTS,
   DEPLOY_TOKEN,
   type DeploymentListResponse,
   type DeploymentResource,
@@ -1012,6 +1014,36 @@ describe('IDEMPOTENCY_KEY_CONSTRAINTS', () => {
     // Both ends of one wire header read the name from here; it was a literal
     // in the API middleware, the SDK, and two CORS allow-lists.
     expect(IDEMPOTENCY_KEY_CONSTRAINTS.HEADER).toBe('Idempotency-Key');
+  });
+});
+
+describe('DEPLOY_REQUEST_CONSTRAINTS', () => {
+  it('pins the request cap and the framing a client counts', () => {
+    // A one-way door: every installed client carries this cap, so it is
+    // pinned as a literal and moves only by a decision.
+    expect(DEPLOY_REQUEST_CONSTRAINTS.MAX_BYTES).toBe(67_108_864);
+    expect(DEPLOY_REQUEST_CONSTRAINTS.PART_OVERHEAD).toBe(256);
+  });
+
+  it('holds the largest file any plan allows, with its framing, under the edge', () => {
+    const largestPlanFile = 50 * 1024 * 1024;
+    const longestPath = 1000;
+    const framing = 2 * DEPLOY_REQUEST_CONSTRAINTS.PART_OVERHEAD + longestPath;
+    expect(largestPlanFile + framing).toBeLessThan(DEPLOY_REQUEST_CONSTRAINTS.MAX_BYTES);
+    expect(DEPLOY_REQUEST_CONSTRAINTS.MAX_BYTES).toBeLessThan(100 * 1024 * 1024);
+  });
+});
+
+describe('the deploy wire: a declaration and its files', () => {
+  it('names the manifest field, and no checksums field', () => {
+    expect(DEPLOY_FIELDS.MANIFEST).toBe('manifest');
+    expect(Object.values(DEPLOY_FIELDS)).not.toContain('checksums');
+  });
+
+  it("addresses a deployment's files under the item", () => {
+    expect(API_PATHS.DEPLOYMENT_FILES('happy-cat-abc1234')).toBe(
+      '/deployments/happy-cat-abc1234/files',
+    );
   });
 });
 
