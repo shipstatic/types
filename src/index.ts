@@ -3382,6 +3382,23 @@ export const MY_API_KEY_URL = `https://my.shipstatic.com${consolePaths().apiKey(
  */
 export const PUBLIC_DEPLOYMENT_TTL_SECONDS = 3 * 24 * 60 * 60;
 
+/**
+ * How long a build may take, start to finish: installing, building and
+ * prerendering together.
+ *
+ * The platform reaches its build service through a proxy that ends a request
+ * after 125 seconds of silence, and only an Enterprise plan can change that,
+ * so a build answers inside this limit or is refused with a sentence that
+ * names it. One number with several readers: the API waits a little longer
+ * than it before giving up, the SDK waits for the upload plus it, the build
+ * service enforces it (its `config.env`, held to this by `builds/check.sh`),
+ * and the docs state it in minutes (held by `scripts/check-doc-limits.sh`).
+ *
+ * The day builds are sold by plan, this moves to `/limits`, where a plan's
+ * numbers are delivered.
+ */
+export const BUILD_TIME_LIMIT_SECONDS = 120;
+
 // =============================================================================
 // TIME REMAINING
 // =============================================================================

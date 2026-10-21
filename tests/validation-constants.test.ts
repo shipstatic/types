@@ -7,6 +7,7 @@ import {
   AUTH_BASE_PATH,
   AuthMethod,
   BUILD_SETTINGS,
+  BUILD_TIME_LIMIT_SECONDS,
   CALLER,
   classifyToken,
   DEPLOY_FIELDS,
@@ -1173,5 +1174,13 @@ describe('build settings', () => {
         /between 1 and/,
       );
     });
+  });
+});
+
+describe('BUILD_TIME_LIMIT_SECONDS', () => {
+  it('is two minutes, under the 125 seconds of silence the proxy allows the build service', () => {
+    // A literal on purpose: builds/check.sh and scripts/check-doc-limits.sh
+    // read this number, and the build service's answer must leave before 125 s.
+    expect(BUILD_TIME_LIMIT_SECONDS).toBe(120);
   });
 });
