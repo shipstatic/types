@@ -1389,8 +1389,9 @@ export const DEPLOY_FIELDS = {
    * `index.html`. The question is asked of the `index.html` the asking request
    * carries. A client sends `true` unless
    * {@link DeploymentUploadOptions.spaDetect} is `false`: the option and the
-   * field are two names for two layers. This is production's own field and
-   * meaning, kept as they are, since a wire name is never renamed.
+   * field are two names for two layers. The name and its `true` are the ones
+   * production's console has always sent; the field is read on both endpoints
+   * and by a deploy split across several requests.
    */
   SPA: 'spa',
   /**
