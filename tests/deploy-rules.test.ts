@@ -10,11 +10,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEPLOYMENT_INDEX_FILENAME,
+  type DeployEntry,
   type DeployRuleFile,
   deployRefusal,
   FILE_RULES,
   firstBrokenRule,
   isDeployablePath,
+  isPublishedFile,
   MAX_PATH_BYTES,
   type PlatformLimits,
   SET_RULES,
@@ -97,25 +99,36 @@ describe('the file rules', () => {
   });
 });
 
+/** Files as sent, each one byte unless it is named with a size. */
+const sent = (...paths: (string | DeployEntry)[]): DeployEntry[] =>
+  paths.map((entry) => (typeof entry === 'string' ? { path: entry, size: 1 } : entry));
+
 describe('the rules for the deployment as a whole', () => {
-  const CASES: [string, string[], string][] = [
+  const CASES: [string, DeployEntry[], string][] = [
     ['files', [], 'There are no files to publish.'],
     [
       'filesCount',
-      ['index.html', 'a.js', 'b.js', 'c.js'],
+      sent('index.html', 'a.js', 'b.js', 'c.js'),
       'Too many files (4). Maximum 3 files allowed.',
     ],
     [
       'index',
-      ['about.html'],
+      sent('about.html'),
       "There's no index.html at the top of your site. It's the page visitors see first, so your site needs one.",
     ],
   ];
 
-  it.each(CASES)('%s produces its one sentence', (name, paths, sentence) => {
-    const broken = SET_RULES.find((rule) => rule.broken(paths, LIMITS));
+  it.each(CASES)('%s produces its one sentence', (name, files, sentence) => {
+    const broken = SET_RULES.find((rule) => rule.broken(files, LIMITS));
     expect(broken?.name).toBe(name);
-    expect(broken?.sentence(paths, LIMITS)).toBe(sentence);
+    expect(broken?.sentence(files, LIMITS)).toBe(sentence);
+  });
+
+  it('counts only what is published: empty files are no files', () => {
+    const broken = SET_RULES.find((rule) => rule.broken(sent({ path: 'a.js', size: 0 }), LIMITS));
+    expect(broken?.name).toBe('files');
+    const fits = sent('index.html', 'a.js', 'b.js', { path: 'c.js', size: 0 });
+    expect(SET_RULES.find((rule) => rule.broken(fits, LIMITS))).toBeUndefined();
   });
 
   it('covers every rule, in the order they apply', () => {
@@ -128,11 +141,8 @@ describe('the rules for the deployment as a whole', () => {
 });
 
 describe('the home page', () => {
-  const refusal = (...paths: string[]) =>
-    deployRefusal(
-      paths.map((path) => ({ path, size: 1 })),
-      { ...LIMITS, maxFilesCount: 100 },
-    );
+  const refusal = (...paths: (string | DeployEntry)[]) =>
+    deployRefusal(sent(...paths), { ...LIMITS, maxFilesCount: 100 });
 
   it('is index.html at the root, exactly', () => {
     expect(refusal('index.html', 'a.css')).toBeUndefined();
@@ -152,6 +162,12 @@ describe('the home page', () => {
     );
   });
 
+  it('says an empty one is empty, not missing', () => {
+    expect(refusal({ path: 'index.html', size: 0 }, 'a.css')).toBe(
+      "The index.html at the top of your site is empty. It's the page visitors see first, so it needs content.",
+    );
+  });
+
   it('names no folder when two hold it at the same depth: either could be the site', () => {
     expect(refusal('blog/index.html', 'docs/index.html')).toBe(
       "There's no index.html at the top of your site. It's the page visitors see first, so your site needs one.",
@@ -159,7 +175,26 @@ describe('the home page', () => {
   });
 });
 
+describe('isPublishedFile', () => {
+  it('publishes every file with bytes in it, and no empty one', () => {
+    expect(isPublishedFile({ size: 1 })).toBe(true);
+    expect(isPublishedFile({ size: 0 })).toBe(false);
+  });
+});
+
 describe('deployRefusal', () => {
+  it('leaves an empty file out of the per-file rules, never refusing it', () => {
+    expect(
+      deployRefusal(
+        [
+          { path: 'index.html', size: 10 },
+          { path: 'installer.exe', size: 0 },
+        ],
+        LIMITS,
+      ),
+    ).toBeUndefined();
+  });
+
   it('judges every file before the deployment as a whole', () => {
     expect(deployRefusal([{ path: 'installer.exe', size: 1 }], LIMITS)).toBe(
       'File "installer.exe" has an extension that is not allowed.',

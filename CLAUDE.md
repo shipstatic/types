@@ -35,7 +35,7 @@ own; only a subpath entry (`schemas`) is a separate file.
 | Picker Accept Hint | `WEB_FILE_ACCEPT` — the `accept` value for a browser file picker. A **hint, never a rule**: `accept` can express only an allowlist while the platform's rule is a blocklist, so this list is necessarily narrower than what the platform hosts and must never decide whether a file may be deployed. The invariant that matters — the picker never offers what the platform will refuse — is fenced in `cloudflare/api/tests/lib/blocklist.test.ts`, which holds this published string against the list it owns. |
 | Filename Character Validation | `UNSAFE_FILENAME_CHARS`, `hasUnsafeChars()` |
 | Unbuilt Project Markers | `UNBUILT_PROJECT_MARKERS`, `hasUnbuiltMarker()` |
-| Deploy Rules | Every rule a deployment's files are held to, by the API at its declaration and by every client before it sends a byte (see "Deploy rules"): `FILE_RULES` (name, extension, project, path, file size, running total), `SET_RULES` (files, count, and the home page, `DEPLOYMENT_INDEX_FILENAME` at the root), `firstBrokenRule`, `brokenSetRule`, `deployRefusal`, and the two predicates they read, `validateFileName` and `isDeployablePath` (+ `MAX_PATH_BYTES`) |
+| Deploy Rules | Every rule a deployment's files are held to, by the API at its declaration and by every client before it sends a byte (see "Deploy rules"): `FILE_RULES` (name, extension, project, path, file size, running total), `SET_RULES` (files, count, and the home page, `DEPLOYMENT_INDEX_FILENAME` at the root), `firstBrokenRule`, `brokenSetRule`, `deployRefusal`, `isPublishedFile` (an empty file is never published), `DeployEntry`, and the two predicates they read, `validateFileName` and `isDeployablePath` (+ `MAX_PATH_BYTES`) |
 | Common Responses | `PingResponse` (`timestamp` in unix seconds) |
 | Credential Shapes | The one address for credential vocabulary: `AUTH_BASE_PATH` (the identity mount — API server and web auth client read the same path), `AuthMethod`, `API_KEY` / `DEPLOY_TOKEN` / `OAUTH_TOKEN` / `CALLER` (namespaced shape constants), and **both halves of the one Bearer slot** — `readBearerValue` READS it (RFC 7235 §2.1 scheme fold; absence stays the caller's own question) and `TokenKind` + `classifyToken` DISPATCH on what came out, both sides of the wire — plus `OAuthScope` |
 | Deployment Config Constants | `DEPLOYMENT_CONFIG_FILENAME` (its sibling, `DEPLOYMENT_INDEX_FILENAME`, is under "Deploy Rules"), and `assertShipJsonSyntax` (syntax only, never schema). The single-page routing config is the platform's to write, so its content lives with its one writer, the API (`cloudflare/api/src/lib/platform-files.ts`); every deploy asks for it unless it sends `DEPLOY_FIELDS.SPA` `false` (`DeploymentUploadOptions.spaDetect`) |
@@ -527,8 +527,19 @@ and not the others.
   rules about the set name none), so every surface shows it as it is.
 - **A limit's sentence ends with the way forward the API delivered**
   (`PlatformLimits.suggestions`), so the client never learns a plan name.
-- **The files judged are the files published**: a caller leaves out the empty
-  ones, which no deployment stores.
+- **A judge passes the files as SENT, empty ones included, and the table
+  decides what is published** (`isPublishedFile`): no deployment stores an
+  empty file, so one is left out of the per-file rules and the totals, never
+  refused, and every store reads the same predicate to drop it. The set rules
+  still see it, which is how an empty `index.html` is refused as empty ("The
+  index.html at the top of your site is empty.") rather than as missing.
+- **A refusal is a sentence and a type, never a rule name.** Every deploy-rule
+  refusal is `validation_failed` at 400, and no client reads which rule broke.
+  A `details.rule` carrying the table's `name` was weighed and refused by the
+  stopping rule: nothing would read it, and the sentence already names the fix.
+  Reopen when a client must act on one rule by itself (an agent that wraps a
+  single file in an `index.html` on its own), and then the field is the table's
+  `name`, which is already stable.
 
 The rules are format, not policy, by this package's test: each is computed
 from the files alone, and the API refuses the same files the same way. The

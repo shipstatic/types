@@ -2485,6 +2485,23 @@ export function validateFileName(filename: string): { valid: boolean; reason?: s
   return { valid: true };
 }
 
+/** A file a deployment was sent: the path it would be served at, and its size in bytes. */
+export interface DeployEntry {
+  readonly path: string;
+  readonly size: number;
+}
+
+/**
+ * Whether a file sent to a deployment is published. An empty one is not: no
+ * deployment stores an empty file, so it is left out rather than refused, by
+ * every judge and every store alike. The rules about the deployment as a whole
+ * still see it, which is how an empty `index.html` is told apart from a
+ * missing one.
+ */
+export function isPublishedFile(file: { readonly size: number }): boolean {
+  return file.size > 0;
+}
+
 /** One file a deployment is judged on, and the deployment so far. */
 export interface DeployRuleFile {
   /** The path the file is served at. */
@@ -2589,35 +2606,45 @@ function nestedIndexFolder(paths: readonly string[]): string | undefined {
   return top.length === 1 ? top[0]?.slice(0, -suffix.length) : undefined;
 }
 
+/** The paths a deployment publishes, out of the files it was sent. */
+function publishedPaths(files: readonly DeployEntry[]): string[] {
+  return files.filter(isPublishedFile).map((file) => file.path);
+}
+
 /**
- * The rules asked of the deployment as a whole, over the paths of the files
- * it publishes, after every file has passed {@link FILE_RULES}: it has files,
- * not more than the plan allows, and a home page at its root. These name no
- * one file, so a surface that lists refusals per file files them under the
+ * The rules asked of the deployment as a whole, after every file has passed
+ * {@link FILE_RULES}: it has files, not more than the plan allows, and a home
+ * page at its root. They read the files as SENT, an empty one included, and
+ * count only what is published ({@link isPublishedFile}), so the home-page
+ * rule can say an `index.html` is empty rather than missing. These name no one
+ * file, so a surface that lists refusals per file files them under the
  * deployment.
  */
-export const SET_RULES: readonly DeployRule<readonly string[]>[] = [
+export const SET_RULES: readonly DeployRule<readonly DeployEntry[]>[] = [
   {
     name: 'files',
-    broken: (paths) => paths.length === 0,
+    broken: (files) => publishedPaths(files).length === 0,
     sentence: () => 'There are no files to publish.',
   },
   {
     name: 'filesCount',
-    broken: (paths, limits) => paths.length > limits.maxFilesCount,
-    sentence: (paths, limits) =>
+    broken: (files, limits) => publishedPaths(files).length > limits.maxFilesCount,
+    sentence: (files, limits) =>
       withSuggestion(
-        `Too many files (${paths.length}). Maximum ${limits.maxFilesCount} files allowed.`,
+        `Too many files (${publishedPaths(files).length}). Maximum ${limits.maxFilesCount} files allowed.`,
         limits,
         'maxFilesCount',
       ),
   },
   {
     name: 'index',
-    broken: (paths) => !paths.includes(DEPLOYMENT_INDEX_FILENAME),
-    sentence: (paths) => {
+    broken: (files) => !publishedPaths(files).includes(DEPLOYMENT_INDEX_FILENAME),
+    sentence: (files) => {
+      if (files.some((file) => file.path === DEPLOYMENT_INDEX_FILENAME)) {
+        return `The ${DEPLOYMENT_INDEX_FILENAME} at the top of your site is empty. It's the page visitors see first, so it needs content.`;
+      }
       const sentence = `There's no ${DEPLOYMENT_INDEX_FILENAME} at the top of your site. It's the page visitors see first, so your site needs one.`;
-      const folder = nestedIndexFolder(paths);
+      const folder = nestedIndexFolder(publishedPaths(files));
       return folder
         ? `${sentence} There's one in ${folder}/. If that's your site, publish that folder instead.`
         : sentence;
@@ -2635,31 +2662,31 @@ export function firstBrokenRule(
 
 /** The first rule the deployment as a whole breaks, or `undefined`. */
 export function brokenSetRule(
-  paths: readonly string[],
+  files: readonly DeployEntry[],
   limits: PlatformLimits,
-): DeployRule<readonly string[]> | undefined {
-  return SET_RULES.find((rule) => rule.broken(paths, limits));
+): DeployRule<readonly DeployEntry[]> | undefined {
+  return SET_RULES.find((rule) => rule.broken(files, limits));
 }
 
 /**
  * Why a deployment of these files is refused, as the one sentence a person
- * reads, or `undefined` when every rule holds: each file in order against
- * {@link FILE_RULES}, then the whole against {@link SET_RULES}. The files are
- * the ones the deployment publishes, an empty file never among them.
+ * reads, or `undefined` when every rule holds: each published file in order
+ * against {@link FILE_RULES}, then the whole against {@link SET_RULES}. Pass
+ * the files as sent, empty ones included: an empty file is left out of the
+ * per-file rules and the totals, never refused.
  */
 export function deployRefusal(
-  files: readonly { readonly path: string; readonly size: number }[],
+  files: readonly DeployEntry[],
   limits: PlatformLimits,
 ): string | undefined {
   let totalSize = 0;
-  for (const { path, size } of files) {
+  for (const { path, size } of files.filter(isPublishedFile)) {
     totalSize += size;
     const file = { path, size, totalSize };
     const rule = firstBrokenRule(file, limits);
     if (rule) return rule.sentence(file, limits);
   }
-  const paths = files.map((file) => file.path);
-  return brokenSetRule(paths, limits)?.sentence(paths, limits);
+  return brokenSetRule(files, limits)?.sentence(files, limits);
 }
 
 // =============================================================================
