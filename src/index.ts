@@ -1331,9 +1331,9 @@ export const API_PATHS = {
   PING: '/ping',
   SETUP: '/setup',
   /**
-   * The single-page question, asked before an upload. Served for the
-   * clients published before {@link DEPLOY_FIELDS.SPA}: they ask here and
-   * write the routing config themselves. Current clients send the field.
+   * The single-page question, asked without deploying. A deploy asks it
+   * itself unless it sends {@link DEPLOY_FIELDS.SPA} `false`, so a client
+   * never needs this path to get the routing config.
    */
   SPA_CHECK: '/spa-check',
   UPLOAD: '/upload',
@@ -1379,11 +1379,11 @@ export const DEPLOY_FIELDS = {
   /** @internal Server-processing flag — first-party `/upload` only. */
   PRERENDER: 'prerender',
   /**
-   * Ask the single-page question of the deployment's files: when its
-   * `index.html` is an empty application shell and it ships no `ship.json`,
+   * Whether the platform asks the single-page question of the deployment's
+   * files: `true` or `false`, and absent means `true`. Asked, when the root
+   * `index.html` is an empty application shell and no `ship.json` is shipped,
    * the platform adds the routing config that serves every path from
-   * `index.html`. Sent on the declaring request, which then carries the root
-   * `index.html` as it carries the root `ship.json`. The SDK sends it unless
+   * `index.html`. A client sends `false` only, when
    * {@link DeploymentUploadOptions.spaDetect} is `false`.
    */
   SPA: 'spa',
