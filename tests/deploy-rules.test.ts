@@ -9,6 +9,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  canonicalDeployPath,
   DEPLOYMENT_INDEX_FILENAME,
   type DeployEntry,
   type DeployRuleFile,
@@ -18,6 +19,7 @@ import {
   isDeployablePath,
   isPublishedFile,
   MAX_PATH_BYTES,
+  namedTwice,
   type PlatformLimits,
   SET_RULES,
   validateFileName,
@@ -106,6 +108,7 @@ const sent = (...paths: (string | DeployEntry)[]): DeployEntry[] =>
 describe('the rules for the deployment as a whole', () => {
   const CASES: [string, DeployEntry[], string][] = [
     ['files', [], 'There are no files to publish.'],
+    ['unique', sent('index.html', 'a.js', 'a.js'), 'The file a.js appears twice.'],
     [
       'filesCount',
       sent('index.html', 'a.js', 'b.js', 'c.js'),
@@ -135,6 +138,22 @@ describe('the rules for the deployment as a whole', () => {
     expect(CASES.map(([name]) => name)).toEqual(SET_RULES.map((rule) => rule.name));
   });
 
+  it('reads a path and its leading-slash spelling as one file', () => {
+    const broken = SET_RULES.find((rule) => rule.broken(sent('index.html', '/index.html'), LIMITS));
+    expect(broken?.sentence(sent('index.html', '/index.html'), LIMITS)).toBe(
+      'The file index.html appears twice.',
+    );
+  });
+
+  it('refuses a path named twice even when one copy is empty', () => {
+    const files = sent('index.html', 'a.js', { path: 'a.js', size: 0 });
+    expect(SET_RULES.find((rule) => rule.broken(files, LIMITS))?.name).toBe('unique');
+  });
+
+  it('says a repeat in the words the API intake uses', () => {
+    expect(namedTwice('a.js')).toBe('The file a.js appears twice.');
+  });
+
   it('names the home page by its one owner', () => {
     expect(DEPLOYMENT_INDEX_FILENAME).toBe('index.html');
   });
@@ -146,6 +165,7 @@ describe('the home page', () => {
 
   it('is index.html at the root, exactly', () => {
     expect(refusal('index.html', 'a.css')).toBeUndefined();
+    expect(refusal('/index.html', 'a.css')).toBeUndefined();
     expect(refusal('Index.html')).toMatch(/^There's no index.html at the top of your site\./);
     expect(refusal('index.htm')).toMatch(/^There's no index.html/);
   });
@@ -257,14 +277,16 @@ describe('validateFileName', () => {
     [' a.html', 'File name " a.html" cannot start or end with spaces.'],
     ['a.', 'File name "a." cannot end with dots.'],
     ['docs/CON.txt', 'File name "docs/CON.txt" uses a reserved system name.'],
-    ['a/../b.html', 'File name "a/../b.html" contains a path traversal pattern.'],
   ])('refuses %j', (name, reason) => {
     expect(validateFileName(name)).toEqual({ valid: false, reason });
   });
 
-  it.each(['index.html', 'café/menu.html', 'a b.html', 'v1.2/app.js'])('accepts %j', (name) => {
-    expect(validateFileName(name)).toEqual({ valid: true });
-  });
+  it.each(['index.html', 'café/menu.html', 'a b.html', 'v1.2/app.js', 'report..final.pdf'])(
+    'accepts %j',
+    (name) => {
+      expect(validateFileName(name)).toEqual({ valid: true });
+    },
+  );
 });
 
 describe('isDeployablePath', () => {
@@ -274,10 +296,30 @@ describe('isDeployablePath', () => {
     ['.well-known/security.txt', true],
     ['blog/.well-known/x', false],
     ['.env', false],
+    ['a/../b.html', false],
+    ['../b.html', false],
     ['a//b.html', false],
     [`${'a'.repeat(256)}.html`, false],
     [`${'a/'.repeat(MAX_PATH_BYTES / 2)}x`, false],
   ])('%j → %s', (path, expected) => {
     expect(isDeployablePath(path)).toBe(expected);
+  });
+});
+
+describe('canonicalDeployPath', () => {
+  it.each([
+    ['index.html', 'index.html'],
+    ['/index.html', 'index.html'],
+    ['/blog/a.html', 'blog/a.html'],
+  ])('%j → %j', (path, canonical) => {
+    expect(canonicalDeployPath(path)).toBe(canonical);
+  });
+});
+
+describe('a traversal', () => {
+  it('is refused by the path rule, which names what is wrong with it', () => {
+    expect(deployRefusal(sent('index.html', 'a/../b.html'), LIMITS)).toBe(
+      'File "a/../b.html" can\'t be published: a folder or file name in its path starts with a dot, is empty, or is too long.',
+    );
   });
 });

@@ -1331,9 +1331,11 @@ export const API_PATHS = {
   PING: '/ping',
   SETUP: '/setup',
   /**
-   * The single-page question, asked without deploying. A deploy asks it
-   * itself unless it sends {@link DEPLOY_FIELDS.SPA} `false`, so a client
-   * never needs this path to get the routing config.
+   * The single-page question, asked without deploying. A deploy that sends
+   * {@link DEPLOY_FIELDS.SPA_DETECT} `true` is asked it at its declaration, so
+   * a client never needs this path to get the routing config: it answers the
+   * clients that predate the field, which ask here and write the config
+   * themselves.
    */
   SPA_CHECK: '/spa-check',
   UPLOAD: '/upload',
@@ -1380,13 +1382,15 @@ export const DEPLOY_FIELDS = {
   PRERENDER: 'prerender',
   /**
    * Whether the platform asks the single-page question of the deployment's
-   * files: `true` or `false`, and absent means `true`. Asked, when the root
-   * `index.html` is an empty application shell and no `ship.json` is shipped,
-   * the platform adds the routing config that serves every path from
-   * `index.html`. A client sends `false` only, when
+   * files: `true` asks, and `false` or absence does not, so a request that
+   * names nothing is never given a config it did not ask for. Asked, when the
+   * root `index.html` is an empty application shell and no `ship.json` is
+   * shipped, the platform adds the routing config that serves every path from
+   * `index.html`. The question is asked of the `index.html` the asking request
+   * carries. A client sends `true` unless
    * {@link DeploymentUploadOptions.spaDetect} is `false`.
    */
-  SPA: 'spa',
+  SPA_DETECT: 'spaDetect',
   /**
    * @internal The build settings, first-party `/upload` only and meaningful
    * only with `BUILD`: the command to run instead of the manifest's build
@@ -2443,14 +2447,33 @@ export const DEPLOYMENT_INDEX_FILENAME = 'index.html';
 export const MAX_PATH_BYTES = 1000;
 
 /**
+ * A deploy path as the deployment stores it: one leading slash names the same
+ * path, so it is dropped. Every rule and every store compares paths in this
+ * form, so `index.html` and `/index.html` are one file wherever they are
+ * judged.
+ */
+export function canonicalDeployPath(path: string): string {
+  return path.startsWith('/') ? path.slice(1) : path;
+}
+
+/**
+ * What a deployment is told when it names one path twice: two files where
+ * the deployment holds one. The deploy rules say it, and so does the API's
+ * intake, which refuses the repeat before it can index the files by path.
+ */
+export function namedTwice(path: string): string {
+  return `The file ${path} appears twice.`;
+}
+
+/**
  * Whether a deploy path can be served as it is: within {@link MAX_PATH_BYTES},
  * with no empty segment, none over 255 characters, and none starting with a
  * dot, root-level `.well-known` excepted (RFC 8615). The router refuses to
- * serve a hidden segment, so a file at one could never be reached. A leading
- * slash is the same path and is ignored.
+ * serve a hidden segment, so a file at one could never be reached. Read in
+ * its canonical form ({@link canonicalDeployPath}).
  */
 export function isDeployablePath(path: string): boolean {
-  const normalized = path.startsWith('/') ? path.slice(1) : path;
+  const normalized = canonicalDeployPath(path);
   if (new TextEncoder().encode(normalized).length > MAX_PATH_BYTES) return false;
   return normalized
     .split('/')
@@ -2466,8 +2489,9 @@ export function isDeployablePath(path: string): boolean {
  * Whether a file name can make the upload-to-serve round trip, and if not, the
  * sentence that says why, naming the file. Only what genuinely breaks it is
  * refused: characters that break a URL or open an XSS vector
- * ({@link hasUnsafeChars}), a leading or trailing space, a trailing dot, a
- * reserved system name, and a path traversal pattern.
+ * ({@link hasUnsafeChars}), a leading or trailing space, a trailing dot, and
+ * a reserved system name. A `..` segment is a segment starting with a dot,
+ * which {@link isDeployablePath} refuses, so `report..final.pdf` is a name.
  */
 export function validateFileName(filename: string): { valid: boolean; reason?: string } {
   const refuse = (why: string) => ({ valid: false, reason: `File name "${filename}" ${why}.` });
@@ -2481,7 +2505,6 @@ export function validateFileName(filename: string): { valid: boolean; reason?: s
   if (/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)/i.test(name)) {
     return refuse('uses a reserved system name');
   }
-  if (filename.includes('..')) return refuse('contains a path traversal pattern');
   return { valid: true };
 }
 
@@ -2629,25 +2652,42 @@ function nestedIndexFolder(paths: readonly string[]): string | undefined {
   return top.length === 1 ? top[0]?.slice(0, -suffix.length) : undefined;
 }
 
-/** The paths a deployment publishes, out of the files it was sent. */
+/** The paths a deployment publishes, out of the files it was sent, in their canonical form. */
 function publishedPaths(files: readonly DeployEntry[]): string[] {
-  return files.filter(isPublishedFile).map((file) => file.path);
+  return files.filter(isPublishedFile).map((file) => canonicalDeployPath(file.path));
+}
+
+/** The first path the files name twice, empty files included, or `undefined`. */
+function repeatedPath(files: readonly DeployEntry[]): string | undefined {
+  const seen = new Set<string>();
+  for (const { path } of files) {
+    const canonical = canonicalDeployPath(path);
+    if (seen.has(canonical)) return canonical;
+    seen.add(canonical);
+  }
+  return undefined;
 }
 
 /**
  * The rules asked of the deployment as a whole, after every file has passed
- * {@link FILE_RULES}: it has files, not more than the plan allows, and a home
- * page at its root. They read the files as SENT, an empty one included, and
- * count only what is published ({@link isPublishedFile}), so the home-page
- * rule can say an `index.html` is empty rather than missing. These name no one
- * file, so a surface that lists refusals per file files them under the
- * deployment.
+ * {@link FILE_RULES}: it has files, it names each path once, it has not more
+ * than the plan allows, and it has a home page at its root. They read the
+ * files as SENT, an empty one included, and count only what is published
+ * ({@link isPublishedFile}), so the home-page rule can say an `index.html` is
+ * empty rather than missing. Paths compare in their canonical form
+ * ({@link canonicalDeployPath}). These name no one file, so a surface that
+ * lists refusals per file files them under the deployment.
  */
 export const SET_RULES: readonly DeployRule<readonly DeployEntry[]>[] = [
   {
     name: 'files',
     broken: (files) => publishedPaths(files).length === 0,
     sentence: () => 'There are no files to publish.',
+  },
+  {
+    name: 'unique',
+    broken: (files) => repeatedPath(files) !== undefined,
+    sentence: (files) => namedTwice(repeatedPath(files) ?? ''),
   },
   {
     name: 'filesCount',
@@ -2663,7 +2703,7 @@ export const SET_RULES: readonly DeployRule<readonly DeployEntry[]>[] = [
     name: 'index',
     broken: (files) => !publishedPaths(files).includes(DEPLOYMENT_INDEX_FILENAME),
     sentence: (files) => {
-      if (files.some((file) => file.path === DEPLOYMENT_INDEX_FILENAME)) {
+      if (files.some((file) => canonicalDeployPath(file.path) === DEPLOYMENT_INDEX_FILENAME)) {
         return `The ${DEPLOYMENT_INDEX_FILENAME} at the top of your site is empty. It's the page visitors see first, so it needs content.`;
       }
       return `There's no ${DEPLOYMENT_INDEX_FILENAME} at the top of your site. It's the page visitors see first, so your site needs one. ${missingIndexAdvice(publishedPaths(files))}`;
@@ -3808,8 +3848,8 @@ export interface DeploymentUploadOptions {
    * Whether the platform asks the single-page question of the files and, when
    * `index.html` is an empty application shell and no `ship.json` is shipped,
    * adds the routing config that serves every path from `index.html`
-   * ({@link DEPLOY_FIELDS.SPA}). Default `true`; `false` deploys the files as
-   * a standard host, where a missing path is a 404.
+   * ({@link DEPLOY_FIELDS.SPA_DETECT}). Default `true`; `false` deploys the
+   * files as a standard host, where a missing path is a 404.
    */
   spaDetect?: boolean;
   /**
