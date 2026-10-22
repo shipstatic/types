@@ -2590,6 +2590,29 @@ export const FILE_RULES: readonly DeployRule<DeployRuleFile>[] = [
   },
 ];
 
+/** Whether a path names an HTML page, the kind of file a site's main page is. */
+function isPagePath(path: string): boolean {
+  return /\.html?$/i.test(path);
+}
+
+/**
+ * What to do about a missing home page, read from what the files show, so
+ * the refusal names the step that fits: the folder that holds the site when
+ * it sits one folder down (the site published from the folder above its
+ * build), the page to rename when there are pages but none is the home page
+ * (a single `report.html`), and the small page to add when there is no page
+ * at all (an image or a PDF published on its own, measured as the most
+ * common case).
+ */
+function missingIndexAdvice(paths: readonly string[]): string {
+  const folder = nestedIndexFolder(paths);
+  if (folder) return `There's one in ${folder}/. If that's your site, publish that folder instead.`;
+  if (paths.some(isPagePath)) {
+    return `If one of your pages is the main one, put it at the top and name it ${DEPLOYMENT_INDEX_FILENAME}.`;
+  }
+  return `To publish a file on its own, like an image or a PDF, add a small ${DEPLOYMENT_INDEX_FILENAME} that links to it.`;
+}
+
 /**
  * Where the home page is, when it is one folder down: the shallowest nested
  * `index.html`, if exactly one folder holds it. A site deployed from the
@@ -2643,11 +2666,7 @@ export const SET_RULES: readonly DeployRule<readonly DeployEntry[]>[] = [
       if (files.some((file) => file.path === DEPLOYMENT_INDEX_FILENAME)) {
         return `The ${DEPLOYMENT_INDEX_FILENAME} at the top of your site is empty. It's the page visitors see first, so it needs content.`;
       }
-      const sentence = `There's no ${DEPLOYMENT_INDEX_FILENAME} at the top of your site. It's the page visitors see first, so your site needs one.`;
-      const folder = nestedIndexFolder(publishedPaths(files));
-      return folder
-        ? `${sentence} There's one in ${folder}/. If that's your site, publish that folder instead.`
-        : sentence;
+      return `There's no ${DEPLOYMENT_INDEX_FILENAME} at the top of your site. It's the page visitors see first, so your site needs one. ${missingIndexAdvice(publishedPaths(files))}`;
     },
   },
 ];

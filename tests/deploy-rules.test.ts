@@ -114,7 +114,7 @@ describe('the rules for the deployment as a whole', () => {
     [
       'index',
       sent('about.html'),
-      "There's no index.html at the top of your site. It's the page visitors see first, so your site needs one.",
+      "There's no index.html at the top of your site. It's the page visitors see first, so your site needs one. If one of your pages is the main one, put it at the top and name it index.html.",
     ],
   ];
 
@@ -170,8 +170,28 @@ describe('the home page', () => {
 
   it('names no folder when two hold it at the same depth: either could be the site', () => {
     expect(refusal('blog/index.html', 'docs/index.html')).toBe(
-      "There's no index.html at the top of your site. It's the page visitors see first, so your site needs one.",
+      "There's no index.html at the top of your site. It's the page visitors see first, so your site needs one. If one of your pages is the main one, put it at the top and name it index.html.",
     );
+  });
+
+  it('asks for the main page to be named index.html when there are pages but no home page', () => {
+    expect(refusal('report.html')).toBe(
+      "There's no index.html at the top of your site. It's the page visitors see first, so your site needs one. If one of your pages is the main one, put it at the top and name it index.html.",
+    );
+    expect(refusal('guide/start.HTM', 'logo.png')).toMatch(/name it index\.html\.$/);
+  });
+
+  it('asks for a small page that links to the file when there is no page at all', () => {
+    expect(refusal('photo.png')).toBe(
+      "There's no index.html at the top of your site. It's the page visitors see first, so your site needs one. To publish a file on its own, like an image or a PDF, add a small index.html that links to it.",
+    );
+    expect(refusal('report.pdf', 'data.csv')).toMatch(
+      /add a small index\.html that links to it\.$/,
+    );
+  });
+
+  it('reads the advice from published files: an empty page is no page', () => {
+    expect(refusal({ path: 'about.html', size: 0 }, 'photo.png')).toMatch(/links to it\.$/);
   });
 });
 

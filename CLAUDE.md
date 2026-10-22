@@ -520,9 +520,14 @@ and not the others.
   exactly (`DEPLOYMENT_INDEX_FILENAME`). ShipStatic publishes websites, and a
   website starts at its home page. There is no exception, a `ship.json` that
   redirects `/` included: a redirect-only site carries an `index.html` nobody
-  sees. When exactly one folder holds the shallowest nested `index.html`, the
-  refusal names it, since publishing the folder above a build is the common
-  way to miss the root.
+  sees. **The refusal ends with the one step that fits what the files show**
+  (`missingIndexAdvice`): the folder to publish when exactly one folder holds
+  the shallowest nested `index.html` (a site published from the folder above
+  its build), the page to rename when there are pages but none at the top (a
+  single `report.html`), and a small page to add when there is no page at all
+  (an image or a PDF on its own). Measured on production before release, the
+  last is the commonest refused upload, so a refusal without it would leave
+  most of the people it reaches with no next step.
 - **Every sentence is complete on its own** and names its file once (the
   rules about the set name none), so every surface shows it as it is.
 - **A limit's sentence ends with the way forward the API delivered**
