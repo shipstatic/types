@@ -2428,6 +2428,241 @@ export function hasUnbuiltMarker(filePath: string): boolean {
 }
 
 // =============================================================================
+// DEPLOY RULES
+// =============================================================================
+
+/**
+ * The page a deployment serves at `/`. Every deployment has one at its root:
+ * ShipStatic publishes websites, and a website starts at its home page.
+ * Beside {@link DEPLOYMENT_CONFIG_FILENAME}, the other file that sets a
+ * deployment up.
+ */
+export const DEPLOYMENT_INDEX_FILENAME = 'index.html';
+
+/** Max deploy-path bytes: R2 keys cap at 1024 bytes and the deployment prefix consumes up to 22. */
+export const MAX_PATH_BYTES = 1000;
+
+/**
+ * Whether a deploy path can be served as it is: within {@link MAX_PATH_BYTES},
+ * with no empty segment, none over 255 characters, and none starting with a
+ * dot, root-level `.well-known` excepted (RFC 8615). The router refuses to
+ * serve a hidden segment, so a file at one could never be reached. A leading
+ * slash is the same path and is ignored.
+ */
+export function isDeployablePath(path: string): boolean {
+  const normalized = path.startsWith('/') ? path.slice(1) : path;
+  if (new TextEncoder().encode(normalized).length > MAX_PATH_BYTES) return false;
+  return normalized
+    .split('/')
+    .every(
+      (segment, index) =>
+        segment !== '' &&
+        segment.length <= 255 &&
+        (!segment.startsWith('.') || (segment === '.well-known' && index === 0)),
+    );
+}
+
+/**
+ * Whether a file name can make the upload-to-serve round trip, and if not, the
+ * sentence that says why, naming the file. Only what genuinely breaks it is
+ * refused: characters that break a URL or open an XSS vector
+ * ({@link hasUnsafeChars}), a leading or trailing space, a trailing dot, a
+ * reserved system name, and a path traversal pattern.
+ */
+export function validateFileName(filename: string): { valid: boolean; reason?: string } {
+  const refuse = (why: string) => ({ valid: false, reason: `File name "${filename}" ${why}.` });
+  if (filename.trim() === '') return { valid: false, reason: 'A file has no name.' };
+  if (hasUnsafeChars(filename)) return refuse('contains unsafe characters');
+  if (filename.startsWith(' ') || filename.endsWith(' ')) {
+    return refuse('cannot start or end with spaces');
+  }
+  if (filename.endsWith('.')) return refuse('cannot end with dots');
+  const name = filename.split('/').pop() || filename;
+  if (/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)/i.test(name)) {
+    return refuse('uses a reserved system name');
+  }
+  if (filename.includes('..')) return refuse('contains a path traversal pattern');
+  return { valid: true };
+}
+
+/** One file a deployment is judged on, and the deployment so far. */
+export interface DeployRuleFile {
+  /** The path the file is served at. */
+  readonly path: string;
+  /** Its size in bytes. */
+  readonly size: number;
+  /** The bytes of the files judged so far, this one INCLUDED: the total rule's subject. */
+  readonly totalSize: number;
+}
+
+/** A rule: what breaks it, and the one sentence that says so. */
+export interface DeployRule<Input> {
+  /** Stable identity, for reading a refusal in a test. */
+  readonly name: string;
+  readonly broken: (input: Input, limits: PlatformLimits) => boolean;
+  readonly sentence: (input: Input, limits: PlatformLimits) => string;
+}
+
+/**
+ * A limit's sentence, followed by the way forward the API delivered for that
+ * limit ({@link PlatformLimits.suggestions}), verbatim. The API writes it with
+ * the function its own plans answer to, so a refusal ends the same way
+ * wherever it is made, and no client learns what a plan is.
+ */
+function withSuggestion(sentence: string, limits: PlatformLimits, key: PlatformLimitKey): string {
+  const suggestion = limits.suggestions?.[key];
+  return suggestion ? `${sentence} ${suggestion}` : sentence;
+}
+
+/**
+ * Every rule each file of a deployment is held to, in the order they apply:
+ * a file that breaks two reports the first, because fixing it may fix the
+ * other. Every sentence names its file once and is complete on its own, so
+ * every surface shows it as it is.
+ *
+ * The API judges a deployment by these rules at its declaration, and every
+ * client judges its files by them before sending a byte, so a refusal reads
+ * the same wherever it is made. Read through {@link deployRefusal}, or
+ * {@link firstBrokenRule} and {@link brokenSetRule} where a caller judges a
+ * deployment as it walks it.
+ */
+export const FILE_RULES: readonly DeployRule<DeployRuleFile>[] = [
+  {
+    name: 'name',
+    broken: ({ path }) => !validateFileName(path).valid,
+    sentence: ({ path }) => validateFileName(path).reason ?? `File name "${path}" is not allowed.`,
+  },
+  {
+    // The list is the platform's, delivered through `/limits`. Absent means
+    // no check here, never an empty policy: the API holds the list.
+    name: 'extension',
+    broken: ({ path }, limits) => isBlockedExtension(path, limits.blockedExtensions ?? []),
+    sentence: ({ path }) => `File "${path}" has an extension that is not allowed.`,
+  },
+  {
+    name: 'project',
+    broken: ({ path }) => hasUnbuiltMarker(path),
+    sentence: ({ path }) =>
+      `File "${path}" belongs to a project that isn't built yet. Build it, then publish the folder the build makes, like dist.`,
+  },
+  {
+    name: 'path',
+    broken: ({ path }) => !isDeployablePath(path),
+    sentence: ({ path }) =>
+      `File "${path}" can't be published: a folder or file name in its path starts with a dot, is empty, or is too long.`,
+  },
+  {
+    name: 'fileSize',
+    broken: ({ size }, limits) => size > limits.maxFileSize,
+    sentence: ({ path }, limits) =>
+      withSuggestion(
+        `File "${path}" is too large. Maximum ${formatFileSize(limits.maxFileSize)} allowed.`,
+        limits,
+        'maxFileSize',
+      ),
+  },
+  {
+    name: 'totalSize',
+    broken: ({ totalSize }, limits) => totalSize > limits.maxTotalSize,
+    sentence: ({ totalSize }, limits) =>
+      withSuggestion(
+        `Files add up to ${formatFileSize(totalSize)}. Maximum ${formatFileSize(limits.maxTotalSize)} allowed.`,
+        limits,
+        'maxTotalSize',
+      ),
+  },
+];
+
+/**
+ * Where the home page is, when it is one folder down: the shallowest nested
+ * `index.html`, if exactly one folder holds it. A site deployed from the
+ * folder above its build is the common way to miss the root, so the refusal
+ * names the folder to publish instead.
+ */
+function nestedIndexFolder(paths: readonly string[]): string | undefined {
+  const suffix = `/${DEPLOYMENT_INDEX_FILENAME}`;
+  const depth = (path: string) => path.split('/').length;
+  const nested = paths.filter((path) => path.endsWith(suffix));
+  if (nested.length === 0) return undefined;
+  const shallowest = Math.min(...nested.map(depth));
+  const top = nested.filter((path) => depth(path) === shallowest);
+  return top.length === 1 ? top[0]?.slice(0, -suffix.length) : undefined;
+}
+
+/**
+ * The rules asked of the deployment as a whole, over the paths of the files
+ * it publishes, after every file has passed {@link FILE_RULES}: it has files,
+ * not more than the plan allows, and a home page at its root. These name no
+ * one file, so a surface that lists refusals per file files them under the
+ * deployment.
+ */
+export const SET_RULES: readonly DeployRule<readonly string[]>[] = [
+  {
+    name: 'files',
+    broken: (paths) => paths.length === 0,
+    sentence: () => 'There are no files to publish.',
+  },
+  {
+    name: 'filesCount',
+    broken: (paths, limits) => paths.length > limits.maxFilesCount,
+    sentence: (paths, limits) =>
+      withSuggestion(
+        `Too many files (${paths.length}). Maximum ${limits.maxFilesCount} files allowed.`,
+        limits,
+        'maxFilesCount',
+      ),
+  },
+  {
+    name: 'index',
+    broken: (paths) => !paths.includes(DEPLOYMENT_INDEX_FILENAME),
+    sentence: (paths) => {
+      const sentence = `There's no ${DEPLOYMENT_INDEX_FILENAME} at the top of your site. It's the page visitors see first, so your site needs one.`;
+      const folder = nestedIndexFolder(paths);
+      return folder
+        ? `${sentence} There's one in ${folder}/. If that's your site, publish that folder instead.`
+        : sentence;
+    },
+  },
+];
+
+/** The first rule a file breaks, or `undefined`. */
+export function firstBrokenRule(
+  file: DeployRuleFile,
+  limits: PlatformLimits,
+): DeployRule<DeployRuleFile> | undefined {
+  return FILE_RULES.find((rule) => rule.broken(file, limits));
+}
+
+/** The first rule the deployment as a whole breaks, or `undefined`. */
+export function brokenSetRule(
+  paths: readonly string[],
+  limits: PlatformLimits,
+): DeployRule<readonly string[]> | undefined {
+  return SET_RULES.find((rule) => rule.broken(paths, limits));
+}
+
+/**
+ * Why a deployment of these files is refused, as the one sentence a person
+ * reads, or `undefined` when every rule holds: each file in order against
+ * {@link FILE_RULES}, then the whole against {@link SET_RULES}. The files are
+ * the ones the deployment publishes, an empty file never among them.
+ */
+export function deployRefusal(
+  files: readonly { readonly path: string; readonly size: number }[],
+  limits: PlatformLimits,
+): string | undefined {
+  let totalSize = 0;
+  for (const { path, size } of files) {
+    totalSize += size;
+    const file = { path, size, totalSize };
+    const rule = firstBrokenRule(file, limits);
+    if (rule) return rule.sentence(file, limits);
+  }
+  const paths = files.map((file) => file.path);
+  return brokenSetRule(paths, limits)?.sentence(paths, limits);
+}
+
+// =============================================================================
 // COMMON RESPONSE PATTERNS
 // =============================================================================
 

@@ -35,9 +35,10 @@ own; only a subpath entry (`schemas`) is a separate file.
 | Picker Accept Hint | `WEB_FILE_ACCEPT` — the `accept` value for a browser file picker. A **hint, never a rule**: `accept` can express only an allowlist while the platform's rule is a blocklist, so this list is necessarily narrower than what the platform hosts and must never decide whether a file may be deployed. The invariant that matters — the picker never offers what the platform will refuse — is fenced in `cloudflare/api/tests/lib/blocklist.test.ts`, which holds this published string against the list it owns. |
 | Filename Character Validation | `UNSAFE_FILENAME_CHARS`, `hasUnsafeChars()` |
 | Unbuilt Project Markers | `UNBUILT_PROJECT_MARKERS`, `hasUnbuiltMarker()` |
+| Deploy Rules | Every rule a deployment's files are held to, by the API at its declaration and by every client before it sends a byte (see "Deploy rules"): `FILE_RULES` (name, extension, project, path, file size, running total), `SET_RULES` (files, count, and the home page, `DEPLOYMENT_INDEX_FILENAME` at the root), `firstBrokenRule`, `brokenSetRule`, `deployRefusal`, and the two predicates they read, `validateFileName` and `isDeployablePath` (+ `MAX_PATH_BYTES`) |
 | Common Responses | `PingResponse` (`timestamp` in unix seconds) |
 | Credential Shapes | The one address for credential vocabulary: `AUTH_BASE_PATH` (the identity mount — API server and web auth client read the same path), `AuthMethod`, `API_KEY` / `DEPLOY_TOKEN` / `OAUTH_TOKEN` / `CALLER` (namespaced shape constants), and **both halves of the one Bearer slot** — `readBearerValue` READS it (RFC 7235 §2.1 scheme fold; absence stays the caller's own question) and `TokenKind` + `classifyToken` DISPATCH on what came out, both sides of the wire — plus `OAuthScope` |
-| Deployment Config Constants | `DEPLOYMENT_CONFIG_FILENAME`, and `assertShipJsonSyntax` (syntax only, never schema). The single-page routing config is the platform's to write, so its content lives with its one writer, the API (`cloudflare/api/src/lib/platform-files.ts`); every deploy asks for it unless it sends `DEPLOY_FIELDS.SPA` `false` (`DeploymentUploadOptions.spaDetect`) |
+| Deployment Config Constants | `DEPLOYMENT_CONFIG_FILENAME` (its sibling, `DEPLOYMENT_INDEX_FILENAME`, is under "Deploy Rules"), and `assertShipJsonSyntax` (syntax only, never schema). The single-page routing config is the platform's to write, so its content lives with its one writer, the API (`cloudflare/api/src/lib/platform-files.ts`); every deploy asks for it unless it sends `DEPLOY_FIELDS.SPA` `false` (`DeploymentUploadOptions.spaDetect`) |
 | Validation Utilities | `validateIdempotencyKey` (+ `IDEMPOTENCY_KEY_CONSTRAINTS`, which owns the header NAME as well as the format — see `CALLER.HEADER` for the same reasoning), `normalizeVia` (moved from the API 2026-08-06: a client reaches the same verdict offline, which is this file's own test for a format rule), `readBearerValue` (the Authorization header's scheme fold — see "The credential shape law"), `validateToken` (classify, then apply the population's format rules via one shared prefixed-credential helper), `validateApiKey`, `validateDeployToken`, `validateOAuthToken`, `validateCaller`, `validateApiUrl`, `isDeployment`, `validateTtl` (+ `TTL_CONSTRAINTS` — see "One lifetime grammar") |
 | SPA Check Types | `SPACheckRequest`, `SPACheckResponse` |
 | Static File | `StaticFile` (cross-environment file representation) |
@@ -500,6 +501,39 @@ card, and the API's own size refusals. It qualifies under the stopping rule the
 same way the deadline does: several holders, and drift between them silent
 (a table saying `180.0Kb` beside a card saying `180 KB` is not an error anything
 raises).
+
+## Deploy rules (the "Deploy Rules" section)
+
+**One table of rules, one sentence each, and every judge reads it.** The API
+judges a deployment's declared files by it (`validateUpload`,
+`cloudflare/api/src/lib/validation.ts`), the SDK judges its files by it before
+the first request (both deploy pipelines throw the first broken rule;
+`validateFiles` lists them), and drop shows the SDK's verdict. So a refusal
+reads the same wherever it is made, and a rule cannot be added to one judge
+and not the others.
+
+- **`FILE_RULES`**, each file in order, the running total included, the first
+  broken rule reported: a file that breaks two reports the first, because
+  fixing it may fix the other.
+- **`SET_RULES`**, the deployment as a whole, after every file: it has files,
+  no more than the plan allows, and a home page, `index.html` at its root,
+  exactly (`DEPLOYMENT_INDEX_FILENAME`). ShipStatic publishes websites, and a
+  website starts at its home page. There is no exception, a `ship.json` that
+  redirects `/` included: a redirect-only site carries an `index.html` nobody
+  sees. When exactly one folder holds the shallowest nested `index.html`, the
+  refusal names it, since publishing the folder above a build is the common
+  way to miss the root.
+- **Every sentence is complete on its own** and names its file once (the
+  rules about the set name none), so every surface shows it as it is.
+- **A limit's sentence ends with the way forward the API delivered**
+  (`PlatformLimits.suggestions`), so the client never learns a plan name.
+- **The files judged are the files published**: a caller leaves out the empty
+  ones, which no deployment stores.
+
+The rules are format, not policy, by this package's test: each is computed
+from the files alone, and the API refuses the same files the same way. The
+two inputs that are policy arrive as data: the limits and the blocklist, from
+`/limits`.
 
 ## Console paths (the "Console Paths" section)
 
