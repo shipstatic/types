@@ -1332,7 +1332,7 @@ export const API_PATHS = {
   SETUP: '/setup',
   /**
    * The single-page question, asked without deploying. A deploy that sends
-   * {@link DEPLOY_FIELDS.SPA_DETECT} `true` is asked it at its declaration, so
+   * {@link DEPLOY_FIELDS.SPA} `true` is asked it at its declaration, so
    * a client never needs this path to get the routing config: it answers the
    * clients that predate the field, which ask here and write the config
    * themselves.
@@ -1388,9 +1388,11 @@ export const DEPLOY_FIELDS = {
    * shipped, the platform adds the routing config that serves every path from
    * `index.html`. The question is asked of the `index.html` the asking request
    * carries. A client sends `true` unless
-   * {@link DeploymentUploadOptions.spaDetect} is `false`.
+   * {@link DeploymentUploadOptions.spaDetect} is `false`: the option and the
+   * field are two names for two layers. This is production's own field and
+   * meaning, kept as they are, since a wire name is never renamed.
    */
-  SPA_DETECT: 'spaDetect',
+  SPA: 'spa',
   /**
    * @internal The build settings, first-party `/upload` only and meaningful
    * only with `BUILD`: the command to run instead of the manifest's build
@@ -2447,13 +2449,16 @@ export const DEPLOYMENT_INDEX_FILENAME = 'index.html';
 export const MAX_PATH_BYTES = 1000;
 
 /**
- * A deploy path as the deployment stores it: one leading slash names the same
+ * A deploy path as the deployment stores it: ONE leading slash names the same
  * path, so it is dropped. Every rule and every store compares paths in this
  * form, so `index.html` and `/index.html` are one file wherever they are
- * judged.
+ * judged. Two leading slashes are not one, so `//index.html` is left as it is
+ * and {@link isDeployablePath} refuses its empty segment. That makes the
+ * function idempotent: a path canonical once is canonical however many times
+ * a boundary asks again, so every judge and every store sees one identity.
  */
 export function canonicalDeployPath(path: string): string {
-  return path.startsWith('/') ? path.slice(1) : path;
+  return path.startsWith('/') && !path.startsWith('//') ? path.slice(1) : path;
 }
 
 /**
@@ -3848,7 +3853,7 @@ export interface DeploymentUploadOptions {
    * Whether the platform asks the single-page question of the files and, when
    * `index.html` is an empty application shell and no `ship.json` is shipped,
    * adds the routing config that serves every path from `index.html`
-   * ({@link DEPLOY_FIELDS.SPA_DETECT}). Default `true`; `false` deploys the
+   * ({@link DEPLOY_FIELDS.SPA}). Default `true`; `false` deploys the
    * files as a standard host, where a missing path is a 404.
    */
   spaDetect?: boolean;

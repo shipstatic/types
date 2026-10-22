@@ -311,8 +311,40 @@ describe('canonicalDeployPath', () => {
     ['index.html', 'index.html'],
     ['/index.html', 'index.html'],
     ['/blog/a.html', 'blog/a.html'],
+    ['//index.html', '//index.html'],
+    ['///index.html', '///index.html'],
   ])('%j → %j', (path, canonical) => {
     expect(canonicalDeployPath(path)).toBe(canonical);
+  });
+
+  it.each(['index.html', '/index.html', '//index.html', '///index.html'])(
+    'changes nothing when asked again: %j',
+    (path) => {
+      const once = canonicalDeployPath(path);
+      expect(canonicalDeployPath(once)).toBe(once);
+    },
+  );
+});
+
+describe('leading slashes', () => {
+  it.each([
+    ['index.html', true],
+    ['/index.html', true],
+    ['//index.html', false],
+    ['///index.html', false],
+  ])('%j is deployable: %s', (path, deployable) => {
+    expect(isDeployablePath(path)).toBe(deployable);
+  });
+
+  it('refuses //index.html by the path rule, never reading it as the home page', () => {
+    expect(deployRefusal(sent('//index.html'), LIMITS)).toBe(
+      'File "//index.html" can\'t be published: a folder or file name in its path starts with a dot, is empty, or is too long.',
+    );
+  });
+
+  it('refuses it however many times the path was made canonical before the rules', () => {
+    const once = canonicalDeployPath('//index.html');
+    expect(deployRefusal(sent(once), LIMITS)).toMatch(/^File "\/\/index\.html" can't be published/);
   });
 });
 
