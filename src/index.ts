@@ -1330,6 +1330,11 @@ export const API_PATHS = {
   PLANS: '/plans',
   PING: '/ping',
   SETUP: '/setup',
+  /**
+   * The single-page question, asked before an upload. Served for the
+   * clients published before {@link DEPLOY_FIELDS.SPA}: they ask here and
+   * write the routing config themselves. Current clients send the field.
+   */
   SPA_CHECK: '/spa-check',
   UPLOAD: '/upload',
 } as const;
@@ -1346,8 +1351,8 @@ export const API_PATHS = {
  * restated the strings the API parses, with nothing comparing them.
  *
  * `FILES` carries one entry per file (the API reads it with `getAll`); every
- * other field is single. The `@internal` flags are serialized as the literal
- * string `'true'` and belong to first-party surfaces only.
+ * other field is single. Flags are serialized as the literal string
+ * `'true'`; the `@internal` ones belong to first-party surfaces only.
  */
 export const DEPLOY_FIELDS = {
   /** One entry per file — read with `getAll`. */
@@ -1373,7 +1378,14 @@ export const DEPLOY_FIELDS = {
   BUILD: 'build',
   /** @internal Server-processing flag — first-party `/upload` only. */
   PRERENDER: 'prerender',
-  /** @internal Server-processing flag — first-party `/upload` only. */
+  /**
+   * Ask the single-page question of the deployment's files: when its
+   * `index.html` is an empty application shell and it ships no `ship.json`,
+   * the platform adds the routing config that serves every path from
+   * `index.html`. Sent on the declaring request, which then carries the root
+   * `index.html` as it carries the root `ship.json`. The SDK sends it unless
+   * {@link DeploymentUploadOptions.spaDetect} is `false`.
+   */
   SPA: 'spa',
   /**
    * @internal The build settings, first-party `/upload` only and meaningful
@@ -2719,34 +2731,6 @@ export type OAuthScopeType = (typeof OAuthScope)[keyof typeof OAuthScope];
 
 export const DEPLOYMENT_CONFIG_FILENAME = 'ship.json';
 
-/** Default ship.json config for SPA routing. Single source of truth — used by both API and SDK. */
-export const SPA_DEFAULT_CONFIG = {
-  rewrites: [{ source: '/(.*)', destination: '/index.html' }],
-} as const;
-
-/**
- * The `/spa-check` pre-flight's client-side envelope: which file is the
- * check's subject, and how large it may be before a client skips the call.
- *
- * One fact with three holders until this export — the API's config declared
- * the cap, the SDK's `checkSPA` hardcoded `100 * 1024`, and prose restated
- * "100KB". `INDEX_FILE` is the selection rule (the file whose content rides
- * `SPACheckRequest.index`), restated by every client that builds the request.
- *
- * Neither member is a validation boundary: a client over the cap skips the
- * pre-flight and answers "no" itself, which is the answer the server gives an
- * oversized index. Every client holds the cap, in bytes: the server's own
- * route refuses a body over the JSON intake cap, so a client that asked about
- * any index would fail a deploy whose upload succeeds. The n8n node, which
- * cannot import this, restates the number under its contract fence.
- */
-export const SPA_CHECK_CONSTRAINTS = {
-  /** The file whose content is the check's subject. */
-  INDEX_FILE: 'index.html',
-  /** Skip the pre-flight above this many UTF-8 bytes: the server answers no. */
-  MAX_INDEX_BYTES: 100 * 1024,
-} as const;
-
 /**
  * Assert that a ship.json file is *syntactically* loadable. Syntax only —
  * never schema.
@@ -3539,8 +3523,14 @@ export interface DeploymentUploadOptions {
   build?: boolean;
   /** @internal Trigger server-side prerender. Only available via /upload endpoint. */
   prerender?: boolean;
-  /** @internal Trigger server-side SPA detection. Only available via /upload endpoint. */
-  spa?: boolean;
+  /**
+   * Whether the platform asks the single-page question of the files and, when
+   * `index.html` is an empty application shell and no `ship.json` is shipped,
+   * adds the routing config that serves every path from `index.html`
+   * ({@link DEPLOY_FIELDS.SPA}). Default `true`; `false` deploys the files as
+   * a standard host, where a missing path is a 404.
+   */
+  spaDetect?: boolean;
   /**
    * @internal The command the build runs instead of the manifest's own
    * `build` script (`npm run build:site`, `hugo`, …). Only with `build`, only
