@@ -961,13 +961,13 @@ describe('DeploymentVia — the origin vocabulary', () => {
   });
 
   it('carries the wrapper-declared members, pinned by name with their env slot', () => {
-    // `git` and `gmn` are declared by first-party WRAPPERS through the
-    // SHIP_VIA_ENV variable rather than by code any compiler links: the
-    // GitHub Action relabels the CLI, the Gemini extension relabels the
-    // stdio MCP bin, and both live in files (YAML, a JSON manifest) that can
-    // import nothing. Deleting either member, or respelling the variable,
-    // would drop their attribution silently: the readers normalize an
-    // unknown value to their own default by design.
+    // `git` is declared by a first-party WRAPPER through the SHIP_VIA_ENV
+    // variable rather than by code any compiler links: the GitHub Action
+    // relabels the CLI from YAML, which can import nothing. `gmn` stays a
+    // member with no sender today (the Gemini extension names the hosted
+    // URL). Deleting a member, or respelling the variable, would drop
+    // attribution silently: the readers normalize an unknown value to their
+    // own default by design.
     expect(SHIP_VIA_ENV).toBe('SHIP_VIA');
     expect(DeploymentVia.GIT).toBe('git');
     expect(DeploymentVia.GMN).toBe('gmn');

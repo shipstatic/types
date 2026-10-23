@@ -33,12 +33,11 @@ export type DeploymentStatusType = (typeof DeploymentStatus)[keyof typeof Deploy
  * member here and every future one:
  *
  * - **Where the platform ships CODE, the code declares it.** `web`, `sdk`,
- *   `cli`, `git`, `n8n`, `vsc` and `gmn` are surfaces this platform authors,
- *   so each names itself in its own source and nothing external is needed to
+ *   `cli`, `git`, `n8n` and `vsc` are surfaces this platform authors, so
+ *   each names itself in its own source and nothing external is needed to
  *   tell them apart. A first-party WRAPPER counts as code even when it is a
- *   manifest: the GitHub Action and the Gemini extension each compose an
- *   invocation of a platform executable and relabel it through
- *   {@link SHIP_VIA_ENV}.
+ *   manifest: the GitHub Action composes an invocation of the `ship` CLI and
+ *   relabels it through {@link SHIP_VIA_ENV}.
  *
  * **And only a surface that DEPLOYS gets a member — `@shipstatic/drop` is the
  * recorded refusal.** The widget collects and validates files and hands raw
@@ -87,7 +86,10 @@ export const DeploymentVia = {
   CLD: 'cld',
   /** Channel: the Cursor marketplace listing → `mcp.<domain>/crs`. */
   CRS: 'crs',
-  /** The Gemini CLI extension. */
+  /**
+   * The Gemini CLI extension. Nothing sends it today: the extension's manifest
+   * names the hosted MCP's bare URL, so its traffic reads `mcp`.
+   */
   GMN: 'gmn',
   /**
    * A deploy that reached the REST API naming no origin at all — the
@@ -2026,9 +2028,9 @@ export class ShipError extends Error {
    *
    * `message` is REQUIRED and has no default here. The API is the only
    * producer of that sentence, and a default in this file would be a second
-   * owner of one fact — see CLAUDE.md, "The Constellation Law" (stopping
-   * rule). It is also the first factory whose status is fixed rather than
-   * defaulted: a maintenance refusal is 503 or it is not this error
+   * owner of one fact (CLAUDE.md, "Validation: format vs policy", on when a
+   * fact earns an owner). It is also the first factory whose status is fixed
+   * rather than defaulted: a maintenance refusal is 503 or it is not this error
    * (`build` is the second, on the same reasoning).
    */
   static maintenance(message: string, details?: unknown): ShipError {
@@ -3650,8 +3652,8 @@ export const SHIP_ENV = {
  * not otherwise reach, so this variable is its one way to name the surface
  * the traffic is really from. Two executables read it through
  * {@link normalizeVia}: the `ship` CLI (default `cli`; the GitHub Action
- * sets `git`) and the stdio MCP bin (default `mcp`; the Gemini CLI
- * extension sets `gmn`). In-process SDK consumers pass the programmatic
+ * sets `git`) and the stdio MCP bin (default `mcp`; no first-party wrapper
+ * sets it today). In-process SDK consumers pass the programmatic
  * `via` option instead: same destination, different mechanism.
  *
  * Deliberately not a member of {@link SHIP_ENV}, which is the SDK's ambient
