@@ -2900,11 +2900,9 @@ export const DEPLOY_TOKEN = {
  * **The prefix must be applied at the MINT, never as a display wrapper.** The
  * authorization server hashes what it stores and the API hashes what it is
  * presented, so the prefix has to be inside the hashed string on both sides.
- * `@better-auth/oauth-provider` offers a `prefix.opaqueAccessToken` option
- * that prepends AFTER hashing and strips on its own read paths; using it would
- * store a hash of the UNPREFIXED token and silently break the platform's read
- * arm. The API therefore mints through `generateOpaqueAccessToken` — recorded
- * beside the config in `cloudflare/api/src/lib/auth/instance.ts`.
+ * A prefix option that prepends AFTER hashing would store a hash of the
+ * UNPREFIXED token and silently break the platform's read arm, so the API
+ * mints the prefixed token itself.
  */
 export const OAUTH_TOKEN = {
   /** Prefix that identifies an OAuth access token. */
