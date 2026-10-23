@@ -295,9 +295,8 @@ Two defects it closed, both live:
 **workerd is a recorded gap, not an oversight.** It rejects with a plain
 `Error`, no code, and two unrelated sentences for its two failure modes, so
 nothing can classify it honestly and it lands on `Api`. Not patched with a
-dialect string, because the one consumer running ship there
-(`cloudflare/mcp`) reaches the API through a service BINDING — in-process, and
-therefore not a source of transport rejections at all.
+dialect string, because the one consumer running ship there reaches the API
+in-process, and is therefore not a source of transport rejections at all.
 
 **Abort and timeout are read from `name` before the `instanceof Error` gate.**
 A `DOMException` satisfies that gate in all six runtimes measured, so the arm
@@ -360,9 +359,8 @@ status-shaped field to anything else.
 | `paused` | the plan fact | instant or null |
 
 **`status` has exactly ONE owner, and it is not in this package.**
-`domainStatus(row)` lives in the platform's `cloudflare/shared/db/domains.ts`,
-beside `domainMapping(row)`, and the two are held to each other by a fence
-that plants implications as literals. The `DomainStatus` constant here states
+The platform derives it, beside the record that decides what a domain
+serves, and holds the two to each other. The `DomainStatus` constant here states
 the precedence in its docblock as the PUBLISHED RECORD of that rule, never as
 a second implementation: a consumer reads the word and switches on it. A
 consumer that recomputes it from `deployment` and `verification` has become
@@ -373,12 +371,9 @@ wore a green "success" dot for months.
 `verified` is monotonic: no verdict clears it, so a domain whose records move
 away keeps the stamp and reads "not verified now, last was <date>". It answers
 a HISTORY question (has this ever verified) where `verification` answers the
-present one, and the platform read the instant as a boolean at eight decision
-points until 2026-09-21 — which made it contradict itself on a drifted row,
-calling the domain `unverified` on the wire while every DNS door refused it as
-already verified. Clearing the stamp instead was refused because the verifier
-gates four once-only consequences of a first verification on it; the record is
-`cloudflare/CLAUDE.md`, "Domain rows and their KV mapping".
+present one. Reading the instant as a boolean makes a drifted domain read as
+verified and unverified at once. Clearing the stamp is refused, because a
+first verification has once-only consequences that the stamp records.
 
 **Why `status` is a repurposed name, once.** Until 3.0.0 it carried the DNS
 enum (`pending`, `partial`, `success`) with `paused` glued on at the API's
@@ -505,8 +500,7 @@ raises).
 ## Deploy rules (the "Deploy Rules" section)
 
 **One table of rules, one sentence each, and every judge reads it.** The API
-judges a deployment's declared files by it (`validateUpload`,
-`cloudflare/api/src/lib/validation.ts`), the SDK judges its files by it before
+judges a deployment's declared files by it, the SDK judges its files by it before
 the first request (both deploy pipelines throw the first broken rule;
 `validateFiles` lists them), and drop shows the SDK's verdict. So a refusal
 reads the same wherever it is made, and a rule cannot be added to one judge
@@ -526,9 +520,9 @@ and not the others.
   the shallowest nested `index.html` (a site published from the folder above
   its build), the page to rename when there are pages but none at the top (a
   single `report.html`), and a small page to add when there is no page at all
-  (an image or a PDF on its own). Measured on production before release, the
-  last is the commonest refused upload, so a refusal without it would leave
-  most of the people it reaches with no next step.
+  (an image or a PDF on its own). The last is the commonest refused upload,
+  so a refusal without it would leave most of the people it reaches with no
+  next step.
 - **Every sentence is complete on its own** and names its file once (the
   rules about the set name none), so every surface shows it as it is.
 - **Paths compare in one form** (`canonicalDeployPath`: one leading slash
@@ -748,19 +742,19 @@ Four rules, each of which was broken once and is now structural:
 
 - **One response is outside the four shapes, and it is recorded rather than
   reshaped.** `GET /deployments/:deployment/config` answers the caller's own
-  `ship.json` — re-parsed through the public schema from the byte-exact R2
-  escrow, which is THE record — or `null` when the deployment carries no
+  `ship.json`, re-parsed through the public schema from the byte-exact
+  original the platform keeps, which is THE record, or `null` when the deployment carries no
   config. It is not a projection of a platform entity, so no shape above fits,
   and it has no type here because the document's schema is ship.json's, which
   the API owns and evolves.
 
   **Wrapping it would be the worse answer.** An envelope would make a caller
   unwrap a platform shape to reach a document the platform did not author,
-  against the whole point of the escrow. `null` rather than a 404 for the same
+  against the whole point of keeping the original. `null` rather than a 404 for the same
   reason it is cheap: `Deployment.config` is a boolean on the entity, so
   "is there one" is already answered before anyone asks for it — this endpoint
   answers with the document or its absence. Its two mid-transition cases
-  (escrow not yet written, cleanup already swept) answer like a no-config
+  (the original not yet stored, cleanup already swept) answer like a no-config
   deployment deliberately, while a missing record on a LIVE deployment is
   storage drift and raises a 500 loudly.
 
@@ -813,48 +807,12 @@ estate depends on this one; from then, the law above holds without it.
 
 ### Admin types
 
-**The operator surface does not ship here.** `AdminAccount`,
-`AdminDeployment`, `AdminDomain`, `AdminToken`, `AdminActivity`,
-`AdminStats` and the `/admin/*` page shapes live in
-`web/my/src/features/admin/types.ts` and nowhere else. Do not move them,
-mirror them, or add a sibling for a new operator endpoint.
-
-The two-consumer rule above is what makes this need saying: those types
-genuinely have two consumers (`cloudflare/api` produces, `web/my` consumes),
-so the general rule argues *for* promoting them. It is overridden here. This
-package is published to npm, so its contents are the platform's public
-vocabulary — shipping the operator schema would enumerate every internal
-column, filter, and lifecycle field we hold on an account to anyone who runs
-`npm install`. Reach is the cost, not correctness.
-
-**The price is paid in `web/my`, deliberately — and this is the one place it
-is written down.** With no shared type, nothing compile-checks the operator
-wire against its client. By 2026-07-28 the two had drifted by sixteen fields:
-`web/my` declared nine the API never sent — five of which
-(`status`, `units`, `synced`, `grace`, `overrides`) it also *rendered*, so
-those columns had shown an empty cell on every row since the table was
-written — and omitted seven the API did send. Among the phantoms was the
-billing reference, read as `sub` where the API has always sent `billing`,
-which left the operator's delete-billing action permanently unreachable
-because its visibility was gated on that field.
-
-Two things hold the seam instead of a compiler:
-`cloudflare/api/tests/integration/list-contract.test.ts` spells out all five
-operator row shapes and fails when a projection changes, and the header of
-`web/my`'s `features/admin/types.ts` states the obligation. A new operator
-column touches both files in one commit or it is drift.
-
-If the operator surface ever needs a third consumer, that is the moment to
-reopen this — a private `@shipstatic/admin-types` package, not this one.
-
-**`AccountOverrides` left for the same reason, in 2026-08 (the billing
-rewrite).** It had sat here since before the rule was written, and it was
-never anything but operator surface: an operator's per-account grant of extra
-capacity, produced and consumed by `cloudflare/api` alone — no SDK reads it,
-and `web/my` declares the admin row shapes itself. Published, it enumerated
-the platform's cap keys to anyone running `npm install`, and it made the cap
-rename a three-repository lock-step for a type with one holder. It lives in
-`cloudflare/shared/plans.ts` now, beside the table it overrides.
+**The operator surface does not ship here.** The operator console's row types
+live with the console and nowhere else: this package is published, so the
+operator schema here would enumerate every internal field the platform holds
+to anyone who runs `npm install`. Do not move them, mirror them, or add a
+sibling for a new operator endpoint, even though they have two consumers. The
+per-account capacity grant (`AccountOverrides`) stays out for the same reason.
 
 **Its siblings never entered.** The per-plan `Limits` (request sizes) and
 `Grants` (may this plan act at all — is it billed, is it paid) have exactly
@@ -906,18 +864,12 @@ the named check watched to fail, reverted).
    **Reading the slot has one owner too, as of 2026-08-14.** `readBearerValue`
    is the RFC 7235 §2.1 scheme fold — case-insensitive on the SCHEME, never on
    the credential's own bytes — and it lives here beside `classifyToken`
-   because they are two halves of one wire boundary. It had two hand-rolled
-   holders (the api middleware's `readCredential`, the mcp worker's
-   `readBearer`), and the platform has paid for getting the rule wrong twice:
-   a spec-conformant `bearer ship-…` client was refused for as long as the
-   API's test was case-sensitive, and `@better-auth/oauth-provider` carries
-   the same defect in four places today — which is exactly why the platform
-   folds the scheme itself and hands that provider a bare token. **The
+   because they are two halves of one wire boundary: every reader of the slot
+   folds the scheme here, and a spec-conformant `bearer ship-…` is a valid
+   header. **The
    recorded refusal to own a `Bearer` CONSTANT still stands and is a different
    thing**: that is RFC vocabulary, the same reason this package owns no
-   `"POST"`. A parser is not a spelling. Operator decision, taken over a
-   `cloudflare/shared/` placement that would have avoided a publish convoy —
-   the convoy is the cost of one owner, not a reason to accept two.
+   `"POST"`. A parser is not a spelling.
 
 3. **No prefix is a prefix of another.** This is why the populations are named
    on different axes — `ship-` for the product, `deploy-` for the capability,

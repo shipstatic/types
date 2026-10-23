@@ -3004,12 +3004,9 @@ const BEARER_SCHEME = 'bearer ';
  * everywhere it is used — `ship-`/`deploy-`/`oauth-` are lowercase hex, and
  * folding them would make a credential match values it is not.
  *
- * **This platform has paid for the rule twice, which is why it has an owner
- * rather than a convention.** A spec-conformant `bearer ship-…` client was
- * refused for as long as the API's scheme test was spelled case-sensitively;
- * and `@better-auth/oauth-provider` carries the same defect in four places
- * today (`startsWith("Bearer ")`), which is precisely why the platform folds
- * the scheme itself and hands the provider a bare token.
+ * **It has an owner rather than a convention** because a case-sensitive
+ * scheme test refuses a spec-conformant `bearer ship-…` client, and every
+ * reader of the slot folds it here.
  *
  * **ABSENCE is deliberately not this function's business.** A missing header
  * and an unreadable one are different facts, and the callers that care split
