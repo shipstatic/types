@@ -87,8 +87,9 @@ export const DeploymentVia = {
   /** Channel: the Cursor marketplace listing → `mcp.<domain>/crs`. */
   CRS: 'crs',
   /**
-   * The Gemini CLI extension. Nothing sends it today: the extension's manifest
-   * names the hosted MCP's bare URL, so its traffic reads `mcp`.
+   * The Gemini CLI extension, before plugin 3.1. Only those older installs
+   * send it: the extension now names the hosted MCP's bare URL, which reads
+   * `mcp`.
    */
   GMN: 'gmn',
   /**
@@ -3652,8 +3653,8 @@ export const SHIP_ENV = {
  * not otherwise reach, so this variable is its one way to name the surface
  * the traffic is really from. Two executables read it through
  * {@link normalizeVia}: the `ship` CLI (default `cli`; the GitHub Action
- * sets `git`) and the stdio MCP bin (default `mcp`; no first-party wrapper
- * sets it today). In-process SDK consumers pass the programmatic
+ * sets `git`) and the stdio MCP bin (default `mcp`; only Gemini extension
+ * installs older than plugin 3.1 set it, to `gmn`). In-process SDK consumers pass the programmatic
  * `via` option instead: same destination, different mechanism.
  *
  * Deliberately not a member of {@link SHIP_ENV}, which is the SDK's ambient

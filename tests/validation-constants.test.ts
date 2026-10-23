@@ -963,9 +963,9 @@ describe('DeploymentVia — the origin vocabulary', () => {
   it('carries the wrapper-declared members, pinned by name with their env slot', () => {
     // `git` is declared by a first-party WRAPPER through the SHIP_VIA_ENV
     // variable rather than by code any compiler links: the GitHub Action
-    // relabels the CLI from YAML, which can import nothing. `gmn` stays a
-    // member with no sender today (the Gemini extension names the hosted
-    // URL). Deleting a member, or respelling the variable, would drop
+    // relabels the CLI from YAML, which can import nothing. `gmn` is sent
+    // only by Gemini extension installs older than plugin 3.1 (the extension
+    // now names the hosted URL). Deleting a member, or respelling the variable, would drop
     // attribution silently: the readers normalize an unknown value to their
     // own default by design.
     expect(SHIP_VIA_ENV).toBe('SHIP_VIA');
