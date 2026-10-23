@@ -610,6 +610,10 @@ The console-only sub-paths (the `qr`, `labels` and `delete` modals,
 `settings/name` and the rest) stay in the console's `lib/routes.ts`: no
 server emits them, so they have one holder.
 
+**Refused: moving `errandOf`, `accountOfPath`, `SECTIONS` or the other
+readers out of this package.** The API reads them too, so they are the
+grammar's, not the console's.
+
 ## Consumers
 
 | Package | Uses |
