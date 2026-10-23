@@ -5,7 +5,7 @@
  * spelling reintroduced by a merge is invisible until an account lands on a
  * plan no `CHECK` constraint accepts. The retired names are listed literally
  * because a renamed identifier is absent from the constitution by construction
- * — nothing can derive them (root `CLAUDE.md`, "The prose fence").
+ * — nothing can derive them (the platform's prose fence works the same way).
  *
  * Watched to fail before being trusted: a fence you have not watched fail is
  * not a fence.
