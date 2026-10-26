@@ -4515,6 +4515,45 @@ export function extractSubdomain(domain: string, platformDomain: string): string
 }
 
 /**
+ * A deployment's address under a platform domain: the hostname it is served
+ * at, its deployment id as the one first label.
+ *
+ * @example addressOf("happy-cat-abc1234", "shipstatic.com") → "happy-cat-abc1234.shipstatic.com"
+ */
+export function addressOf(deployment: string, platformDomain: string): string {
+  return `${deployment}.${platformDomain}`;
+}
+
+/**
+ * The deployment a hostname names: its first label, split off literally, when
+ * that label is a deployment id; otherwise null. Reads the id out of an
+ * address and out of a bare id alike. `isDeployment` alone is not this test,
+ * because it also accepts a dotted suffix.
+ *
+ * @example deploymentOf("happy-cat-abc1234.shipstatic.com") → "happy-cat-abc1234"
+ * @example deploymentOf("happy-cat-abc1234") → "happy-cat-abc1234"
+ * @example deploymentOf("www.shipstatic.com") → null
+ */
+export function deploymentOf(hostname: string): string | null {
+  const dot = hostname.indexOf('.');
+  const label = dot === -1 ? hostname : hostname.slice(0, dot);
+  return isDeployment(label) ? label : null;
+}
+
+/**
+ * Whether a hostname is a deployment's address under this platform domain:
+ * exactly one label in the deployment grammar, then the platform domain.
+ *
+ * @example isAddress("happy-cat-abc1234.shipstatic.com", "shipstatic.com") → true
+ * @example isAddress("happy-cat-abc1234.docs.shipstatic.com", "shipstatic.com") → false
+ * @example isAddress("www.shipstatic.com", "shipstatic.com") → false
+ */
+export function isAddress(hostname: string, platformDomain: string): boolean {
+  const deployment = deploymentOf(hostname);
+  return deployment !== null && hostname === addressOf(deployment, platformDomain);
+}
+
+/**
  * Generate HTTPS URL for a deployment hostname.
  */
 export function generateDeploymentUrl(deployment: string): string {

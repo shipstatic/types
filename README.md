@@ -165,6 +165,9 @@ import {
   isPlatformDomain,
   isCustomDomain,
   extractSubdomain,
+  addressOf,
+  deploymentOf,
+  isAddress,
   generateDeploymentUrl,
   generateDomainUrl,
 } from '@shipstatic/types';
