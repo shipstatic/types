@@ -4515,13 +4515,13 @@ export function extractSubdomain(domain: string, platformDomain: string): string
 }
 
 /**
- * A deployment's address under a platform domain: the hostname it is served
- * at, its deployment id as the one first label.
+ * A deployment's address under a serve domain: the hostname it is served at,
+ * its deployment id as the one first label.
  *
  * @example addressOf("happy-cat-abc1234", "shipstatic.com") → "happy-cat-abc1234.shipstatic.com"
  */
-export function addressOf(deployment: string, platformDomain: string): string {
-  return `${deployment}.${platformDomain}`;
+export function addressOf(deployment: string, serveDomain: string): string {
+  return `${deployment}.${serveDomain}`;
 }
 
 /**
@@ -4541,16 +4541,16 @@ export function deploymentOf(hostname: string): string | null {
 }
 
 /**
- * Whether a hostname is a deployment's address under this platform domain:
- * exactly one label in the deployment grammar, then the platform domain.
+ * Whether a hostname is a deployment's address under this serve domain:
+ * exactly one label in the deployment grammar, then the serve domain.
  *
  * @example isAddress("happy-cat-abc1234.shipstatic.com", "shipstatic.com") → true
  * @example isAddress("happy-cat-abc1234.docs.shipstatic.com", "shipstatic.com") → false
  * @example isAddress("www.shipstatic.com", "shipstatic.com") → false
  */
-export function isAddress(hostname: string, platformDomain: string): boolean {
+export function isAddress(hostname: string, serveDomain: string): boolean {
   const deployment = deploymentOf(hostname);
-  return deployment !== null && hostname === addressOf(deployment, platformDomain);
+  return deployment !== null && hostname === addressOf(deployment, serveDomain);
 }
 
 /**

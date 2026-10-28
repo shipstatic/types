@@ -56,7 +56,7 @@ section of `index.ts`; only a subpath entry (`schemas`) is its own file.
 | Billing Types | `BillingInterval`, `Plan`, `PlansResponse`, `BillingPortalSession`, `PlanChangeRefusalDetails`: vocabulary only, spelled as Stripe spells it (`tests/billing-vocabulary.test.ts`). No price or cap is published; `GET /plans` delivers them |
 | Activity Types | `ActivityEvent`, `UserVisibleActivityEvent`, `Activity`, `ActivityMeta`, `ActivityListResponse`. Deliberately **no** `ActivityResource`: the SDK does not reach `GET /activities`, and an interface nothing implements is dead surface |
 | File Upload Types | `FileValidationStatus`, `ValidationIssue`, `ValidatableFile`, `FileValidationResult`, `UploadedFile` |
-| Domain Utilities | `isPlatformDomain`, `isCustomDomain`, `extractSubdomain`, `addressOf`, `deploymentOf`, `isAddress` (a deployment's address: its id as the one first label under a platform domain; `isDeployment` alone accepts any dotted suffix, so it is not the address test), `generate*Url` |
+| Domain Utilities | `isPlatformDomain`, `isCustomDomain`, `extractSubdomain`, `addressOf`, `deploymentOf`, `isAddress` (a deployment's address: its id as the one first label under a serve domain; `isDeployment` alone accepts any dotted suffix, so it is not the address test), `generate*Url` |
 | Label Utilities | `LABEL_CONSTRAINTS`, `LABEL_PATTERN`, `validateLabel`, `validateLabels`, `serializeLabels`, `deserializeLabels` |
 | Password Utilities | `PASSWORD_CONSTRAINTS`, `validatePassword` |
 
