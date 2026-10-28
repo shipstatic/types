@@ -4479,39 +4479,40 @@ export interface UploadedFile {
 // =============================================================================
 
 /**
- * Check if a domain is a platform domain (subdomain of our platform).
- * Platform domains are free and don't require DNS verification.
+ * Whether a domain is a platform domain: a domain under this serve domain.
+ * Platform domains are free and need no DNS verification.
  *
  * @example isPlatformDomain("www.shipstatic.com", "shipstatic.com") → true
  * @example isPlatformDomain("example.com", "shipstatic.com") → false
  */
-export function isPlatformDomain(domain: string, platformDomain: string): boolean {
-  return domain.endsWith(`.${platformDomain}`);
+export function isPlatformDomain(domain: string, serveDomain: string): boolean {
+  return domain.endsWith(`.${serveDomain}`);
 }
 
 /**
- * Check if a domain is a custom domain (not a platform domain).
- * Custom domains are billable and require DNS verification.
+ * Whether a domain is a custom domain: any domain that is not a platform
+ * domain under this serve domain. Custom domains are billable and need DNS
+ * verification.
  *
  * @example isCustomDomain("example.com", "shipstatic.com") → true
  * @example isCustomDomain("www.shipstatic.com", "shipstatic.com") → false
  */
-export function isCustomDomain(domain: string, platformDomain: string): boolean {
-  return !isPlatformDomain(domain, platformDomain);
+export function isCustomDomain(domain: string, serveDomain: string): boolean {
+  return !isPlatformDomain(domain, serveDomain);
 }
 
 /**
- * Extract subdomain from a platform domain.
- * Returns null if not a platform domain.
+ * The part of a platform domain before its serve domain. Null for any other
+ * domain.
  *
  * @example extractSubdomain("www.shipstatic.com", "shipstatic.com") → "www"
  * @example extractSubdomain("example.com", "shipstatic.com") → null
  */
-export function extractSubdomain(domain: string, platformDomain: string): string | null {
-  if (!isPlatformDomain(domain, platformDomain)) {
+export function extractSubdomain(domain: string, serveDomain: string): string | null {
+  if (!isPlatformDomain(domain, serveDomain)) {
     return null;
   }
-  return domain.slice(0, -(platformDomain.length + 1)); // +1 for the dot
+  return domain.slice(0, -(serveDomain.length + 1)); // +1 for the dot
 }
 
 /**
