@@ -871,9 +871,8 @@ export interface Caps {
    */
   readonly deployments: number;
   /**
-   * Names the customer chose under the platform's own suffix
-   * (`my-app.shipstatic.com`) — every row, paused ones included, by the same
-   * rule as custom domains.
+   * Platform domains (`my-app.shipstatic.com`): every row, paused ones
+   * included, by the same rule as custom domains.
    */
   readonly platformDomains: number;
   /**

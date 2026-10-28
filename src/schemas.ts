@@ -262,7 +262,7 @@ export const CapsSchema = z.object({
   platformDomains: z
     .int()
     .nonnegative()
-    .describe('Names chosen under the platform\'s own suffix, e.g. "my-app.shipstatic.com".'),
+    .describe('ShipStatic domains, like "my-app.shipstatic.com", paused ones included.'),
   customDomains: z
     .int()
     .nonnegative()
