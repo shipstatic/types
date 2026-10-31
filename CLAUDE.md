@@ -100,7 +100,11 @@ Notes on the sections:
   subprocess wrapper's origin relabel (the CLI and the stdio MCP bin read it),
   outside `SHIP_ENV` because the SDK never does. `MY_API_KEY_URL` is the
   console deep link every authentication-teaching surface quotes: the bare
-  `consolePaths().apiKey()` on the production console.
+  `consolePaths().apiKey()` on the production console. It is computed inside
+  a function marked `/* @__PURE__ */`, so a bundle that never reads it (the
+  platform's frozen router) drops it and `consolePaths` with it; a plain
+  template keeps both. **A top-level constant computed by a call carries
+  the same mark**, or every bundle of this package carries the call.
 - **A label** is a word (`production`) or a key and value split by one `:`
   (`env:production`), stored lowercase and shown as stored. The platform reads
   nothing from a key or a value, so one key may carry several values.
@@ -493,8 +497,12 @@ it, and no fence reaches across the two codebases.
   whose subject is a person emits the bare form, which the console opens in
   the account the person entered last.
 - **`SECTIONS`** lists an account's sections by first segment, with the
-  `owner` flag on the three that mean the reader's OWN account (`upgrade`,
-  `success`, `api-key`): a bare path into one opens the person's own account.
+  `owner` flag on the four that mean the reader's OWN account (`upgrade`,
+  `success`, `billing`, `api-key`): a bare path into one opens the person's
+  own account. `billing` is the one way into the Stripe Customer Portal: the
+  console mints the session there on arrival, so a link (a letter's
+  included) can name it, where a Portal session URL is minted per request
+  and expires.
   The console mounts every section twice from it. Modals carry their own owner
   rule in the console; the flag is the section's alone.
 - **The claim is a section, not a door.** A claim link

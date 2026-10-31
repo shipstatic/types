@@ -38,6 +38,7 @@ describe('consolePaths', () => {
     expect(scoped.upgrade('pro')).toBe('/k3v9x2m7q1w8e5r4/upgrade/pro');
     expect(scoped.success()).toBe('/k3v9x2m7q1w8e5r4/success');
     expect(scoped.successAfterCheckout()).toBe('/k3v9x2m7q1w8e5r4/success?upgrading=true');
+    expect(scoped.billing()).toBe('/k3v9x2m7q1w8e5r4/billing');
     expect(scoped.apiKey()).toBe('/k3v9x2m7q1w8e5r4/api-key');
     expect(scoped.claim('abc123')).toBe('/k3v9x2m7q1w8e5r4/claim/abc123');
   });
@@ -57,6 +58,7 @@ describe('consolePaths', () => {
     expect(bare.upgrade('pro')).toBe('/upgrade/pro');
     expect(bare.success()).toBe('/success');
     expect(bare.successAfterCheckout()).toBe('/success?upgrading=true');
+    expect(bare.billing()).toBe('/billing');
     expect(bare.apiKey()).toBe('/api-key');
     expect(bare.claim('abc123')).toBe('/claim/abc123');
   });
@@ -67,11 +69,11 @@ describe('consolePaths', () => {
 });
 
 describe('SECTIONS', () => {
-  it('flags the three sections that mean the reader’s own account', () => {
+  it('flags the four sections that mean the reader’s own account', () => {
     const owned = Object.entries(SECTIONS)
       .filter(([, section]) => section.owner)
       .map(([name]) => name);
-    expect(owned).toEqual(['upgrade', 'success', 'api-key']);
+    expect(owned).toEqual(['upgrade', 'success', 'billing', 'api-key']);
   });
 });
 
@@ -168,7 +170,15 @@ describe('the matchers', () => {
       'k3v9x2m7q1w8e5r4',
     );
     expect(accountOfPath('/foo')).toBe('foo');
-    for (const path of ['/', '/domains', '/api-key', '/login', '/claim/abc', '/admin/accounts']) {
+    for (const path of [
+      '/',
+      '/domains',
+      '/api-key',
+      '/billing',
+      '/login',
+      '/claim/abc',
+      '/admin/accounts',
+    ]) {
       expect(accountOfPath(path), path).toBeNull();
     }
   });

@@ -1563,7 +1563,7 @@ export type ErrorType = (typeof ErrorType)[keyof typeof ErrorType];
  * from the server, so `fromHttpResponse` will not trust them even if a
  * misbehaving server claims one in `body.error`.
  */
-const CLIENT_ONLY_ERROR_TYPES = new Set<string>([
+const CLIENT_ONLY_ERROR_TYPES = /* @__PURE__ */ new Set<string>([
   ErrorType.Network,
   ErrorType.Timeout,
   ErrorType.Cancelled,
@@ -1626,9 +1626,8 @@ const ERROR_CATEGORIES = {
  * `CLIENT_ONLY_ERROR_TYPES` so adding a new server-producible type to
  * `ErrorType` is automatically picked up.
  */
-const SERVER_PRODUCIBLE_ERROR_TYPES = new Set<string>(
-  Object.values(ErrorType).filter((t) => !CLIENT_ONLY_ERROR_TYPES.has(t)),
-);
+const SERVER_PRODUCIBLE_ERROR_TYPES = /* @__PURE__ */ (() =>
+  new Set<string>(Object.values(ErrorType).filter((t) => !CLIENT_ONLY_ERROR_TYPES.has(t))))();
 
 /**
  * Ceiling on a message adopted from a **non-JSON** error body — a foreign
@@ -2377,7 +2376,8 @@ const WEB_FILE_EXTENSIONS = [
  * blocklist became the API's, and moving it was the price of that: a fence
  * belongs with whichever side can change and break it.
  */
-export const WEB_FILE_ACCEPT: string = WEB_FILE_EXTENSIONS.map((ext) => `.${ext}`).join(',');
+export const WEB_FILE_ACCEPT: string = /* @__PURE__ */ (() =>
+  WEB_FILE_EXTENSIONS.map((ext) => `.${ext}`).join(','))();
 
 // =============================================================================
 // FILENAME CHARACTER VALIDATION
@@ -2418,7 +2418,7 @@ export function hasUnsafeChars(filename: string): boolean {
  * Path segment names that indicate an unbuilt project was uploaded instead of build output.
  * Used for early detection in CLI, browser, and server validation.
  */
-export const UNBUILT_PROJECT_MARKERS: ReadonlySet<string> = new Set([
+export const UNBUILT_PROJECT_MARKERS: ReadonlySet<string> = /* @__PURE__ */ new Set([
   'node_modules',
   'package.json',
 ]);
@@ -3381,8 +3381,9 @@ export interface StaticFile {
  * `owner` marks a section that means the person's OWN account: a bare path
  * into it opens the person's own account rather than the one entered last.
  * A pricing link's `/upgrade/pro` and the published API-key link speak about
- * the reader's plan and key, and `/success` is where a purchase lands: only
- * an owner buys, and a person owns exactly one account. Modals inside a
+ * the reader's plan and key, `/success` is where a purchase lands, and
+ * `/billing` is where it is paid for and managed: only an owner buys, and a
+ * person owns exactly one account. Modals inside a
  * section carry their own owner rule in the console; this flag is the
  * section's alone.
  */
@@ -3398,6 +3399,9 @@ export const SECTIONS = {
   claim: { owner: false },
   upgrade: { owner: true },
   success: { owner: true },
+  // The Stripe Customer Portal, opened on arrival: the one way into it, for
+  // every Manage billing in the console and for the failed-payment letter.
+  billing: { owner: true },
   'api-key': { owner: true },
 } as const satisfies Readonly<Record<string, { readonly owner: boolean }>>;
 
@@ -3473,6 +3477,8 @@ export function consolePaths(account?: string) {
     success: (): string => at('/success'),
     /** The success page, marked as the landing of a Stripe Checkout return. */
     successAfterCheckout: (): string => at(`/success?${marker('checkout')}`),
+    /** The page that opens this account's Stripe Customer Portal on arrival. */
+    billing: (): string => at('/billing'),
     apiKey: (): string => at('/api-key'),
   };
 }
@@ -3490,10 +3496,13 @@ interface Journey {
  * a sign-in email's link opens, `/login/link/<token>`: the door's object, the
  * link's token, rides the path, and the journey still rides the query.
  */
-const login = Object.assign(({ next }: Journey = {}): string => withNext('/login', next), {
-  link: ({ token, next }: Journey & { readonly token: string }): string =>
-    withNext(`/login/link/${token}`, next),
-});
+const login = /* @__PURE__ */ Object.assign(
+  ({ next }: Journey = {}): string => withNext('/login', next),
+  {
+    link: ({ token, next }: Journey & { readonly token: string }): string =>
+      withNext(`/login/link/${token}`, next),
+  },
+);
 
 /**
  * The doors: the pages a PERSON stands on before an account is known, one
@@ -3671,8 +3680,15 @@ export const SHIP_VIA_ENV = 'SHIP_VIA';
  *
  * Production-branded by design: published artifacts name the product, never
  * an environment (root `CLAUDE.md`, "Environment-Aware URLs").
+ *
+ * Computed inside a function marked pure, so a bundle that never reads it
+ * drops it, and `consolePaths` with it: the platform's frozen router imports
+ * this package and must not carry the console's path grammar. A plain
+ * template here would keep the call, since a bundler cannot prove
+ * `consolePaths()` free of side effects.
  */
-export const MY_API_KEY_URL = `https://my.shipstatic.com${consolePaths().apiKey()}`;
+export const MY_API_KEY_URL = /* @__PURE__ */ (() =>
+  `https://my.shipstatic.com${consolePaths().apiKey()}`)();
 
 /**
  * How long an anonymous deployment lives before it expires.
