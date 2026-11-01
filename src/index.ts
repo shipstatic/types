@@ -320,10 +320,10 @@ export type DomainStatusType = (typeof DomainStatus)[keyof typeof DomainStatus];
  * **The CNAME divides the three because it is the record that serves the
  * site.** `partial` says the site is served and only the redirect is missing;
  * an apex A record without the CNAME serves nothing, so it is `pending`. The
- * verifier's drift line depends on exactly that: on a domain that has verified
- * before, a move into `pending` is the site no longer being served, and it is
- * the drift the operator is told about (`cloudflare/consumer`'s
- * `verifyDnsMapping`).
+ * owner's letter does not depend on that: for the owner, DNS is valid or
+ * invalid, `verified` against either other word, and on a domain that has
+ * verified before the move out of `verified` is the one edge the operator and
+ * the owner are told about (`cloudflare/consumer`'s `verifyDnsMapping`).
  *
  * Written by the DNS verifier and at birth, and by nothing else. **It is the
  * only field that says whether DNS is verified NOW**: its sibling instant
