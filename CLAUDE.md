@@ -41,7 +41,7 @@ section of `index.ts`; only a subpath entry (`schemas`) is its own file.
 | Picker Accept Hint | `WEB_FILE_ACCEPT`: a file picker's `accept`, a **hint, never a rule** (an allowlist, where the platform's rule is a blocklist). The API's suite holds the invariant that the picker never offers what the platform refuses |
 | Filename Character Validation | `UNSAFE_FILENAME_CHARS`, `hasUnsafeChars()` |
 | Unbuilt Project Markers | `UNBUILT_PROJECT_MARKERS`, `hasUnbuiltMarker()` |
-| Deploy Rules | `FILE_RULES`, `SET_RULES`, `firstBrokenRule`, `brokenSetRule`, `deployRefusal`, `isPublishedFile`, `DeployEntry`, `canonicalDeployPath`, `namedTwice`, `DEPLOYMENT_INDEX_FILENAME`, and the predicates they read, `validateFileName` and `isDeployablePath` (+ `MAX_PATH_BYTES`). See "Deploy rules" |
+| Deploy Rules | `FILE_RULES`, `SET_RULES`, `firstBrokenRule`, `brokenSetRule`, `deployRefusal`, `isPublishedFile`, `DeployEntry`, `canonicalDeployPath`, `namedTwice`, `DEPLOYMENT_INDEX_FILENAME`, and the predicates they read, `validateFileName`, `isDeployablePath` (+ `MAX_PATH_BYTES`) and its structural half `isHiddenPath`. See "Deploy rules" |
 | Common Responses | `PingResponse` (`timestamp` in unix seconds) |
 | Credential Shapes | `AUTH_BASE_PATH`, `AuthMethod`, `API_KEY` / `DEPLOY_TOKEN` / `OAUTH_TOKEN` / `CALLER`, both halves of the Bearer slot (`readBearerValue` reads it, `TokenKind` + `classifyToken` dispatch on it), `OAuthScope` |
 | Deployment Config Constants | `DEPLOYMENT_CONFIG_FILENAME`, `assertShipJsonSyntax` (syntax only, never schema) |

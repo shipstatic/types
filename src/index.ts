@@ -2474,23 +2474,37 @@ export function namedTwice(path: string): string {
 }
 
 /**
+ * Whether a path has a hidden segment: a non-empty segment that starts with a
+ * dot, a root-level `.well-known` excepted (RFC 8615). Empty segments are
+ * skipped, the way the platform's serving workers read a request path, so a
+ * stored key and a request path are judged by one rule. It is the structural
+ * half of {@link isDeployablePath}: no file can be deployed at a hidden path,
+ * and no visitor can fetch one, which is why the platform keeps its own files
+ * under a deployment at hidden paths.
+ */
+export function isHiddenPath(path: string): boolean {
+  return path
+    .split('/')
+    .filter((segment) => segment !== '')
+    .some(
+      (segment, index) => segment.startsWith('.') && !(segment === '.well-known' && index === 0),
+    );
+}
+
+/**
  * Whether a deploy path can be served as it is: within {@link MAX_PATH_BYTES},
- * with no empty segment, none over 255 characters, and none starting with a
- * dot, root-level `.well-known` excepted (RFC 8615). The router refuses to
- * serve a hidden segment, so a file at one could never be reached. Read in
- * its canonical form ({@link canonicalDeployPath}).
+ * with no empty segment, none over 255 characters, and no hidden segment
+ * ({@link isHiddenPath}). The router refuses to serve a hidden segment, so a
+ * file at one could never be reached. Read in its canonical form
+ * ({@link canonicalDeployPath}).
  */
 export function isDeployablePath(path: string): boolean {
   const normalized = canonicalDeployPath(path);
   if (new TextEncoder().encode(normalized).length > MAX_PATH_BYTES) return false;
-  return normalized
+  const wellFormed = normalized
     .split('/')
-    .every(
-      (segment, index) =>
-        segment !== '' &&
-        segment.length <= 255 &&
-        (!segment.startsWith('.') || (segment === '.well-known' && index === 0)),
-    );
+    .every((segment) => segment !== '' && segment.length <= 255);
+  return wellFormed && !isHiddenPath(normalized);
 }
 
 /**

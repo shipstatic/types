@@ -17,6 +17,7 @@ import {
   FILE_RULES,
   firstBrokenRule,
   isDeployablePath,
+  isHiddenPath,
   isPublishedFile,
   MAX_PATH_BYTES,
   namedTwice,
@@ -303,6 +304,32 @@ describe('isDeployablePath', () => {
     [`${'a/'.repeat(MAX_PATH_BYTES / 2)}x`, false],
   ])('%j → %s', (path, expected) => {
     expect(isDeployablePath(path)).toBe(expected);
+  });
+});
+
+describe('isHiddenPath', () => {
+  it.each([
+    ['.ship/x', true],
+    ['.ship.json', true],
+    ['.declaration.json', true],
+    ['.well-known/.ship/x', true],
+    ['.env', true],
+    ['/.env', true],
+    ['blog/.well-known/x', true],
+    ['a/./b.html', true],
+    ['a/../b.html', true],
+    ['.Well-Known/x', true],
+    ['.well-known/x', false],
+    ['/.well-known/x', false],
+    ['//.well-known/x', false],
+    ['.well-known', false],
+    ['index.html', false],
+    ['my.folder/app.config.js', false],
+    ['a//b.html', false],
+    ['', false],
+    ['/', false],
+  ])('%j → %s', (path, expected) => {
+    expect(isHiddenPath(path)).toBe(expected);
   });
 });
 
