@@ -66,8 +66,8 @@ describe('isAddress', () => {
 });
 
 describe('isDeployment, unchanged', () => {
-  // The router reads a bare id with it, and the API a full hostname: both
-  // forms stay accepted, which is why it is not the address test.
+  // The API reads a deployment id in a path and a full hostname in a body:
+  // both forms stay accepted, which is why it is not the address test.
   it('accepts a bare id and a dotted suffix alike', () => {
     expect(isDeployment('happy-cat-abc1234')).toBe(true);
     expect(isDeployment('happy-cat-abc1234.shipstatic.com')).toBe(true);

@@ -10,10 +10,11 @@
  * as "drop this if unused". A call whose arguments compute is wrapped in a
  * function marked pure, since a bundler keeps a marked call's arguments.
  *
- * The consumer this protects is the platform's frozen router, whose built
- * bundle is held to a recorded digest: without the marks it carried the
- * console's path grammar, the error vocabulary's derived sets and the doors,
- * and any change to them moved a digest the router never asked to move.
+ * The consumer this protects is a bundle that reads one constant and nothing
+ * else, as the platform's frozen serving worker does: without the marks it
+ * would carry the console's path grammar, the error vocabulary's derived sets
+ * and the doors, and any change to them would change a bundle that never
+ * asked for them.
  * `CLAUDE.md`, "Platform constants", states the rule.
  */
 
