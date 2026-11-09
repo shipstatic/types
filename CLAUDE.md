@@ -102,7 +102,7 @@ Notes on the sections:
   console deep link every authentication-teaching surface quotes: the bare
   `consolePaths().apiKey()` on the production console. It is computed inside
   a function marked `/* @__PURE__ */`, so a bundle that never reads it (the
-  platform's frozen router) drops it and `consolePaths` with it; a plain
+  platform's frozen serving worker) drops it and `consolePaths` with it; a plain
   template keeps both. **A top-level constant computed by a call carries
   the same mark**, or every bundle of this package carries the call.
 - **A label** is a word (`production`) or a key and value split by one `:`

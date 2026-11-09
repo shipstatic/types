@@ -2499,7 +2499,7 @@ export function isHiddenPath(path: string): boolean {
 /**
  * Whether a deploy path can be served as it is: within {@link MAX_PATH_BYTES},
  * with no empty segment, none over 255 characters, and no hidden segment
- * ({@link isHiddenPath}). The router refuses to serve a hidden segment, so a
+ * ({@link isHiddenPath}). The serving worker refuses to serve a hidden segment, so a
  * file at one could never be reached. Read in its canonical form
  * ({@link canonicalDeployPath}).
  */
@@ -3701,7 +3701,7 @@ export const SHIP_VIA_ENV = 'SHIP_VIA';
  * an environment (root `CLAUDE.md`, "Environment-Aware URLs").
  *
  * Computed inside a function marked pure, so a bundle that never reads it
- * drops it, and `consolePaths` with it: the platform's frozen router imports
+ * drops it, and `consolePaths` with it: the platform's frozen serving worker imports
  * this package and must not carry the console's path grammar. A plain
  * template here would keep the call, since a bundler cannot prove
  * `consolePaths()` free of side effects.
@@ -4848,7 +4848,7 @@ export const PASSWORD_CONSTRAINTS = {
  * value.
  *
  * The trim is canonical: at upload, the API hashes the trimmed value; at
- * unlock, the router trims submissions before hashing. Submission and storage
+ * unlock, the serving worker trims submissions before hashing. Submission and storage
  * agree byte-for-byte. Length validation runs on the trimmed value because
  * that's the user's actual intent — and it disarms a class of invisible
  * foot-guns (trailing newlines from copy/paste, mobile auto-spacing,
