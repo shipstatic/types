@@ -2449,10 +2449,10 @@ export function hasUnbuiltMarker(filePath: string): boolean {
 export const DEPLOYMENT_INDEX_FILENAME = 'index.html';
 
 /**
- * Max deploy-path bytes, counted in UTF-8. R2 keys cap at 1,024 bytes, and a
- * file is stored twice: at `<deployment>/<path>` and at
- * `<deployment>/.ship/<path>`. The deployment prefix consumes up to 22 bytes
- * and `.ship/` six more, which leaves 996.
+ * Max path bytes, counted in UTF-8. The budget is the longest key a path can
+ * have, `<deployment>/.ship/<path>`, within R2's 1,024-byte key cap: the
+ * deployment and its slash take up to 22 bytes and `.ship/` six more, which
+ * leaves 996.
  */
 export const MAX_PATH_BYTES = 996;
 
