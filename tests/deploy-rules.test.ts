@@ -290,6 +290,36 @@ describe('validateFileName', () => {
   );
 });
 
+describe('the path budget', () => {
+  // Four folders of 200 bytes each ('a' × 199 and the slash), then the file.
+  const folders = `${'a'.repeat(199)}/`.repeat(4);
+  // 'é' is two bytes in UTF-8, so these files are counted in bytes, not characters.
+  const accented = (n: number) => `${folders}${'é'.repeat(n)}b.html`;
+
+  it('is 996 bytes', () => {
+    expect(MAX_PATH_BYTES).toBe(996);
+  });
+
+  it.each([
+    [996, true, `${folders}${'b'.repeat(191)}.html`],
+    [997, false, `${folders}${'b'.repeat(192)}.html`],
+    [996, true, accented(95)],
+    [997, false, accented(95).replace('b.html', 'bb.html')],
+  ])('a path of %i bytes → %s', (bytes, expected, path) => {
+    expect(new TextEncoder().encode(path).length).toBe(bytes);
+    expect(isDeployablePath(path)).toBe(expected);
+  });
+
+  it("refuses a 997-byte path with the path rule's own sentence", () => {
+    const file = { ...clean, path: `${folders}${'b'.repeat(192)}.html` };
+    const broken = firstBrokenRule(file, LIMITS);
+    expect(broken?.name).toBe('path');
+    expect(broken?.sentence(file, LIMITS)).toBe(
+      `File "${file.path}" can't be published: a folder or file name in its path starts with a dot, is empty, or is too long.`,
+    );
+  });
+});
+
 describe('isDeployablePath', () => {
   it.each([
     ['index.html', true],

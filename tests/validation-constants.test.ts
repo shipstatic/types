@@ -1028,7 +1028,7 @@ describe('DEPLOY_REQUEST_CONSTRAINTS', () => {
 
   it('holds the largest file any plan allows, with its framing, under the edge', () => {
     const largestPlanFile = 50 * 1024 * 1024;
-    const longestPath = 1000;
+    const longestPath = 996;
     const framing = 2 * DEPLOY_REQUEST_CONSTRAINTS.PART_OVERHEAD + longestPath;
     expect(largestPlanFile + framing).toBeLessThan(DEPLOY_REQUEST_CONSTRAINTS.MAX_BYTES);
     expect(DEPLOY_REQUEST_CONSTRAINTS.MAX_BYTES).toBeLessThan(100 * 1024 * 1024);
