@@ -1892,6 +1892,8 @@ export class ShipError extends Error {
    * - `TimeoutError` → `ShipError.timeout(...)` — a deadline expired; the
    *   message names the timeout, and the type is in the network CATEGORY
    *   because nothing was exchanged
+   * - `NotReadableError`, on the rejection or as its cause → `ShipError.file(...)`:
+   *   a file in the request body changed or went away, so no retry can help
    * - A transport failure → `ShipError.network(...)` — see `isTransportFailure`
    *   for what each runtime offers as evidence
    * - Any other `Error` → `ShipError(Api, ...)` (no HTTP status — fetch never reached the server)
@@ -1936,6 +1938,16 @@ export class ShipError extends Error {
       // rather than relayed: "The operation was aborted due to timeout" is
       // the mechanism, not the news.
       return ShipError.timeout(`${op} timed out`, { cause });
+    }
+
+    // A file the request was sending could no longer be read: it changed or
+    // went away after it was picked. The runtime says so by name, on the
+    // rejection or as its cause (Node rejects `fetch failed` with it beneath).
+    // Read ahead of the transport arm, which would claim it and have the
+    // caller send the same unreadable file again.
+    const reason = (cause as { cause?: { name?: unknown } } | null | undefined)?.cause?.name;
+    if (name === 'NotReadableError' || reason === 'NotReadableError') {
+      return ShipError.file('A file changed while it was being uploaded. Deploy again.');
     }
 
     if (cause instanceof Error) {
@@ -3343,33 +3355,23 @@ export interface SPACheckResponse {
 // =============================================================================
 
 /**
- * Represents a file that has been processed and is ready for deploy.
- * Used across the platform (API, SDK, CLI) for file operations.
+ * One file of a deployment, ready to send: where it is served, how large it
+ * is, the MD5 of its bytes, and the bytes themselves. What the SDK's file
+ * pipeline produces, and what its manifest, its request planner and its
+ * request bodies are built from.
  */
 export interface StaticFile {
-  /**
-   * The content of the file.
-   * In Node.js, this is typically a `Buffer`.
-   * In the browser, this is typically a `File` or `Blob` object.
-   */
-  content: File | Buffer | Blob;
-  /**
-   * The desired path for the file on the server, relative to the deployment root.
-   * Should include the filename, e.g., `images/photo.jpg`.
-   */
+  /** The deploy path, relative to the deployment root, no leading slash. */
   path: string;
-  /**
-   * The original absolute file system path (primarily used in Node.js environments).
-   * This helps in debugging or associating the server path back to its source.
-   */
-  filePath?: string;
-  /**
-   * The MD5 hash (checksum) of the file's content.
-   * This is calculated by the SDK before deploy if not provided.
-   */
-  md5?: string;
-  /** The size of the file in bytes. */
+  /** The file's size in bytes. */
   size: number;
+  /** The MD5 of the file's bytes, 32 lowercase hex characters. */
+  md5: string;
+  /**
+   * The file's bytes, as a `Blob` on every platform: a browser's `File`, or
+   * in Node the file on disk, which is read only when it is hashed or sent.
+   */
+  content: Blob;
 }
 
 // =============================================================================

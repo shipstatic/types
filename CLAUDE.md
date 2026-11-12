@@ -47,7 +47,7 @@ section of `index.ts`; only a subpath entry (`schemas`) is its own file.
 | Deployment Config Constants | `DEPLOYMENT_CONFIG_FILENAME`, `assertShipJsonSyntax` (syntax only, never schema) |
 | Validation Utilities | `validateIdempotencyKey` (+ `IDEMPOTENCY_KEY_CONSTRAINTS`, which owns the header name too), `normalizeVia`, `validateToken`, `validateApiKey`, `validateDeployToken`, `validateOAuthToken`, `validateCaller`, `validateApiUrl`, `isDeployment`, `validateTtl` (+ `TTL_CONSTRAINTS`) |
 | SPA Check Types | `SPACheckRequest`, `SPACheckResponse` |
-| Static File | `StaticFile` (cross-environment file representation) |
+| Static File | `StaticFile`: one file of a deployment, ready to send (path, size, MD5, and its bytes as a `Blob` on every platform) |
 | Person Name | `personName`, `personShortName`: what a person is ADDRESSED by (name, else address; the first word where room is narrow). A surface that STATES a name as a fact does not call them |
 | Time Remaining / File Size | `formatTimeRemaining`, `formatDuration` / `formatFileSize` (see their sections) |
 | Console Paths | `consolePaths`, `SECTIONS`, `doors`, the matchers, `billingReturnOf` (see "Console paths") |
@@ -244,7 +244,8 @@ Consumer (the SDK, the console):
                      // (401 Authentication, 403 Forbidden, 429 RateLimit, else Api)
   fetch threw     →  throw ShipError.fromFetchError(cause, operationName)
                      // ShipError passes through • AbortError: Cancelled
-                     // TimeoutError: Timeout • transport: Network • other: Api
+                     // TimeoutError: Timeout • NotReadableError: File
+                     // transport: Network • other: Api
 ```
 
 **Conventions:**
@@ -294,6 +295,11 @@ gate.** A `DOMException` passes that gate in every runtime measured, so the
 suite plants a non-`Error` shape to hold the arm.
 
 - `AbortError` → `Cancelled`: someone stopped it on purpose.
+- `NotReadableError`, on the rejection or as its cause → **`File`**: a file in
+  the request body changed or went away after it was picked. Node rejects
+  `fetch failed` with it beneath, which the transport arm would claim, so it
+  is read first: nothing was exchanged, and sending the same file again
+  cannot go differently.
 - `TimeoutError` → **`Timeout`**, message `"<op> timed out"`, with
   `isNetworkError()` **true**: no server answered and nobody cancelled, so
   nothing was exchanged, which puts a timeout in the same retryable class as a

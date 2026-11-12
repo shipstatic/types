@@ -919,6 +919,28 @@ describe('ShipError.fromFetchError', () => {
       expect(ShipError.fromFetchError(timedOut, 'Ping').type).toBe(ErrorType.Timeout);
     });
 
+    it('a file that changed under the request is a file error, not a network one', () => {
+      // Captured on Node 20 and 22: a body whose file changed after it was
+      // picked rejects `TypeError: fetch failed`, with the reason beneath.
+      // The TypeError alone reads as transport, which a caller retries.
+      const unreadable = Object.assign(new Error('The blob could not be read'), {
+        name: 'NotReadableError',
+      });
+      const beneath = ShipError.fromFetchError(
+        new TypeError('fetch failed', { cause: unreadable }),
+        'Deploy',
+      );
+      expect(beneath.type).toBe(ErrorType.File);
+      expect(beneath.isNetworkError()).toBe(false);
+      expect(beneath.status).toBeUndefined();
+      expect(beneath.message).toBe('A file changed while it was being uploaded. Deploy again.');
+
+      expect(ShipError.fromFetchError(unreadable, 'Deploy').type).toBe(ErrorType.File);
+      // The same TypeError with any other reason beneath stays transport.
+      const refused = new TypeError('fetch failed', { cause: new Error('ECONNREFUSED') });
+      expect(ShipError.fromFetchError(refused, 'Deploy').type).toBe(ErrorType.Network);
+    });
+
     it('a coded Error is transport evidence; an uncoded plain one is not', () => {
       expect(ShipError.fromFetchError(shape('Error', 'x', 'ConnectionRefused')).type).toBe(
         ErrorType.Network,
