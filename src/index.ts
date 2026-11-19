@@ -3979,10 +3979,10 @@ export interface TokenCreateOptions {
 /**
  * Deployment resource interface - the contract all implementations must follow.
  *
- * The interface defines the minimal wire contract; SDK implementations may
- * extend the upload options with runtime concerns (timeout, signal, progress
- * callbacks) by parameterizing: `DeploymentResource<MyUploadOptions>`. The
- * default keeps plain `DeploymentResource` valid for wire-only consumers.
+ * The interface defines the minimal wire contract; the SDK extends the upload
+ * options with its own (`signal`, `pathDetect`) by parameterizing:
+ * `DeploymentResource<DeploymentOptions>`. The default keeps plain
+ * `DeploymentResource` valid for wire-only consumers.
  */
 export interface DeploymentResource<
   UploadOptions extends DeploymentUploadOptions = DeploymentUploadOptions,
