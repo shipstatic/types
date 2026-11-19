@@ -3853,7 +3853,7 @@ export type DeployInput = File[] | string | string[];
 
 /**
  * Options for deployment creation at the API contract level.
- * SDK implementations may extend with additional options (timeout, signal, callbacks, etc.).
+ * The SDK extends it with its own options (`signal`, `pathDetect`).
  */
 export interface DeploymentUploadOptions {
   /** Optional labels for categorization and filtering */
