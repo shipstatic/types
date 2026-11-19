@@ -100,25 +100,27 @@ describe('ShipError factories', () => {
     expect(err.details).toEqual({ log: '[build] Installing dependencies with npm...' });
   });
 
-  it('network → type=Network, no status, cause stored in details', () => {
+  it('network → type=Network, no status, and the cause on error.cause', () => {
     const cause = new Error('Network down');
-    const err = ShipError.network('Connection failed', { cause });
+    const err = ShipError.network('Connection failed', undefined, { cause });
     expect(err.type).toBe(ErrorType.Network);
     expect(err.message).toBe('Connection failed');
     expect(err.status).toBeUndefined();
     expect(err.isNetworkError()).toBe(true);
-    expect((err.details as { cause?: Error } | undefined)?.cause).toBe(cause);
+    expect(err.cause).toBe(cause);
+    expect(err.details).toBeUndefined();
   });
 
   it('timeout → type=Timeout, no status, and inside the network category', () => {
     const cause = new Error('The operation was aborted due to timeout');
-    const err = ShipError.timeout('Deploy timed out', { cause });
+    const err = ShipError.timeout('Deploy timed out', undefined, { cause });
     expect(err.type).toBe(ErrorType.Timeout);
     expect(err.message).toBe('Deploy timed out');
     expect(err.status).toBeUndefined();
     // Distinct type, shared category — the two halves of the decision.
     expect(err.isNetworkError()).toBe(true);
-    expect((err.details as { cause?: Error } | undefined)?.cause).toBe(cause);
+    expect(err.cause).toBe(cause);
+    expect(err.details).toBeUndefined();
   });
 
   it('cancelled → type=Cancelled with no status', () => {
@@ -251,6 +253,33 @@ describe('ShipError.toResponse()', () => {
       expect(response.message).toBe('Invalid input');
       expect(response.status).toBe(400);
       expect(response.details).toEqual({ field: 'email' });
+    });
+
+    it('carries no cause, and no disk path from one', () => {
+      // Node's errno error for a file it could not open: its own fields hold
+      // the path on disk. On `details` it would reach the wire and the CLI's
+      // `--json`; on `error.cause` no serializer reaches it.
+      const errno = Object.assign(
+        new Error("EACCES: permission denied, open '/Users/someone/site/a.txt'"),
+        { code: 'EACCES', errno: -13, syscall: 'open', path: '/Users/someone/site/a.txt' },
+      );
+      const unreadable = Object.assign(new Error('The blob could not be read'), {
+        name: 'NotReadableError',
+        cause: errno,
+      });
+      for (const err of [
+        ShipError.file('We couldn\'t read "a.txt".', { filePath: 'a.txt' }, { cause: errno }),
+        ShipError.network('Deploy failed: fetch failed', undefined, { cause: errno }),
+        ShipError.timeout('Deploy timed out', undefined, { cause: errno }),
+        ShipError.fromFetchError(new TypeError('fetch failed', { cause: unreadable }), 'Deploy'),
+        ShipError.fromFetchError(new TypeError('fetch failed', { cause: errno }), 'Deploy'),
+      ]) {
+        expect(err.cause, err.message).toBeDefined();
+        const wire = JSON.stringify(err.toResponse());
+        expect(wire, err.message).not.toContain('cause');
+        expect(wire, err.message).not.toContain('/Users/someone');
+        expect(wire, err.message).not.toContain('EACCES');
+      }
     });
   });
 
@@ -712,7 +741,8 @@ describe('ShipError.fromFetchError', () => {
     expect(err.type).toBe(ErrorType.Network);
     expect(err.message).toBe('Ping failed: fetch failed');
     expect(err.isNetworkError()).toBe(true);
-    expect((err.details as { cause?: Error })?.cause).toBe(networkErr);
+    expect(err.cause).toBe(networkErr);
+    expect(err.details).toBeUndefined();
   });
 
   it('maps any other Error to ErrorType.Api with operation prefix (no HTTP status)', () => {
@@ -835,7 +865,7 @@ describe('ShipError.fromFetchError', () => {
       expect(err.status).toBeUndefined();
       // The runtime's own sentence is relayed; only the TYPE is normalized.
       expect(err.message).toBe(`Ping failed: ${thrown.message}`);
-      expect((err.details as { cause?: Error })?.cause).toBe(thrown);
+      expect(err.cause).toBe(thrown);
     });
 
     // ── argument errors: fetch judging its own input, not the network ────────
@@ -937,10 +967,11 @@ describe('ShipError.fromFetchError', () => {
 
       const bare = ShipError.fromFetchError(unreadable, 'Deploy');
       expect(bare.type).toBe(ErrorType.File);
-      // What the runtime rejected with rides along, as on the network and
+      // What the runtime rejected with is the cause, as on the network and
       // timeout arms: the sentence names no file, so the cause is the trace.
-      expect((beneath.details as { cause: unknown }).cause).toBeInstanceOf(TypeError);
-      expect((bare.details as { cause: unknown }).cause).toBe(unreadable);
+      expect(beneath.cause).toBeInstanceOf(TypeError);
+      expect(bare.cause).toBe(unreadable);
+      expect(beneath.details).toBeUndefined();
       // The same TypeError with any other reason beneath stays transport.
       const refused = new TypeError('fetch failed', { cause: new Error('ECONNREFUSED') });
       expect(ShipError.fromFetchError(refused, 'Deploy').type).toBe(ErrorType.Network);

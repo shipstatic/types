@@ -1758,7 +1758,14 @@ export interface BuildFailureDetails {
 }
 
 /**
- * Simple unified error class for both API and SDK
+ * Simple unified error class for both API and SDK.
+ *
+ * **A cause is the standard `Error.cause`, never a field of `details`.**
+ * `details` is wire data: `toResponse()` carries it, so the CLI's `--json`
+ * prints it, and a runtime's error there serializes as `{}` or as its errno
+ * fields, a path on disk included. `Error.cause` is where every runtime prints
+ * a cause and where no serializer reaches. The three factories that can be
+ * handed one (`network`, `timeout`, `file`) take it as their third argument.
  */
 export class ShipError extends Error {
   constructor(
@@ -1766,8 +1773,9 @@ export class ShipError extends Error {
     message: string,
     public readonly status?: number,
     public readonly details?: unknown,
+    options?: ErrorOptions,
   ) {
-    super(message);
+    super(message, options);
     this.name = 'ShipError';
   }
 
@@ -1937,25 +1945,27 @@ export class ShipError extends Error {
       // someone to check their Wi-Fi. The runtime's own sentence is dropped
       // rather than relayed: "The operation was aborted due to timeout" is
       // the mechanism, not the news.
-      return ShipError.timeout(`${op} timed out`, { cause });
+      return ShipError.timeout(`${op} timed out`, undefined, { cause });
     }
 
     // A file the request was sending could no longer be read: it changed or
     // went away after it was picked. The runtime says so by name, on the
     // rejection or as its cause (Node rejects `fetch failed` with it beneath).
     // Read ahead of the transport arm, which would claim it and have the
-    // caller send the same unreadable file again. The rejection rides along
-    // as the cause, as it does on every arm that reads one.
+    // caller send the same unreadable file again. The rejection is the
+    // error's cause, as on every arm that reads one.
     const reason = (cause as { cause?: { name?: unknown } } | null | undefined)?.cause?.name;
     if (name === 'NotReadableError' || reason === 'NotReadableError') {
-      return ShipError.file('A file changed while it was being uploaded. Deploy again.', {
-        cause,
-      });
+      return ShipError.file(
+        'A file changed while it was being uploaded. Deploy again.',
+        undefined,
+        { cause },
+      );
     }
 
     if (cause instanceof Error) {
       if (isTransportFailure(cause)) {
-        return ShipError.network(`${op} failed: ${cause.message}`, { cause });
+        return ShipError.network(`${op} failed: ${cause.message}`, undefined, { cause });
       }
       return new ShipError(ErrorType.Api, `${op} failed: ${cause.message}`);
     }
@@ -1966,7 +1976,8 @@ export class ShipError extends Error {
   // Factory methods. Uniform shape `(message, details?)` with two principled
   // exceptions: `notFound` composes its message from (resource, id?), and
   // `business` / `api` accept an optional status because they're the
-  // multi-status fallbacks.
+  // multi-status fallbacks. `network`, `timeout` and `file` take a third
+  // argument, the standard `ErrorOptions`, for the cause (see the class).
 
   static validation(message: string, details?: unknown): ShipError {
     return new ShipError(ErrorType.Validation, message, 400, details);
@@ -2006,8 +2017,8 @@ export class ShipError extends Error {
     return new ShipError(ErrorType.Business, message, status, details);
   }
 
-  static network(message: string, details?: unknown): ShipError {
-    return new ShipError(ErrorType.Network, message, undefined, details);
+  static network(message: string, details?: unknown, options?: ErrorOptions): ShipError {
+    return new ShipError(ErrorType.Network, message, undefined, details, options);
   }
 
   /**
@@ -2017,16 +2028,16 @@ export class ShipError extends Error {
    * there is no HTTP status to report. `isNetworkError()` is true — see
    * `ErrorType.Timeout` for why the category is shared and the type is not.
    */
-  static timeout(message: string, details?: unknown): ShipError {
-    return new ShipError(ErrorType.Timeout, message, undefined, details);
+  static timeout(message: string, details?: unknown, options?: ErrorOptions): ShipError {
+    return new ShipError(ErrorType.Timeout, message, undefined, details, options);
   }
 
   static cancelled(message: string, details?: unknown): ShipError {
     return new ShipError(ErrorType.Cancelled, message, undefined, details);
   }
 
-  static file(message: string, details?: unknown): ShipError {
-    return new ShipError(ErrorType.File, message, undefined, details);
+  static file(message: string, details?: unknown, options?: ErrorOptions): ShipError {
+    return new ShipError(ErrorType.File, message, undefined, details, options);
   }
 
   static config(message: string, details?: unknown): ShipError {

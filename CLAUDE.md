@@ -160,10 +160,10 @@ ShipError.forbidden(message, details?)
 ShipError.authentication(message?, details?)  // see "internal: telemetry" below
 ShipError.rateLimit(message?, details?)
 ShipError.business(message, status?, details?)  // status defaults to 400
-ShipError.network(message, details?)            // pass `{ cause }` for the underlying Error
-ShipError.timeout(message, details?)            // a deadline expired; isNetworkError() is true
+ShipError.network(message, details?, { cause }?)  // the underlying Error is error.cause
+ShipError.timeout(message, details?, { cause }?)  // a deadline expired; isNetworkError() is true
 ShipError.cancelled(message, details?)
-ShipError.file(message, details?)               // pass `{ filePath }` for the path
+ShipError.file(message, details?, { cause }?)     // pass `{ filePath }` for the path
 ShipError.config(message, details?)
 ShipError.api(message, status?, details?)       // status defaults to 500
 ShipError.maintenance(message, details?)        // status FIXED at 503; message required
@@ -180,13 +180,21 @@ ShipError.fromFetchError(cause, operationName?)              // fetch itself thr
 isShipError(error)         // structural guard (survives module duplication in bundles)
 ```
 
+**A cause is `error.cause`, never a field of `details`.** `details` is wire
+data: `toResponse()` carries it and the CLI's `--json` prints it, so a
+runtime's error there serializes as `{}`, or as its errno fields with a path
+on disk. The three factories handed one (`network`, `timeout`, `file`) take
+the standard `ErrorOptions` third, which every runtime prints and no
+serializer reaches. `tests/errors.test.ts` plants an errno error with a path
+and holds the serialized response to carrying neither.
+
 **The five client-only factories (`network`, `timeout`, `cancelled`, `file`,
 `config`) are exactly the statusless ones, and that pairing is load-bearing.**
 `ErrorResponse.status` answers "what would the wire say?". A local pre-check
 that MIRRORS a server rule (blocked extension, label shape, token format)
 keeps the server's type and 400, so the error reads the same wherever it was
-caught. A fault with no server rule to mirror (wrong runtime, unreadable file,
-a CLI's own command grammar) has no status and takes one of these five. The
+caught. A fault with no server rule to mirror (an unreadable file, a CLI's
+own command grammar) has no status and takes one of these five. The
 worked split is "What a status means" in the SDK repo's own instructions.
 
 ### `internal:` telemetry pattern (Authentication errors)
@@ -299,8 +307,8 @@ suite plants a non-`Error` shape to hold the arm.
   the request body changed or went away after it was picked. Node rejects
   `fetch failed` with it beneath, which the transport arm would claim, so it
   is read first: nothing was exchanged, and sending the same file again
-  cannot go differently. The sentence names no file, so the rejection rides
-  along as `details.cause`, as on the timeout and network arms.
+  cannot go differently. The sentence names no file, so the rejection is the
+  error's `cause`, as on the timeout and network arms.
 - `TimeoutError` → **`Timeout`**, message `"<op> timed out"`, with
   `isNetworkError()` **true**: no server answered and nobody cancelled, so
   nothing was exchanged, which puts a timeout in the same retryable class as a
@@ -330,9 +338,9 @@ TokenResource      : create, list, get, delete
 AccountResource    : get
 ```
 
-`upload`'s wide input is `DeployInput` (`File[] | string | string[]`); each
-SDK narrows its `Ship.deploy()` shortcut (`File[]` in the browser,
-`string | string[]` in Node) and validates the resource-layer call at runtime.
+`upload`'s input is `DeployInput` (`File[] | string | string[]`), and the
+SDK's `Ship.deploy()` takes the same in every build: a build with no
+filesystem refuses a path at run time, in words and with no request.
 No `BillingResource` or `KeysResource`: the console calls billing directly.
 
 ### A domain says one derived word, and three raw facts once each
