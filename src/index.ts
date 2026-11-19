@@ -1348,8 +1348,8 @@ export const API_PATHS = {
  * surface beside {@link API_PATHS}. These are the names the API reads from a
  * multipart body on `POST /deployments` and the first-party `/upload`.
  *
- * Declared once because the body has three independent WRITERS — the SDK's
- * Node and browser body builders, and the n8n community node's hand-rolled
+ * Declared once because the body has two independent WRITERS — the SDK's
+ * body builder, and the n8n community node's hand-rolled
  * client (which cannot import this under n8n Cloud's zero-dependency rule,
  * and fences its restated copy instead) — and until this export every writer
  * restated the strings the API parses, with nothing comparing them.
@@ -3382,8 +3382,9 @@ export interface StaticFile {
   /** The MD5 of the file's bytes, 32 lowercase hex characters. */
   md5: string;
   /**
-   * The file's bytes, as a `Blob` on every platform: a browser's `File`, or
-   * in Node the file on disk, which is read only when it is hashed or sent.
+   * The file's bytes, as a `Blob` on every runtime: the `File` a deploy was
+   * handed, or for a path the file on disk, which is read only when it is
+   * hashed or sent.
    */
   content: Blob;
 }
