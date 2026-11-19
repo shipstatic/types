@@ -3838,14 +3838,15 @@ export function formatFileSize(bytes: number, decimals: number = 1): string {
 // =============================================================================
 
 /**
- * Universal deploy input — the union of every shape the SDK accepts.
+ * What a deploy takes: `File`s, or a path, or a list of paths.
  *
- * - **Browser**: `File[]` (typically from `<input type="file">` or drag-and-drop)
- * - **Node**: `string | string[]` (file or directory path(s) on disk; directories are walked)
+ * - **`File[]`**, wherever the SDK runs: a file input, a drop, or content
+ *   made in memory. A file's name is its path and may hold folders.
+ * - **`string | string[]`**, where there is a filesystem (Node, Bun): a file
+ *   or a folder, or a list of them. A folder is walked.
  *
- * Each platform's SDK narrows its `deploy()` signature to the relevant shape
- * and rejects anything else at runtime. Use the structural types directly
- * (`File[]`, `string | string[]`) when writing platform-specific code.
+ * It is one type on every build. A build with no filesystem refuses a path
+ * in words when it is handed one, and makes no request.
  */
 export type DeployInput = File[] | string | string[];
 
