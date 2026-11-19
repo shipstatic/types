@@ -299,7 +299,8 @@ suite plants a non-`Error` shape to hold the arm.
   the request body changed or went away after it was picked. Node rejects
   `fetch failed` with it beneath, which the transport arm would claim, so it
   is read first: nothing was exchanged, and sending the same file again
-  cannot go differently.
+  cannot go differently. The sentence names no file, so the rejection rides
+  along as `details.cause`, as on the timeout and network arms.
 - `TimeoutError` → **`Timeout`**, message `"<op> timed out"`, with
   `isNetworkError()` **true**: no server answered and nobody cancelled, so
   nothing was exchanged, which puts a timeout in the same retryable class as a

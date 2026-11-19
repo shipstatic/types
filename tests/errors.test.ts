@@ -935,7 +935,12 @@ describe('ShipError.fromFetchError', () => {
       expect(beneath.status).toBeUndefined();
       expect(beneath.message).toBe('A file changed while it was being uploaded. Deploy again.');
 
-      expect(ShipError.fromFetchError(unreadable, 'Deploy').type).toBe(ErrorType.File);
+      const bare = ShipError.fromFetchError(unreadable, 'Deploy');
+      expect(bare.type).toBe(ErrorType.File);
+      // What the runtime rejected with rides along, as on the network and
+      // timeout arms: the sentence names no file, so the cause is the trace.
+      expect((beneath.details as { cause: unknown }).cause).toBeInstanceOf(TypeError);
+      expect((bare.details as { cause: unknown }).cause).toBe(unreadable);
       // The same TypeError with any other reason beneath stays transport.
       const refused = new TypeError('fetch failed', { cause: new Error('ECONNREFUSED') });
       expect(ShipError.fromFetchError(refused, 'Deploy').type).toBe(ErrorType.Network);

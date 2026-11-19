@@ -1944,10 +1944,13 @@ export class ShipError extends Error {
     // went away after it was picked. The runtime says so by name, on the
     // rejection or as its cause (Node rejects `fetch failed` with it beneath).
     // Read ahead of the transport arm, which would claim it and have the
-    // caller send the same unreadable file again.
+    // caller send the same unreadable file again. The rejection rides along
+    // as the cause, as it does on every arm that reads one.
     const reason = (cause as { cause?: { name?: unknown } } | null | undefined)?.cause?.name;
     if (name === 'NotReadableError' || reason === 'NotReadableError') {
-      return ShipError.file('A file changed while it was being uploaded. Deploy again.');
+      return ShipError.file('A file changed while it was being uploaded. Deploy again.', {
+        cause,
+      });
     }
 
     if (cause instanceof Error) {
