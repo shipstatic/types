@@ -283,13 +283,13 @@ describe('ShipError.toResponse()', () => {
     });
   });
 
-  // The `internal:` telemetry pattern (see JSDoc on ShipError.authentication
-  // and the dedicated subsection in CLAUDE.md): server-side auth code attaches
-  // a granular tag like `{ internal: 'jwt_missing_subject' }` to record which
-  // strategy/check failed. toResponse() strips the entire details object on
-  // Authentication errors when this key is present, so the wire response is
-  // a clean "Authentication failed" with no leakage.
-  describe('internal: telemetry stripping (Authentication only)', () => {
+  // `internal` is the reserved word for the server's own diagnostics (see
+  // JSDoc on ShipError.authentication and the subsection in CLAUDE.md): a tag
+  // like `{ internal: 'jwt_missing_subject' }` records which check failed.
+  // toResponse() never serializes the key, and an Authentication error
+  // carrying it serializes no details at all, so the wire response is a clean
+  // "Authentication failed".
+  describe('internal: the reserved word no wire carries', () => {
     it('strips details from Authentication errors when details.internal is set', () => {
       const err = ShipError.authentication('Authentication failed', {
         internal: 'jwt_missing_subject',
@@ -305,9 +305,30 @@ describe('ShipError.toResponse()', () => {
       expect(err.toResponse().details).toEqual({ hint: 'reauth' });
     });
 
-    it('does NOT strip details on non-Authentication errors even when details.internal is set', () => {
-      const err = ShipError.validation('bad input', { internal: 'should_not_strip' });
-      expect(err.toResponse().details).toEqual({ internal: 'should_not_strip' });
+    it('drops internal from every other error and keeps the other keys', () => {
+      const err = ShipError.forbidden('Not allowed', {
+        internal: 'owner_required',
+        account: 'paused',
+      });
+      expect(err.toResponse().details).toEqual({ account: 'paused' });
+      // The error itself keeps the tag for the server's logs and tests.
+      expect(err.details).toEqual({ internal: 'owner_required', account: 'paused' });
+    });
+
+    it('serializes no details when internal was the only key', () => {
+      const err = ShipError.api('An unexpected error occurred', 500, {
+        internal: 'stripe_refused',
+      });
+      expect(err.toResponse().details).toBeUndefined();
+      expect('details' in JSON.parse(JSON.stringify(err.toResponse()))).toBe(false);
+    });
+
+    it('leaves details that are not an object as they are', () => {
+      expect(ShipError.validation('bad input', ['a', 'b']).toResponse().details).toEqual([
+        'a',
+        'b',
+      ]);
+      expect(ShipError.validation('bad input', 'internal').toResponse().details).toBe('internal');
     });
 
     it('handles Authentication errors with no details at all', () => {

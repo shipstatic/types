@@ -1767,6 +1767,14 @@ export interface BuildFailureDetails {
  * a cause and where no serializer reaches. The three factories that can be
  * handed one (`network`, `timeout`, `file`) take it as their third argument.
  */
+/** What of an error's `details` crosses the wire: everything but `internal`. */
+function wireDetails(type: ErrorType, details: unknown): unknown {
+  if (typeof details !== 'object' || details === null || !('internal' in details)) return details;
+  if (type === ErrorType.Authentication) return undefined;
+  const { internal: _internal, ...rest } = details as Record<string, unknown>;
+  return Object.keys(rest).length > 0 ? rest : undefined;
+}
+
 export class ShipError extends Error {
   constructor(
     public readonly type: ErrorType,
@@ -1779,20 +1787,20 @@ export class ShipError extends Error {
     this.name = 'ShipError';
   }
 
-  /** Convert to wire format */
+  /**
+   * Convert to wire format.
+   *
+   * `internal` is the reserved word for the server's own diagnostics, and no
+   * wire carries it: a `details.internal` key is dropped, with every other
+   * key kept. An Authentication error tagged with it carries no details at
+   * all (see {@link ShipError.authentication}).
+   */
   toResponse(): ErrorResponse {
-    // Strip authentication details when they carry an `internal` telemetry
-    // tag (see `ShipError.authentication` JSDoc) — these are server-side
-    // diagnostics like 'session_invalid' that must not leak to clients.
-    const authDetails = this.details as { internal?: unknown } | undefined;
-    const details =
-      this.type === ErrorType.Authentication && authDetails?.internal ? undefined : this.details;
-
     return {
       error: this.type,
       message: this.message,
       status: this.status,
-      details,
+      details: wireDetails(this.type, this.details),
     };
   }
 
@@ -1999,15 +2007,15 @@ export class ShipError extends Error {
   /**
    * Construct an Authentication (401) error.
    *
-   * **Telemetry pattern — `details: { internal: '<tag>' }`.** When the
-   * server creates an auth error with an `internal` key in `details`
-   * (e.g. `{ internal: 'session_invalid' }`), `toResponse()` strips the
-   * entire `details` object before serialization. This keeps the wire
-   * response a clean "Authentication failed" while preserving granular
-   * server-side telemetry (which strategy/check failed) for logs and tests.
+   * **Telemetry pattern — `details: { internal: '<tag>' }`.** `internal` is
+   * reserved for the server's own diagnostics on every error, and
+   * `toResponse()` never serializes it. On an auth error carrying it
+   * (e.g. `{ internal: 'session_invalid' }`), `toResponse()` serializes no
+   * `details` at all. This keeps the wire response a clean "Authentication
+   * failed" while preserving granular server-side telemetry (which
+   * strategy/check failed) for logs and tests.
    *
-   * Use this pattern in API auth code; do not put client-visible info under
-   * `internal`. Other `details` keys round-trip normally.
+   * Do not put client-visible info under `internal`.
    */
   static authentication(message: string = 'Authentication required', details?: unknown): ShipError {
     return new ShipError(ErrorType.Authentication, message, 401, details);
@@ -4216,7 +4224,6 @@ export type ActivityEvent =
   // `meta.name` is the new name, and the row's actor is the owner.
   | 'account.create'
   | 'account.update'
-  | 'account.delete'
   | 'account.key.generate'
   | 'account.plan.transition'
   // Person events (internal). `session.create` is a sign-in: a session born
@@ -4277,7 +4284,6 @@ export type ActivityEvent =
   // may become)
   | 'checkout.open'
   // Admin events (not user-visible)
-  | 'admin.account.plan.update'
   | 'admin.account.suspended.update'
   | 'admin.account.ref.update'
   | 'admin.account.labels.update'
@@ -4308,7 +4314,6 @@ export type ActivityEvent =
 export const USER_VISIBLE_EVENTS = [
   'account.create',
   'account.update',
-  'account.delete',
   'account.key.generate',
   'account.plan.transition',
   'deployment.create',

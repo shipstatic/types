@@ -197,21 +197,21 @@ caught. A fault with no server rule to mirror (an unreadable file, a CLI's
 own command grammar) has no status and takes one of these five. The
 worked split is "What a status means" in the SDK repo's own instructions.
 
-### `internal:` telemetry pattern (Authentication errors)
+### `internal`: the reserved word no wire carries
 
-Server-side auth code tags `details` with WHICH check failed, without telling
-the client:
+Server code tags `details` with WHICH check failed, without telling the
+client:
 
 ```typescript
 throw ShipError.authentication('Authentication failed', { internal: 'jwt_missing_subject' });
 ```
 
-`toResponse()` strips the entire `details` object when `details.internal` is
-truthy on an Authentication error, so the wire carries the flat
+`toResponse()` never serializes `details.internal`, on any error: the key is
+dropped and every other key round-trips. An Authentication error carrying it
+serializes no `details` at all, so the wire carries the flat
 `{ error: 'authentication_failed', message: 'Authentication failed', status: 401 }`
-while the server keeps the tag for logs and tests. Other `details` keys
-round-trip normally. **Never put client-visible information under
-`internal`.** `details` is `unknown` everywhere; narrow at the read site:
+while the server keeps the tag for logs and tests. **Never put
+client-visible information under `internal`.** `details` is `unknown` everywhere; narrow at the read site:
 `(error.details as { internal?: string } | undefined)?.internal`.
 
 ### Error Flow
@@ -654,7 +654,7 @@ Seven composition rules, each structural:
 - **One operation, one verb, and destruction is `delete`**: in the method, the
   command, the response type, the activity event and the sentence a user
   reads. HTTP says `DELETE`, the persisted activity events are
-  `deployment.delete`, `domain.delete`, `token.delete`, `account.delete`, and
+  `deployment.delete`, `domain.delete`, `token.delete`, and
   it is the accurate word (`Map.prototype.delete` destroys; `Element.remove()`
   detaches). **A method whose name disagrees with its own return type is the
   drift announcing itself.**
