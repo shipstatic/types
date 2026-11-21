@@ -625,7 +625,7 @@ Seven composition rules, each structural:
 - **An acknowledgement is a projection of the resource.** Where a mutation
   leaves no entity, it answers with the resource noun carrying the item's key,
   plus the resource's own state field where the state changed
-  (`DeploymentDeleteResponse.status`, `AccountDeleteResponse.plan`); a hard
+  (`DeploymentDeleteResponse.status`, `AccountDeleteResponse.deleted`); a hard
   delete is the key alone (`DomainDeleteResponse`, `TokenDeleteResponse`). No
   `message`: every surface composes its own copy. **The test is what the field
   IS, not how predictable its value is**: `status` is always `'deleting'` but

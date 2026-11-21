@@ -1206,11 +1206,11 @@ export interface PlanDestination {
 }
 
 /**
- * Acknowledgement of `DELETE /account` (202). Termination is asynchronous —
- * a cleanup consumer finishes the job — so the account survives long enough
- * to state the plan it is transitioning through. `plan` is the account's
- * state field, the way `status` is a deployment's. See
- * {@link DeploymentDeleteResponse} for the law.
+ * Acknowledgement of `DELETE /account` (202). Termination is asynchronous:
+ * the deletion is accepted now and finished afterwards, so the answer states
+ * the instant it was asked for. `deleted` is the account's state field, the
+ * way `status` is a deployment's. See {@link DeploymentDeleteResponse} for
+ * the law.
  */
 export interface AccountDeleteResponse {
   /** The account whose deletion was accepted */
