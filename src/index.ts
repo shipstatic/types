@@ -1757,6 +1757,14 @@ export interface BuildFailureDetails {
   log: string;
 }
 
+/** What of an error's `details` crosses the wire: everything but `internal`. */
+function wireDetails(type: ErrorType, details: unknown): unknown {
+  if (typeof details !== 'object' || details === null || !('internal' in details)) return details;
+  if (type === ErrorType.Authentication) return undefined;
+  const { internal: _internal, ...rest } = details as Record<string, unknown>;
+  return Object.keys(rest).length > 0 ? rest : undefined;
+}
+
 /**
  * Simple unified error class for both API and SDK.
  *
@@ -1767,14 +1775,6 @@ export interface BuildFailureDetails {
  * a cause and where no serializer reaches. The three factories that can be
  * handed one (`network`, `timeout`, `file`) take it as their third argument.
  */
-/** What of an error's `details` crosses the wire: everything but `internal`. */
-function wireDetails(type: ErrorType, details: unknown): unknown {
-  if (typeof details !== 'object' || details === null || !('internal' in details)) return details;
-  if (type === ErrorType.Authentication) return undefined;
-  const { internal: _internal, ...rest } = details as Record<string, unknown>;
-  return Object.keys(rest).length > 0 ? rest : undefined;
-}
-
 export class ShipError extends Error {
   constructor(
     public readonly type: ErrorType,
@@ -4226,7 +4226,7 @@ export type ActivityEvent =
   | 'account.update'
   | 'account.key.generate'
   | 'account.plan.transition'
-  | 'account.delete' // Internal, RETIRED in 3.20.0: no longer written (a deletion's record is the account's `deleted` instant, and its rows go with it). Kept so rows written before then stay typed until retention ages them out (90 days); delete it in the first release after 2027-03-01
+  | 'account.delete' // Internal, RETIRED in 3.20.0: no longer written (a deletion's record is the account's `deleted` instant, and its rows go with it). Kept so rows written before then stay typed while retention holds them; delete it in the first release after 2027-03-01
   // Person events (internal). `session.create` is a sign-in: a session born
   // to a person, on their own account, with the request's address and
   // country beside it; a session ending writes nothing, since expiry ends
@@ -4285,7 +4285,7 @@ export type ActivityEvent =
   // may become)
   | 'checkout.open'
   // Admin events (not user-visible)
-  | 'admin.account.plan.update' // RETIRED in 3.20.0: no longer written (an operator's plan move is one `account.plan.transition` row whose `meta.reason` is `admin`). Kept so rows written before then stay typed until retention ages them out (90 days); delete it in the first release after 2027-03-01
+  | 'admin.account.plan.update' // RETIRED in 3.20.0: no longer written (an operator's plan move is one `account.plan.transition` row whose `meta.reason` is `admin`). Kept so rows written before then stay typed while retention holds them; delete it in the first release after 2027-03-01
   | 'admin.account.suspended.update'
   | 'admin.account.ref.update'
   | 'admin.account.labels.update'
