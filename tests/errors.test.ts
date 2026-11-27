@@ -1049,6 +1049,13 @@ describe('assertShipJsonSyntax', () => {
     expect(() => assertShipJsonSyntax('﻿{"cleanUrls":true}')).not.toThrow();
   });
 
+  it('names the file in each refusal', () => {
+    expect(() => assertShipJsonSyntax('{"redirects":[],}')).toThrow(
+      /^ship\.json is not valid JSON: /,
+    );
+    expect(() => assertShipJsonSyntax('[]')).toThrow('ship.json must contain a JSON object');
+  });
+
   it('rejects valid JSON that is not an object', () => {
     for (const text of ['[]', '"a string"', '42', 'null', 'true']) {
       expect(() => assertShipJsonSyntax(text), text).toThrow(ShipError);

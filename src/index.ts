@@ -3144,9 +3144,12 @@ export function assertShipJsonSyntax(text: string): void {
   try {
     parsed = JSON.parse(withoutBom);
   } catch (error) {
-    throw ShipError.config(`invalid JSON format in config: ${(error as Error).message}`, {
-      filePath: DEPLOYMENT_CONFIG_FILENAME,
-    });
+    throw ShipError.config(
+      `${DEPLOYMENT_CONFIG_FILENAME} is not valid JSON: ${(error as Error).message}`,
+      {
+        filePath: DEPLOYMENT_CONFIG_FILENAME,
+      },
+    );
   }
 
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
