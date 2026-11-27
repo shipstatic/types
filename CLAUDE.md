@@ -660,9 +660,9 @@ Seven composition rules, each structural:
   drift announcing itself.**
 
 **One response is outside the shapes, recorded rather than reshaped.**
-`GET /deployments/:deployment/config` answers the caller's own `ship.json`,
-re-parsed through the public schema from the original the platform keeps, or
-`null` when there is none. It projects no platform entity and has no type here,
+`GET /deployments/:deployment/config` answers the caller's own `ship.json` as
+written, the JSON of the original the platform keeps, or `null` when there is
+none. It projects no platform entity and has no type here,
 since its schema is ship.json's, which the API owns; an envelope would make a
 caller unwrap a platform shape to reach a document the platform did not
 author. `null`, not a 404, because `Deployment.config` already answers "is

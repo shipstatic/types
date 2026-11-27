@@ -3133,9 +3133,9 @@ export const DEPLOYMENT_CONFIG_FILENAME = 'ship.json';
  * diverging there would reintroduce exactly the false rejection this
  * function exists to avoid.
  *
- * @throws {ShipError} `ErrorType.Config` — the same type the server's own
- * config rejection carries, so the error contract is identical wherever the
- * failure is detected.
+ * @throws {ShipError} `ErrorType.Config`. The server's own refusal of a
+ * config is a 400 of `ErrorType.Validation` (`validation_failed`), so the two
+ * places a config can fail answer with different types.
  */
 export function assertShipJsonSyntax(text: string): void {
   const withoutBom = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
